@@ -134,6 +134,7 @@ actor SQLiteDatabase {
     var statisticsCache = StatisticsDatabaseCache()
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    var vocabularyObservers: [UUID: AsyncStream<Void>.Continuation] = [:]
     private var learningTimeObservers: [UUID: AsyncStream<Void>.Continuation] = [:]
     var maturityProjection = MaturityProjection()
     var maturityStatistics = MaturityReadStatistics()
@@ -396,6 +397,16 @@ actor SQLiteDatabase {
             // UUID's canonical representation contains no SQL metacharacters.
             candidateScope = ids.isEmpty ? "0 = 1" : "candidate.deck_id IN (" + ids.map { "'" + $0.uuidString + "'" }.sorted().joined(separator: ",") + ")"
         }
+        let ranking: (String) -> String = { alias in
+            """
+            (\(alias).due_at < cards.due_at OR (\(alias).due_at = cards.due_at AND CASE
+                WHEN \(alias).template_id = '\(VocabularySet.readingID.uuidString)'
+                     AND cards.template_id = '\(VocabularySet.productionID.uuidString)' THEN 1
+                WHEN \(alias).template_id = '\(VocabularySet.productionID.uuidString)'
+                     AND cards.template_id = '\(VocabularySet.readingID.uuidString)' THEN 0
+                ELSE \(alias).id < cards.id END))
+            """
+        }
         if compact {
             // Count reads need only existence. Visit each family/card once and
             // combine its three exclusion reasons instead of traversing the
@@ -421,8 +432,7 @@ actor SQLiteDatabase {
                         relative_card.is_suspended = 0 AND relative_card.due_at <= \(instant)
                         AND (
                             relative_card.phase != 'new'
-                            OR ((\(relatedScope)) AND (relative_card.due_at < cards.due_at
-                                OR (relative_card.due_at = cards.due_at AND relative_card.id < cards.id)))
+                            OR ((\(relatedScope)) AND \(ranking("relative_card")))
                         )
                         AND \(usableStudyCardSQL("relative_card"))
                     )
@@ -458,7 +468,7 @@ actor SQLiteDatabase {
                       AND \(usableStudyCardSQL("candidate"))
                       AND candidate.is_suspended = 0 AND candidate.phase = 'new' AND candidate.due_at <= \(instant)
                       AND (\(candidateScope))
-                      AND (candidate.due_at < cards.due_at OR (candidate.due_at = cards.due_at AND candidate.id < cards.id))
+                      AND \(ranking("candidate"))
                 )
               )
         )
@@ -805,6 +815,10 @@ actor SQLiteDatabase {
                 if try tableExists("cards"), try columnExists("memory",in:"cards"), try columnExists("scheduling_history_origin",in:"cards"),try tableExists("api_transaction_context"),try tableExists("review_reverts") {
                     for sql in Schema.statisticsTriggerStatements {try execute(sql)}
                 }
+            }
+
+            if current < 35 {
+                for sql in Schema.vocabularyStatements { try execute(sql) }
             }
 
             try execute(
@@ -5109,7 +5123,7 @@ actor SQLiteDatabase {
             } else {
                 try updateCardMemory(cardID, memory: memoryAfter)
             }
-            try insertReviewLog(log, memoryBefore: memoryBefore)
+            try insertReviewLog(try vocabularyReview(log), memoryBefore: memoryBefore)
             if let introducedDeckID, let introductionStudyDay {
                 try execute(
                     """
@@ -5538,7 +5552,7 @@ actor SQLiteDatabase {
             } else {
                 try updateCardMemory(cardID, memory: memoryAfter)
             }
-            try insertReviewLog(log, memoryBefore: memoryBefore)
+            try insertReviewLog(try vocabularyReview(log), memoryBefore: memoryBefore)
             if let introducedDeckID, let introductionStudyDay {
                 try execute(
                     """

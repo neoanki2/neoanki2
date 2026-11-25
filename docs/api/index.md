@@ -2,7 +2,7 @@
 title: Local API reference
 description: Generated endpoint and schema reference for the NeoAnki loopback automation API.
 audience: api
-contract_digest: sha256:6ff4618f78e4f51af1ae89bb6a454366e671c0926b57417d49e09257f2aa5b27
+contract_digest: sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5
 nav_order: 3
 permalink: /api/
 ---
@@ -29,7 +29,7 @@ in the [API design requirements]({{ '/LOCAL_API/' | relative_url }}).
 - [Cards and study]({{ '/api/cards-and-study/' | relative_url }}) — 14 operations
 - [Scheduling]({{ '/api/scheduling/' | relative_url }}) — 3 operations
 - [Responses and media]({{ '/api/responses-and-media/' | relative_url }}) — 9 operations
-- [Vocabulary]({{ '/api/vocabulary/' | relative_url }}) — 13 operations
+- [Vocabulary]({{ '/api/vocabulary/' | relative_url }}) — 16 operations
 - [Import and export]({{ '/api/import-and-export/' | relative_url }}) — 10 operations
 - [Changes and events]({{ '/api/changes-and-events/' | relative_url }}) — 2 operations
 

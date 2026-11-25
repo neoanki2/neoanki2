@@ -191,6 +191,9 @@ pack until you choose it.
 
 These states are informational:
 
+- **Known Words is empty:** choose the language you are learning. The list
+  shows known vocabulary for that language. Use **Add Word** to mark a word
+  you already know.
 - **No decks yet:** create a top-level deck with **New Deck**. Items may still
   exist under **All Decks** or **Unassigned**.
 - **No Items Yet:** add an item; Card setups generate its cards.

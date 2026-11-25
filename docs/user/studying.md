@@ -313,6 +313,12 @@ at 30 minutes and remain subject to the 20 MB audio limit.
 
 Cloze cards show the surrounding text while concealing only the blank for the current cloze group. Choose **Show Answer** to reveal that blank. Distinct cloze groups generate distinct cards, so one cloze item can contribute several cards to a session.
 
+Vocabulary sets schedule two cards independently. The recognition card shows
+the target word in its example sentence and asks you to recall its meaning
+before revealing it. The production card hides the exact form in the sentence
+with a native Cloze blank and uses the saved meaning as a cue. Type the
+missing word to compare your answer with the original form before grading.
+
 ## Feedback and grading
 
 After reveal, NeoAnki2 may show:

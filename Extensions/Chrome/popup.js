@@ -184,3 +184,54 @@ init().catch(error => status(error.message, true)).finally(() => {
   controls();
   if (!draft?.pending) lookup?.search(draft.front, packId);
 });
+
+async function setupReadingControls() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  const translation = new Intl.DisplayNames([navigator.language], { type: 'language' });
+  for (const code of ['ar', 'de', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'nl', 'pl', 'pt', 'ru', 'sv', 'tr', 'uk', 'zh']) {
+    $('reading-languages').append(new Option(translation.of(code), code));
+  }
+  const send = async (type, attributes = {}) => {
+    const result = await chrome.runtime.sendMessage({ type, tabId: tab.id, ...attributes });
+    if (result?.error) {
+      const message = result.status === 403 ? 'Reconnect in Settings to approve Reading Mode.' : result.error;
+      throw new Error(message);
+    }
+    return result?.value;
+  };
+  const { readingLanguages = {} } = await readState();
+  let mode = await send('neoankiReadingStatus');
+  let pageLanguage = '';
+  if (!mode && !readingLanguages.language && /^https?:/.test(tab.url || '')) {
+    try {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id }, func: () => document.documentElement.lang,
+      });
+      pageLanguage = result?.result?.split('-')[0] || '';
+    } catch { /* Restricted documents require an explicit choice on a supported page. */ }
+  }
+  $('reading-language').value = mode?.language || readingLanguages.language || pageLanguage;
+  $('meaning-language').value = mode?.meaningLanguage || readingLanguages.meaningLanguage || navigator.language.split('-')[0];
+  function render() {
+    $('reading-toggle').textContent = mode ? 'Stop Reading Mode' : 'Start Reading Mode';
+    $('reading-language').disabled = Boolean(mode);
+    $('meaning-language').disabled = Boolean(mode);
+    if (mode) $('reading-mode').open = true;
+  }
+  render();
+  $('reading-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    $('reading-toggle').disabled = true;
+    try {
+      mode = await send(mode ? 'neoankiReadingStop' : 'neoankiReadingStart', {
+        language: $('reading-language').value, meaningLanguage: $('meaning-language').value,
+      });
+      $('reading-status').textContent = mode ? 'Reading Mode is on in this tab.' : '';
+      render();
+    } catch (error) {
+      $('reading-status').textContent = error.message;
+    } finally { $('reading-toggle').disabled = false; }
+  });
+}
+setupReadingControls().catch(error => { $('reading-status').textContent = error.message; });

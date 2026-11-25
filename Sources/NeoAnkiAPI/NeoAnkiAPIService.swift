@@ -247,6 +247,8 @@ public actor NeoAnkiAPIService {
                         "study.reviews",
                         "study.responses",
                         "vocabulary.lookup",
+                        "vocabulary.known-words",
+                        "vocabulary.card-sets",
                         "vocabulary.pack-lifecycle",
                     ]
                 )
@@ -367,6 +369,23 @@ public actor NeoAnkiAPIService {
         case (.post, "/v1/exports"):
             try require(grant, scope: .libraryExport)
             return try await createExportJob(request, grant: grant)
+        case (.get, "/v1/known-words"):
+            return try await listKnownWords(request)
+        case (.post, "/v1/known-words/judgments"):
+            let input = try decodeVocabularyInput(VocabularyJudgmentInput.self, request: request)
+            let changeID = try vocabularyMutationID(request, grant: grant)
+            return try await mapVocabularyErrors {
+                let result = try await personalVocabulary().setVocabularyJudgment(input.judgment, for: input.term, changeID: changeID)
+                return try .json(VocabularyJudgmentReceipt(id: result.id.uuidString.lowercased(),
+                    term: result.term, judgment: result.judgment, changedAt: result.changedAt))
+            }
+        case (.post, "/v1/vocabulary-sets"):
+            let input = try decodeVocabularyInput(VocabularySetDraft.self, request: request)
+            let itemID = try vocabularyMutationID(request, grant: grant)
+            return try await mapVocabularyErrors {
+                let result = try await personalVocabulary().createVocabularySet(input, id: itemID)
+                return try .json(status: 201, VocabularySetReceipt(itemId: result.uuidString.lowercased(), cardCount: 2))
+            }
         case (.get, "/v1/vocabulary-packs"):
             try require(grant, scope: .vocabularyRead)
             return try await listVocabularyPacks(request)
@@ -2912,6 +2931,77 @@ public actor NeoAnkiAPIService {
             )
         }
         return key
+    }
+
+    private struct VocabularyJudgmentInput: Decodable {
+        let term: VocabularyTerm
+        let judgment: VocabularyJudgment
+    }
+
+    private struct VocabularyJudgmentReceipt: Encodable {
+        let id: String
+        let term: VocabularyTerm
+        let judgment: VocabularyJudgment
+        let changedAt: Date
+    }
+
+    private struct VocabularySetReceipt: Encodable {
+        let itemId: String
+        let cardCount: Int
+    }
+
+    private func personalVocabulary() throws -> any PersonalVocabulary {
+        guard let vocabulary = store as? any PersonalVocabulary else {
+            throw APIServiceError.notFound("Known Words is unavailable in this library.")
+        }
+        return vocabulary
+    }
+
+    private func listKnownWords(_ request: APIRequest) async throws -> APIResponse {
+        let limit = try pageLimit(request.query)
+        let route = collectionRouteKey(path: request.path, query: request.query)
+        let offset = if let cursor = request.query["cursor"]?.first {
+            try await decodeCursor(cursor, route: route)
+        } else { 0 }
+        let language = request.query["language"]?.first
+        if let language {
+            guard VocabularyTerm.isLanguageCode(language) else {
+                throw APIServiceError.validation("Choose a learning language.", pointer: "/query/language")
+            }
+        }
+        let statuses = try await personalVocabulary().vocabularyStatuses(language: language)
+        let values = Array(statuses.dropFirst(offset).prefix(limit))
+        let next = offset + values.count
+        let cursor = next < statuses.count ? try await encodedCursor(route: route, offset: next) : nil
+        return try .json(APICollection(data: values, page: .init(nextCursor: cursor, limit: limit)))
+    }
+
+    private func decodeVocabularyInput<T: Decodable>(_ type: T.Type, request: APIRequest) throws -> T {
+        guard let value = try? APIJSON.decoder.decode(type, from: request.body) else {
+            throw APIServiceError.validation("Review the vocabulary request fields.")
+        }
+        return value
+    }
+
+    private func vocabularyMutationID(_ request: APIRequest, grant: APIClientGrant) throws -> UUID {
+        let key = try requiredIdempotencyKey(request)
+        let input = "\(grant.id.uuidString)|\(request.path)|\(key)"
+        let digest = APICrypto.sha256Hex(Data(input.utf8))
+        let widths = [8, 4, 4, 4, 12]
+        var start = digest.startIndex
+        let sections = widths.map { width in
+            let end = digest.index(start, offsetBy: width)
+            defer { start = end }
+            return String(digest[start..<end])
+        }
+        return UUID(uuidString: sections.joined(separator: "-"))!
+    }
+
+    private func mapVocabularyErrors<T>(_ operation: () async throws -> T) async throws -> T {
+        do { return try await operation() }
+        catch VocabularySetError.idConflict { throw DatabaseError.idempotencyConflict }
+        catch let error as VocabularySetError { throw APIServiceError.validation(error.localizedDescription) }
+        catch let error as ClozeValidationError { throw APIServiceError.validation(error.localizedDescription) }
     }
 
     private func boolQuery(_ query: [String: [String]], key: String) throws -> Bool? {

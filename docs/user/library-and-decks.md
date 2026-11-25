@@ -74,6 +74,11 @@ From **All Decks**, capture restores the last destination and dictionary pair,
 or asks you to choose a destination on first use. Renaming a deck preserves its
 saved dictionary setup because the pairing uses the deck's stable identity.
 
+Opening **Known Words** shows the vocabulary list for the selected learning
+language. Marking a word as known leaves existing cards and due dates intact.
+If you choose **Create Cards**, the new set belongs to the deck you select or
+to **Unassigned**.
+
 The app icon's due-count badge always uses **All Decks**, including Unassigned.
 It counts cards available to study, excluding suspended cards and new cards
 deferred by daily limits. Changing a deck's limit updates that total; selecting

@@ -29,6 +29,7 @@ public actor OfflineFirstSyncService: SyncService {
     private let transport: any CloudSyncTransport
     private let metadataStore: SyncMetadataStore
     private let statistics: StatisticsSyncService?
+    private let knownWords: VocabularyJudgmentSyncService?
     private let learningTime: LearningTimeSyncService?
     private let backupURL: @Sendable () -> URL
     private let recoveryPollInterval: Duration
@@ -37,7 +38,7 @@ public actor OfflineFirstSyncService: SyncService {
     private var currentStatus: SyncStatus = .offline
     private var currentIssues: [SyncIssue] = []
     private enum Work: Hashable, CaseIterable {
-        case upload, download, media, statistics, learningTime
+        case upload, download, media, statistics, learningTime, knownWords
 
         var usesLibraryTransport: Bool { self == .upload || self == .download || self == .media }
     }
@@ -59,6 +60,7 @@ public actor OfflineFirstSyncService: SyncService {
     private var automaticSyncTask: Task<Void, Never>?
     private var activityPollTask: Task<Void, Never>?
     private var localChangeMonitor: Task<Void, Never>?
+    private var knownWordsMonitor: Task<Void, Never>?
     private var learningTimeMonitor: Task<Void, Never>?
     private var localSyncTask: Task<Void, Never>?
     private var networkMonitor: NWPathMonitor?
@@ -79,6 +81,7 @@ public actor OfflineFirstSyncService: SyncService {
         metadataStore: SyncMetadataStore,
         learningTime: LearningTimeSyncService? = nil,
         statistics: StatisticsSyncService? = nil,
+        knownWords: VocabularyJudgmentSyncService? = nil,
         recoveryPollInterval: Duration = .seconds(3),
         backupURL: @escaping @Sendable () -> URL
     ) {
@@ -88,6 +91,7 @@ public actor OfflineFirstSyncService: SyncService {
         self.metadataStore = metadataStore
         self.learningTime = learningTime
         self.statistics = statistics
+        self.knownWords = knownWords
         self.backupURL = backupURL
         self.recoveryPollInterval = recoveryPollInterval
         self.timing = .continuous
@@ -110,6 +114,7 @@ public actor OfflineFirstSyncService: SyncService {
         self.metadataStore = metadataStore
         self.learningTime = nil
         self.statistics = nil
+        self.knownWords = nil
         self.backupURL = backupURL
         self.recoveryPollInterval = recoveryPollInterval
         self.timing = timing
@@ -119,7 +124,7 @@ public actor OfflineFirstSyncService: SyncService {
     public func start() async {
         await startMonitoring()
         guard isStarted else { return }
-        request(.upload, .download, .media, .statistics, .learningTime)
+        request(.upload, .download, .media, .statistics, .learningTime, .knownWords)
         await wait(for: [.upload, .download])
     }
 
@@ -133,6 +138,16 @@ public actor OfflineFirstSyncService: SyncService {
                 for await cursor in stream {
                     guard !Task.isCancelled else { return }
                     await self?.scheduleLocalSync(after: cursor)
+                }
+            }
+            if let knownWords {
+                let changes = await knownWords.committedChanges()
+                guard generation == lifecycle else { return }
+                knownWordsMonitor = Task { [weak self] in
+                    for await _ in changes {
+                        guard !Task.isCancelled else { return }
+                        await self?.request(.knownWords)
+                    }
                 }
             }
             if let learningTime {
@@ -154,7 +169,7 @@ public actor OfflineFirstSyncService: SyncService {
         guard self.foreground != foreground else { return }
         self.foreground = foreground
         configureForegroundTimers()
-        if foreground, isStarted { request(.download, .upload, .media, .statistics, .learningTime) }
+        if foreground, isStarted { request(.download, .upload, .media, .statistics, .learningTime, .knownWords) }
     }
 
     public func receiveRemoteChanges(_ scope: SyncRemoteScope) async -> SyncRemoteResult {
@@ -165,6 +180,7 @@ public actor OfflineFirstSyncService: SyncService {
         case .library: .download
         case .statistics: .statistics
         case .learningTime: .learningTime
+        case .knownWords: .knownWords
         }
         let before = appliedGenerations[work, default: 0]
         request(work)
@@ -177,12 +193,12 @@ public actor OfflineFirstSyncService: SyncService {
     public func synchronize() async {
         let core: Set<Work> = [.upload, .download]
         let alreadyRunning = core.contains { workers[$0] != nil }
-        request(.upload, .download, .media, .statistics, .learningTime)
+        request(.upload, .download, .media, .statistics, .learningTime, .knownWords)
         if !alreadyRunning { await wait(for: Set(Work.allCases)) }
     }
 
     public func synchronizeAndWait() async {
-        request(.upload, .download, .media, .statistics, .learningTime)
+        request(.upload, .download, .media, .statistics, .learningTime, .knownWords)
         await wait(for: Set(Work.allCases))
     }
 
@@ -223,7 +239,7 @@ public actor OfflineFirstSyncService: SyncService {
                 await self?.pollLibrary()
             }
         }
-        if statistics != nil || learningTime != nil {
+        if statistics != nil || learningTime != nil || knownWords != nil {
             activityPollTask = Task { [weak self] in
                 while !Task.isCancelled {
                     do { try await scheduler.sleep(.seconds(30), .activityPoll) }
@@ -242,7 +258,7 @@ public actor OfflineFirstSyncService: SyncService {
 
     private func pollActivity() {
         guard foreground else { return }
-        request(.statistics, .learningTime)
+        request(.statistics, .learningTime, .knownWords)
     }
 
     private func monitorConnectivity() {
@@ -264,13 +280,14 @@ public actor OfflineFirstSyncService: SyncService {
             for work in Work.allCases where retryAttempts[work] != nil {
                 retryUntil[work] = nil
             }
-            request(.download, .upload, .media, .statistics, .learningTime)
+            request(.download, .upload, .media, .statistics, .learningTime, .knownWords)
         }
     }
 
     private func request(_ work: Work...) {
         for operation in work {
             if (operation == .statistics && statistics == nil)
+                || (operation == .knownWords && knownWords == nil)
                 || (operation == .learningTime && learningTime == nil) { continue }
             if operation == .media && !(transport is any IncrementalLibraryTransport) { continue }
             if let deadline = retryUntil[operation], deadline > timing.now() { continue }
@@ -293,6 +310,8 @@ public actor OfflineFirstSyncService: SyncService {
                 case .media: try await transferMedia(generation: generation)
                 case .statistics:
                     if try await statistics?.synchronize() == true { appliedGenerations[work, default: 0] += 1 }
+                case .knownWords:
+                    if try await knownWords?.synchronize() == true { appliedGenerations[work, default: 0] += 1 }
                 case .learningTime:
                     if try await learningTime?.synchronize() == true { appliedGenerations[work, default: 0] += 1 }
                 }
@@ -711,6 +730,8 @@ public actor OfflineFirstSyncService: SyncService {
         activityPollTask = nil
         localChangeMonitor?.cancel()
         localChangeMonitor = nil
+        knownWordsMonitor?.cancel()
+        knownWordsMonitor = nil
         learningTimeMonitor?.cancel()
         learningTimeMonitor = nil
         localSyncTask?.cancel()
@@ -737,6 +758,7 @@ public actor OfflineFirstSyncService: SyncService {
         libraryReady = false
         currentStatus = .offline
         await transport.stop()
+        await knownWords?.stop()
         await learningTime?.stop()
         await statistics?.stop()
     }
@@ -827,6 +849,7 @@ public actor OfflineFirstSyncService: SyncService {
         if cloud?.code == .internalError {
             switch work {
             case .statistics: await statistics?.stop()
+            case .knownWords: await knownWords?.stop()
             case .learningTime: await learningTime?.stop()
             default:
                 libraryReady = false

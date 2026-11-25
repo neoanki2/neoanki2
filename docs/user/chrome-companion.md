@@ -1,6 +1,6 @@
 ---
 title: Chrome companion
-description: Turn selected web-page text into a NeoAnki2 card with local dictionary suggestions.
+description: Read with vocabulary highlights, mark known words, and turn web-page text into NeoAnki2 study cards.
 audience: user
 nav_order: 11
 parent: User Guide
@@ -46,6 +46,24 @@ unmatched phrases still allow manual answers.
 Selectable YouTube transcript text works with this same flow. Automatic caption
 capture, AI generation, audio, and bulk imports are outside this version.
 
+## Use Reading Mode
+
+Open the companion on a web page, expand **Reading Mode**, and choose your
+learning language and the language you want to use for meanings. Select
+**Start Reading Mode**. Dotted underlines mark unassessed vocabulary and solid
+underlines mark words you’re studying. Known words appear as ordinary text.
+Reading Mode stays on as you follow links on the same site in this tab. Use
+**Stop** to remove the highlights.
+
+Click an underlined word or select a phrase to open its actions. **I know this**
+records that you understand it while reading. Use **Undo** if you tapped by
+mistake. **Create card set** uses the selected word and its sentence to make
+one meaning-recall card and one Cloze card for producing the word. Review the
+meaning and Cloze preview before saving. The dictionary is optional.
+
+If you paired the companion before Reading Mode was added, reconnect in
+**Settings** and approve Known Words access in NeoAnki2.
+
 ## Recover an unfinished card
 
 Closing the popup preserves your draft. **Use selection** starts over with the
@@ -66,7 +84,7 @@ change your card setups.
 
 The extension reads selected text when invoked and connects only to IPv4
 loopback (`127.0.0.1`). It requests `library.read`, `items.write`, and
-`vocabulary.read`. Its token and unfinished draft are stored locally in Chrome,
+`vocabulary.read`. Reading Mode also uses \`known-words.read\` and \`known-words.write\`. Its token and unfinished draft are stored locally in Chrome,
 with access restricted to trusted extension contexts, rather than Chrome sync.
 Cards saved into NeoAnki2 follow the app's sync settings.
 

@@ -41,6 +41,9 @@ public struct LibraryFeatureFactory {
         try await (library as? any LibraryExtraStudying)?.availableExtraStudyCardCount(scope: scope) ?? 0
     }
 
+    public var personalVocabulary: (any PersonalVocabulary)? { library as? any PersonalVocabulary }
+    public var vocabularyDecks: any LibraryDeckManaging { library }
+
     public func makeSavedResponses() -> SavedResponsesFeatureModel { .init(library: library) }
     public func makeStatistics(scope: DeckScope = .allDecks, sessionID: UUID? = nil) -> StatisticsFeatureModel {
         .init(library: library, scope: scope, sessionID: sessionID)

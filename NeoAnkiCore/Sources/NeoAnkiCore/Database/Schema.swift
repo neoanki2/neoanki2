@@ -1,7 +1,23 @@
 import Foundation
 
 enum Schema {
-    static let version = 34
+    static let version = 35
+
+    static let vocabularyStatements = [
+        """
+        CREATE TABLE IF NOT EXISTS vocabulary_judgments (
+            sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT NOT NULL UNIQUE,
+            term_id TEXT NOT NULL,
+            language TEXT NOT NULL,
+            changed_at REAL NOT NULL,
+            outbound INTEGER NOT NULL,
+            payload BLOB NOT NULL
+        );
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_vocabulary_judgment_term ON vocabulary_judgments(term_id, changed_at DESC, id DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_vocabulary_judgment_language ON vocabulary_judgments(language);",
+    ]
 
     static let learningTimeStatements: [String] = [
         """
@@ -71,7 +87,7 @@ enum Schema {
         }
     }
 
-    static let createStatements: [String] = statisticsStatements + learningTimeStatements + [
+    static let createStatements: [String] = statisticsStatements + learningTimeStatements + vocabularyStatements + [
         """
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER NOT NULL

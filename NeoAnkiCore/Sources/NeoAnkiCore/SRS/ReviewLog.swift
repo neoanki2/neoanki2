@@ -21,6 +21,7 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
     /// Full scheduling provenance. Absent on records written before the
     /// versioned scheduler audit format was introduced.
     public let schedulingAudit: ReviewSchedulingAudit?
+    public let vocabularyPrompt: String?
 
     public init(
         id: UUID = UUID(),
@@ -32,7 +33,8 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
         phaseBefore: Phase,
         durationMs: Int,
         sequence: Int64? = nil,
-        schedulingAudit: ReviewSchedulingAudit? = nil
+        schedulingAudit: ReviewSchedulingAudit? = nil,
+        vocabularyPrompt: String? = nil
     ) {
         self.id = id
         self.cardID = cardID
@@ -44,9 +46,14 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
         self.durationMs = durationMs
         self.sequence = sequence
         self.schedulingAudit = schedulingAudit
+        self.vocabularyPrompt = vocabularyPrompt
     }
 
     func withSequence(_ sequence: Int64) -> ReviewLog {
+        withVocabularyPrompt(vocabularyPrompt, sequence: sequence)
+    }
+
+    func withVocabularyPrompt(_ prompt: String?, sequence: Int64? = nil) -> ReviewLog {
         ReviewLog(
             id: id,
             cardID: cardID,
@@ -56,14 +63,15 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
             scheduledDays: scheduledDays,
             phaseBefore: phaseBefore,
             durationMs: durationMs,
-            sequence: sequence,
-            schedulingAudit: schedulingAudit
+            sequence: sequence ?? self.sequence,
+            schedulingAudit: schedulingAudit,
+            vocabularyPrompt: prompt
         )
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, cardID, reviewedAt, rating, elapsedDays, scheduledDays
-        case phaseBefore, durationMs, sequence, schedulingAudit
+        case phaseBefore, durationMs, sequence, schedulingAudit, vocabularyPrompt
     }
 
     public init(from decoder: Decoder) throws {
@@ -81,7 +89,8 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
             schedulingAudit: try values.decodeIfPresent(
                 ReviewSchedulingAudit.self,
                 forKey: .schedulingAudit
-            )
+            ),
+            vocabularyPrompt: try values.decodeIfPresent(String.self, forKey: .vocabularyPrompt)
         )
     }
 }

@@ -29,7 +29,7 @@ package enum APIOpenAPI {
             if path.hasPrefix("/v1/study-responses") || path.hasPrefix("/v1/media") {
                 return .responses
             }
-            if path.hasPrefix("/v1/vocabulary") { return .vocabulary }
+            if path.hasPrefix("/v1/vocabulary") || path.hasPrefix("/v1/known-words") { return .vocabulary }
             if path.hasPrefix("/v1/imports") || path.hasPrefix("/v1/exports") {
                 return .transfers
             }
@@ -173,6 +173,7 @@ package enum APIOpenAPI {
             if isProtectedMutation {
                 let required = [
                     "POST /v1/items", "POST /v1/items/bulk", "POST /v1/reviews",
+                    "POST /v1/known-words/judgments", "POST /v1/vocabulary-sets",
                     "POST /v1/media", "POST /v1/cards/{id}/resets",
                     "DELETE /v1/study-responses/{id}",
                     "POST /v1/deck-deletion-plans/{id}/commits",
@@ -340,6 +341,10 @@ package enum APIOpenAPI {
         add("/v1/media/{sha256}", .head, .headMedia, authorization: .scope(.libraryRead), response: nil, responseContentType: "application/octet-stream")
         add("/v1/media/{sha256}", .get, .downloadMedia, authorization: .scope(.libraryRead), response: "Binary", responseContentType: "application/octet-stream")
         add("/v1/media/{sha256}/metadata", .get, .mediaMetadata, authorization: .scope(.libraryRead), response: "MediaMetadata")
+
+        add("/v1/known-words", .get, .listKnownWords, authorization: .scope(.knownWordsRead), response: "KnownWordCollection", query: ["language", "limit", "cursor"])
+        add("/v1/known-words/judgments", .post, .recordVocabularyJudgment, authorization: .scope(.knownWordsWrite), request: "VocabularyJudgmentInput", response: "VocabularyJudgmentChange")
+        add("/v1/vocabulary-sets", .post, .createVocabularySet, authorization: .scope(.itemsWrite), success: 201, request: "VocabularySetInput", response: "VocabularySetReceipt")
 
         add("/v1/vocabulary-packs", .get, .listVocabularyPacks, authorization: .scope(.vocabularyRead), response: "VocabularyPackCollection")
         add("/v1/vocabulary-packs/{id}", .get, .getVocabularyPack, authorization: .scope(.vocabularyRead), response: "VocabularyPack", successHeaders: ["ETag": vocabularyETagHeader])
@@ -557,7 +562,7 @@ package enum APIOpenAPI {
                 "library.read", "items.write", "decks.write", "schemas.write",
                 "study.review", "study.responses.read", "study.responses.delete",
                 "media.write", "library.import", "library.export",
-                "vocabulary.read", "vocabulary.write",
+                "vocabulary.read", "vocabulary.write", "known-words.read", "known-words.write",
                 "settings.write", "ui.control",
             ],
         ] as [String: Any]
@@ -642,6 +647,34 @@ package enum APIOpenAPI {
                 "id": uuid, "displayName": ["type": "string"],
                 "origin": ["type": ["string", "null"]], "scopes": array(scope, min: 1),
                 "createdAt": timestamp, "revision": revision,
+            ]),
+            "VocabularyTerm": object(["language", "expression"], [
+                "language": ["type": "string", "minLength": 2], "expression": ["type": "string", "minLength": 1],
+                "sense": ["type": ["string", "null"]],
+            ]),
+            "KnownWord": object(["term", "readingMature", "clozeMature", "hasCards"], [
+                "term": reference("VocabularyTerm"), "judgment": reference("VocabularyJudgment"),
+                "readingMature": ["type": "boolean"], "clozeMature": ["type": "boolean"], "hasCards": ["type": "boolean"],
+            ]),
+            "KnownWordCollection": object(["data", "page"], [
+                "data": array(reference("KnownWord")), "page": reference("PageInfo"),
+            ]),
+            "VocabularyJudgment": ["type": "string", "enum": ["known", "unfamiliar", "reviewHistory"]],
+            "VocabularyJudgmentInput": object(["term", "judgment"], [
+                "term": reference("VocabularyTerm"), "judgment": reference("VocabularyJudgment"),
+            ]),
+            "VocabularyJudgmentChange": object(["id", "term", "judgment", "changedAt"], [
+                "id": uuid, "term": reference("VocabularyTerm"), "judgment": reference("VocabularyJudgment"), "changedAt": timestamp,
+            ]),
+            "VocabularySetInput": object(["term", "meaning", "meaningLanguage", "sentence", "occurrence"], [
+                "term": reference("VocabularyTerm"), "meaning": ["type": "string"], "meaningLanguage": ["type": "string"],
+                "sentence": ["type": "string"], "occurrence": nonnegative,
+                "productionSentence": ["type": ["string", "null"]], "productionForm": ["type": ["string", "null"]],
+                "productionOccurrence": nonnegative, "acceptedVariants": array(["type": "string"], max: 16),
+                "source": ["type": ["string", "null"]], "deckID": uuid,
+            ]),
+            "VocabularySetReceipt": object(["itemId", "cardCount"], [
+                "itemId": uuid, "cardCount": ["type": "integer", "const": 2],
             ]),
             "VocabularyProvenance": object(["sourceId"], [
                 "sourceId": ["type": "string"],

@@ -1,5 +1,6 @@
 export const BASIC_ID = 'a2000001-0000-4000-8000-000000000001';
 export const SCOPES = ['library.read', 'items.write', 'vocabulary.read'];
+export const READING_SCOPES = ['known-words.read', 'known-words.write'];
 
 export function apiBase(port = 8766) {
   if (!/^\d+$/.test(String(port)) || Number(port) < 1024 || Number(port) > 65535) {
@@ -62,7 +63,7 @@ export async function allPages(api, path) {
   let cursor;
   const visited = new Set();
   do {
-    const page = await api(`${path}?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+    const page = await api(`${path}${path.includes('?') ? '&' : '?'}limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
     values.push(...page.data);
     cursor = page.page?.nextCursor;
     if (cursor && visited.has(cursor)) throw new Error('NeoAnki2 returned a repeated page. Reopen the extension to try again.');

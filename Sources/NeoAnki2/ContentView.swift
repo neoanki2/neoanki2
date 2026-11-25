@@ -459,6 +459,10 @@ struct ContentView: View {
                             isShowingSavedResponses = showing
                         }
                     ),
+                    isShowingKnownWords: Binding(
+                        get: { appSession.route == .knownWords },
+                        set: { updateRoute(active: $0, route: .knownWords) }
+                    ),
                     onDeleteAllUnassigned: {
                         Task {
                             _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
@@ -492,6 +496,7 @@ struct ContentView: View {
         if isStudying { return "Study" }
         if isManagingTemplates { return "Item Types" }
         if isShowingSavedResponses { return "Recordings" }
+        if appSession.route == .knownWords { return "Known Words" }
         if isAddingItem { return "Add Item" }
         return "NeoAnki2"
     }
@@ -690,6 +695,10 @@ struct ContentView: View {
                         Button("Back to Deck") { appSession.route = .scopeHome }
                     }
                 }
+        } else if appSession.route == .knownWords, let vocabulary = features.personalVocabulary {
+            KnownWordsView(vocabulary: vocabulary, decks: features.vocabularyDecks) {
+                await refreshLibrary(forceRefresh: true)
+            }
         } else if isShowingSavedResponses {
             SavedResponsesView(model: features.makeSavedResponses())
             .frame(maxWidth: .infinity, maxHeight: .infinity)

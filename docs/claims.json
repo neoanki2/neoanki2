@@ -11,10 +11,29 @@
       "video": 100000000
     },
     "allowedExtensions": {
-      "audio": ["aac", "caf", "m4a", "mp3", "wav"],
-      "image": ["heic", "jpeg", "jpg", "png", "tiff", "webp"],
-      "gif": ["gif"],
-      "video": ["m4v", "mov", "mp4"]
+      "audio": [
+        "aac",
+        "caf",
+        "m4a",
+        "mp3",
+        "wav"
+      ],
+      "image": [
+        "heic",
+        "jpeg",
+        "jpg",
+        "png",
+        "tiff",
+        "webp"
+      ],
+      "gif": [
+        "gif"
+      ],
+      "video": [
+        "m4v",
+        "mov",
+        "mp4"
+      ]
     }
   },
   "itemImport": {
@@ -94,7 +113,9 @@
   "articleAssertions": [
     {
       "article": "user/import-export.md",
-      "contains": ["Creation saves the new deck and its selected parent together."]
+      "contains": [
+        "Creation saves the new deck and its selected parent together."
+      ]
     },
     {
       "article": "user/content-and-media.md",

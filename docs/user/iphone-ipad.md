@@ -72,6 +72,11 @@ a persistent sidebar with the selected destination in the detail area. Rotate
 the device freely: compact layouts use tabs and regular layouts use the split
 view. System Back controls return through nested screens.
 
+Open **Library → Known Words**. Choose the learning
+language, then tap **Add Word**. **Mark Known** saves the word to that list.
+**Create Cards** uses an example sentence to make two study cards for the
+selected deck or Unassigned, including a Cloze card you answer by typing.
+
 When you return to the app, Home and deck screens check your local library
 for due cards. **Checking due cards…** appears while the first count is loading.
 The displayed count stays visible during later refreshes, including while

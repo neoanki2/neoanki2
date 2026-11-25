@@ -435,11 +435,15 @@ struct StudySessionView: View {
     @ViewBuilder
     private func interaction(for card: DueCard) -> some View {
         switch card.template.interaction {
-        case .reveal, .cloze, .imageOcclusion, .record:
+        case .cloze where !VocabularySet.supportsTypedResponse(card):
             EmptyView()
-        case .type:
+        case .reveal, .imageOcclusion, .record:
+            EmptyView()
+        case .type, .cloze:
             TextField("Type your answer", text: Binding(get: { session.typedAnswer }, set: { session.updateTypedAnswer($0) }), axis: .vertical)
                 .focused($typedAnswerFocused)
+                .autocorrectionDisabled(VocabularySet.supportsTypedResponse(card))
+                .textInputAutocapitalization(VocabularySet.supportsTypedResponse(card) ? .never : nil)
                 .textFieldStyle(.roundedBorder).submitLabel(.done).onSubmit { session.performPrimaryAction() }
                 .frame(maxWidth: 520).accessibilityLabel("Typed answer")
         case .choose:
@@ -508,6 +512,8 @@ struct StudySessionView: View {
 
     private var primaryActionLabel: String {
         switch session.currentCard?.template.interaction {
+        case .cloze where session.currentCard.map(VocabularySet.supportsTypedResponse) == true
+            && !session.typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty: "Check Answer"
         case .type: "Check Answer"
         case .choose: "Check Choice"
         case .arrange: "Check Order"

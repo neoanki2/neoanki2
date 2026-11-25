@@ -191,6 +191,8 @@ actor MobileSyncCoordinator: SyncService {
                     directory: paths.syncMetadataDirectory.appendingPathComponent("Learning Time", isDirectory: true)),
                 statistics: try await StatisticsSyncService.make(repository: repository,
                     directory: paths.syncMetadataDirectory.appendingPathComponent("Statistics", isDirectory: true)),
+                knownWords: try await VocabularyJudgmentSyncService.make(repository: repository,
+                    directory: paths.syncMetadataDirectory.appendingPathComponent("Known Words", isDirectory: true)),
                 backupURL: { [paths] in paths.backupURL }
             )
             guard generation == lifecycle, !Task.isCancelled else { return nil }

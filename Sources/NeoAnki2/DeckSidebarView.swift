@@ -16,6 +16,7 @@ enum DeckDragPayload {
 private enum LibrarySidebarDestination: Hashable {
     case scope(SidebarSelection)
     case recordings
+    case knownWords
     case statistics
 }
 
@@ -24,6 +25,7 @@ struct DeckSidebarView: View {
     @Binding var selection: SidebarSelection
     @Binding var isShowingStatistics: Bool
     @Binding var isShowingSavedResponses: Bool
+    @Binding var isShowingKnownWords: Bool
     var onDeleteAllUnassigned: () -> Void = {}
     var onDeckSettingsSaved: () async -> Void = {}
     var onDeckProgressReset: () async -> Void = {}
@@ -59,6 +61,8 @@ struct DeckSidebarView: View {
                                 tag: .allDecks
                             )
 
+                            sidebarRow(title: "Known Words", subtitle: nil, systemImage: "text.book.closed", destination: .knownWords)
+                                .accessibilityIdentifier("knownWordsSidebar")
                             sidebarRow(title: "Statistics", subtitle: nil, systemImage: "chart.bar.xaxis", destination: .statistics)
                                 .accessibilityIdentifier("statisticsSidebar")
                             sidebarRow(
@@ -151,6 +155,7 @@ struct DeckSidebarView: View {
                         parentID: newDeckParentID
                     ) {
                         isShowingSavedResponses = false
+                        isShowingKnownWords = false
                         selection = .deck(deck.id)
                     }
                 }
@@ -226,10 +231,18 @@ struct DeckSidebarView: View {
     private var sidebarSelection: Binding<LibrarySidebarDestination> {
         Binding(
             get: {
-                isShowingStatistics ? .statistics : isShowingSavedResponses ? .recordings : .scope(selection)
+                if isShowingKnownWords { return .knownWords }
+                if isShowingStatistics { return .statistics }
+                if isShowingSavedResponses { return .recordings }
+                return .scope(selection)
             },
             set: { destination in
+                if destination != .knownWords { isShowingKnownWords = false }
                 switch destination {
+                case .knownWords:
+                    isShowingStatistics = false
+                    isShowingSavedResponses = false
+                    isShowingKnownWords = true
                 case .statistics:
                     isShowingSavedResponses = false
                     isShowingStatistics = true

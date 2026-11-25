@@ -207,7 +207,7 @@ public protocol SyncService: Sendable {
 }
 
 public enum SyncRemoteScope: Sendable {
-    case library, statistics, learningTime
+    case library, statistics, learningTime, knownWords
 }
 
 public enum SyncRemoteResult: Sendable {

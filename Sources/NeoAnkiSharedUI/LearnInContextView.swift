@@ -29,6 +29,7 @@ import SwiftUI
 // A deck and an expression are the only inputs. Language, meanings, spans, and speech are automatic.
 public struct LearnInContextView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("vocabularyLearningLanguage") private var activeLearningLanguage = ""
     @State private var model: LearnInContextModel
     @State private var previewPlayback = ContextPreviewPlayback()
     @FocusState private var expressionFocused: Bool
@@ -73,6 +74,12 @@ public struct LearnInContextView: View {
                         }
                         .accessibilityLabel("Word or phrase")
                         .accessibilityIdentifier("context-expression")
+                        if let vocabulary = model.personalVocabulary,
+                           !model.draft.target.expression.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            let draft = model.vocabularySetDraft
+                            VocabularyCaptureActions(vocabulary: vocabulary, decks: model.vocabularyDecks,
+                                                     term: draft.term, preset: draft) {}
+                        }
                         if model.selectedExamples.isEmpty {
                             Button("Find Examples", systemImage: "text.magnifyingglass") {
                                 model.findExamples(); expressionFocused = false
@@ -150,7 +157,8 @@ public struct LearnInContextView: View {
             }
             .disabled(model.isSaving || model.isLoading)
             .task {
-                await model.start(deckID: deckID, expression: expression, language: language, meaning: meaning)
+                let learningLanguage = activeLearningLanguage.isEmpty ? nil : activeLearningLanguage
+                await model.start(deckID: deckID, expression: expression, language: language ?? learningLanguage, meaning: meaning)
                 expressionFocused = model.selectedExamples.isEmpty
             }
             .onChange(of: model.draft) { _, _ in model.checkpoint() }

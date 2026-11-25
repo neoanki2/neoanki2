@@ -10,7 +10,7 @@ private struct FixtureApprover: APIPairingApprover {
     func approve(_ request: APIPairingRequest) async -> Bool {
         request.displayName == "NeoAnki2 Chrome Companion"
             && request.origin?.hasPrefix("chrome-extension://") == true
-            && request.requestedScopes == [.libraryRead, .itemsWrite, .vocabularyRead]
+            && request.requestedScopes == [.libraryRead, .itemsWrite, .vocabularyRead, .knownWordsRead, .knownWordsWrite]
     }
 }
 

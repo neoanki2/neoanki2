@@ -57,7 +57,8 @@
         "NeoAnki2MobileUITests/MobileCardJourneyUITests/testCreateBrowseAndStudyBasicCardJourney",
         "NeoAnki2MobileUITests/MobileCardJourneyUITests/testSaveFromStudyEditorDismissesAndPersistsTheCorrection",
         "NeoAnki2MobileUITests/MobileStudyModesRedesignUITests/testExtraStudyFromRegularCompletionAndDeck",
-        "NeoAnki2MobileUITests/MobileAuthoringSurfaceUITests/testAuthoringTransferVocabularyAndSyncConsentSurfaces"
+        "NeoAnki2MobileUITests/MobileAuthoringSurfaceUITests/testAuthoringTransferVocabularyAndSyncConsentSurfaces",
+        "NeoAnki2MobileUITests/MobileNavigationUITests/testKnownWordsAndContextualVocabularyCapture"
       ]
     },
     {

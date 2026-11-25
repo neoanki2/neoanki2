@@ -549,7 +549,8 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
                         phaseBefore: log.phaseBefore,
                         durationMs: log.durationMs,
                         sequence: log.sequence,
-                        schedulingAudit: log.schedulingAudit
+                        schedulingAudit: log.schedulingAudit,
+                        vocabularyPrompt: log.vocabularyPrompt
                     ),
                     memoryBefore: review.memoryBefore,
                     introductionContext: review.introductionContext.map {

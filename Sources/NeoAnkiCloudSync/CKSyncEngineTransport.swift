@@ -115,6 +115,8 @@ public actor CKSyncEngineTransport: IncrementalLibraryTransport, CKSyncEngineDel
     public static let librarySubscriptionID = "neoanki-library-changes-v1"
     public static let statisticsZoneName = "NeoAnkiStatisticsV1"
     public static let statisticsSubscriptionID = "neoanki-statistics-changes-v1"
+    public static let knownWordsZoneName = "NeoAnkiKnownWordsV1"
+    public static let knownWordsSubscriptionID = "neoanki-known-words-changes-v1"
     public static let learningTimeZoneName = "NeoAnkiLearningTimeV1"
     public static let learningTimeSubscriptionID = "neoanki-learning-time-changes-v1"
 
@@ -137,6 +139,7 @@ public actor CKSyncEngineTransport: IncrementalLibraryTransport, CKSyncEngineDel
         switch notification.subscriptionID {
         case librarySubscriptionID: return .library
         case statisticsSubscriptionID: return .statistics
+        case knownWordsSubscriptionID: return .knownWords
         case learningTimeSubscriptionID: return .learningTime
         default: return nil
         }
@@ -190,7 +193,12 @@ public actor CKSyncEngineTransport: IncrementalLibraryTransport, CKSyncEngineDel
         self.metadataStore = metadataStore
         self.initialState = initialState
         zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
-        subscriptionID = zoneName == Self.statisticsZoneName ? Self.statisticsSubscriptionID : zoneName == Self.learningTimeZoneName ? Self.learningTimeSubscriptionID : Self.librarySubscriptionID
+        subscriptionID = switch zoneName {
+        case Self.statisticsZoneName: Self.statisticsSubscriptionID
+        case Self.learningTimeZoneName: Self.learningTimeSubscriptionID
+        case Self.knownWordsZoneName: Self.knownWordsSubscriptionID
+        default: Self.librarySubscriptionID
+        }
     }
 
     public static func make(metadataStore: SyncMetadataStore, zoneName: String = zoneName) async throws -> CKSyncEngineTransport {

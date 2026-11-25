@@ -2,7 +2,7 @@
 title: Vocabulary
 description: Generated NeoAnki local API operations for vocabulary.
 audience: api
-contract_digest: sha256:6ff4618f78e4f51af1ae89bb6a454366e671c0926b57417d49e09257f2aa5b27
+contract_digest: sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5
 parent: Local API reference
 permalink: /api/vocabulary/
 ---
@@ -11,6 +11,54 @@ permalink: /api/vocabulary/
 
 [API reference]({{ '/api/' | relative_url }}) · [OpenAPI JSON]({{ '/api/openapi.json' | relative_url }})
 
+## `GET /v1/known-words`
+
+List known words through the loopback-only NeoAnki API.
+
+- **Operation ID:** `listKnownWords`
+- **Authorization:** Bearer token with `known-words.read`
+- **Success:** `200` with [KnownWordCollection]({{ '/api/schemas/#schema-knownwordcollection' | relative_url }})
+- **Request body:** None
+- **Success headers:** None
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `language` — query; optional. The language query parameter.
+- `limit` — query; optional. Maximum number of results to return.
+- `cursor` — query; optional. Opaque cursor returned by the preceding page.
+
+### Example request
+
+```bash
+curl --request GET \
+  'http://127.0.0.1:8766/v1/known-words' \
+  --header 'Authorization: Bearer <token>'
+```
+## `POST /v1/known-words/judgments`
+
+Record vocabulary judgment through the loopback-only NeoAnki API.
+
+- **Operation ID:** `recordVocabularyJudgment`
+- **Authorization:** Bearer token with `known-words.write`
+- **Success:** `200` with [VocabularyJudgmentChange]({{ '/api/schemas/#schema-vocabularyjudgmentchange' | relative_url }})
+- **Request body:** [VocabularyJudgmentInput]({{ '/api/schemas/#schema-vocabularyjudgmentinput' | relative_url }})
+- **Success headers:** `X-NeoAnki-Change-Cursor`
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `Idempotency-Key` — header; required. Caller-generated key used to replay a mutation safely.
+
+### Example request
+
+```bash
+curl --request POST \
+  'http://127.0.0.1:8766/v1/known-words/judgments' \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '<request-json>'
+```
 ## `POST /v1/vocabulary-pack-imports`
 
 Create vocabulary pack import through the loopback-only NeoAnki API.
@@ -314,7 +362,31 @@ curl --request HEAD \
   'http://127.0.0.1:8766/v1/vocabulary-packs/{id}/media' \
   --header 'Authorization: Bearer <token>'
 ```
+## `POST /v1/vocabulary-sets`
 
-Contract digest: `sha256:6ff4618f78e4f51af1ae89bb6a454366e671c0926b57417d49e09257f2aa5b27`.
+Create vocabulary set through the loopback-only NeoAnki API.
+
+- **Operation ID:** `createVocabularySet`
+- **Authorization:** Bearer token with `items.write`
+- **Success:** `201` with [VocabularySetReceipt]({{ '/api/schemas/#schema-vocabularysetreceipt' | relative_url }})
+- **Request body:** [VocabularySetInput]({{ '/api/schemas/#schema-vocabularysetinput' | relative_url }})
+- **Success headers:** `X-NeoAnki-Change-Cursor`
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `Idempotency-Key` — header; required. Caller-generated key used to replay a mutation safely.
+
+### Example request
+
+```bash
+curl --request POST \
+  'http://127.0.0.1:8766/v1/vocabulary-sets' \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '<request-json>'
+```
+
+Contract digest: `sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._
