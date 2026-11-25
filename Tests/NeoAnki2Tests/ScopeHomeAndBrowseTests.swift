@@ -273,18 +273,21 @@ private func addItem(
 @Test @MainActor func browseSearchResultsTrackItemChanges() async throws {
     let (model, _, _) = try await makeModels()
     await model.load()
-    _ = await addItem(model, front: "France", back: "Paris")
-    _ = await addItem(model, front: "Francium", back: "Element 87")
+    try #require(await addItem(model, front: "France", back: "Paris"))
+    try #require(await addItem(model, front: "Francium", back: "Element 87"))
+    await model.awaitReadModels()
     model.searchText = "fran"
     await model.waitForPendingSearch()
     #expect(model.visibleItems.count == 2)
 
     let doomed = try #require(model.items.first { $0.title == "Francium" }?.id)
-    #expect(await model.deleteItem(id: doomed))
+    try #require(await model.deleteItem(id: doomed))
+    await model.awaitReadModels()
     await model.waitForPendingSearch()
     #expect(model.visibleItems.map(\.title) == ["France"])
 
-    _ = await addItem(model, front: "Frankfurt", back: "Germany")
+    try #require(await addItem(model, front: "Frankfurt", back: "Germany"))
+    await model.awaitReadModels()
     await model.waitForPendingSearch()
     #expect(model.visibleItems.map(\.title) == ["France", "Frankfurt"])
 
