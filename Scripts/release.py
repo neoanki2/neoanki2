@@ -267,24 +267,41 @@ class Release:
             commands.append(("", ["swift", "run", "neoanki-api-reference", "check"]))
         environment = os.environ.copy()
         environment["SDKROOT"] = run(["xcrun", "--sdk", "macosx", "--show-sdk-path"])
-        evidence = self.state.get("validation_progress", [])
-        for index, (prefix, command) in enumerate(commands):
-            log = self.directory / f"verify-{index}.log"
-            if index < len(evidence):
-                if sha(log) != evidence[index]["sha256"]:
-                    raise RuntimeError("Validation evidence changed")
-                continue
-            print("Verifying " + " ".join(command), flush=True)
-            try:
-                run(command, cwd=self.source / prefix, log=log, env=environment)
-            except Exception:
-                self.state["validation_failure"] = {"command": command, "log": log.name,
-                    "sha256": sha(log) if log.exists() else None}
-                self.save(remote=True)
-                raise
-            evidence.append({"command": command, "package": prefix, "log": log.name, "sha256": sha(log)})
-            self.state["validation_progress"] = evidence
-            self.save()
+        evidence = list(self.state.get("validation_progress", []))
+        evidence.extend([None] * (len(commands) - len(evidence)))
+        work = {}
+        for index, (package, command) in enumerate(commands):
+            saved = evidence[index]
+            if saved is None:
+                work.setdefault(package, []).append((index, command))
+            elif saved["command"] != command or sha(self.directory / saved["log"]) != saved["sha256"]:
+                raise RuntimeError("Validation evidence changed")
+
+        def verify_package(package, checks):
+            for index, command in checks:
+                log = self.directory / f"verify-{index}.log"
+                print("Verifying " + " ".join(command), flush=True)
+                try:
+                    run(command, cwd=self.source / package, log=log, env=environment)
+                except Exception:
+                    with self.lock:
+                        if "validation_failure" not in self.state:
+                            self.state["validation_failure"] = {"command": command, "log": log.name,
+                                "sha256": sha(log) if log.exists() else None}
+                            self.save(remote=True)
+                    raise
+                with self.lock:
+                    evidence[index] = {"command": command, "package": package, "log": log.name, "sha256": sha(log)}
+                    self.state["validation_progress"] = evidence
+                    self.save()
+
+        # The packages have separate SwiftPM build directories. Preserve
+        # command order within each package and checkpoint by original index.
+        if work:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(work)) as pool:
+                checks = [pool.submit(verify_package, package, commands) for package, commands in work.items()]
+                for check in concurrent.futures.as_completed(checks):
+                    check.result()
         self.state["validation"] = evidence
         self.save()
 

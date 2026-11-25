@@ -663,6 +663,55 @@ class RecoveryTests(unittest.TestCase):
         with patch.object(controller.time,'sleep',side_effect=AssertionError('error retried')):
             self.assertEqual(r.publish_until_ready(600),({'ios':'invalid binary'},{}))
         self.assertEqual(calls,['publish'])
+    def test_independent_packages_overlap_but_api_check_waits_for_root_tests(self):
+        release = self.release(["ios", "mac"])
+        with tempfile.TemporaryDirectory() as directory:
+            release.directory = release.source = Path(directory)
+            release.state.update(tests={"": ["RootTests"], "NeoAnkiCore": ["CoreTests"]},
+                                 changed_paths=["Sources/NeoAnkiAPI/Registry.swift"])
+            packages_started = threading.Barrier(2, timeout=5)
+            root_finished = threading.Event()
+
+            def run(args, *, cwd=None, log=None, env=None):
+                if args[0] == "xcrun":
+                    return "/SDK"
+                if args[1] == "test":
+                    packages_started.wait()
+                    if cwd == release.source:
+                        root_finished.set()
+                else:
+                    self.assertEqual(args, ["swift", "run", "neoanki-api-reference", "check"])
+                    self.assertTrue(root_finished.is_set())
+                log.write_text("passed")
+
+            with patch.object(controller, "run", side_effect=run):
+                release.validate()
+            self.assertEqual([item["package"] for item in release.state["validation"]], ["", "NeoAnkiCore", ""])
+            self.assertEqual([item["log"] for item in release.state["validation"]],
+                             ["verify-0.log", "verify-1.log", "verify-2.log"])
+
+    def test_resume_reuses_completed_core_check_while_root_is_pending(self):
+        release = self.release(["ios"])
+        with tempfile.TemporaryDirectory() as directory:
+            release.directory = release.source = Path(directory)
+            core_log = release.directory / "verify-1.log"
+            core_log.write_text("Core checks passed")
+            core_entry = {"command": ["swift", "test", "--parallel", "--filter", "CoreTests"],
+                          "package": "NeoAnkiCore", "log": core_log.name, "sha256": controller.sha(core_log)}
+            release.state.update(tests={"": ["RootTests"], "NeoAnkiCore": ["CoreTests"]}, changed_paths=[],
+                                 validation_progress=[None, core_entry])
+
+            def run(args, *, cwd=None, log=None, env=None):
+                if args[0] == "xcrun":
+                    return "/SDK"
+                self.assertEqual(cwd, release.source)
+                log.write_text("Root checks passed")
+
+            with patch.object(controller, "run", side_effect=run):
+                release.validate()
+            self.assertEqual(release.state["validation"][1], core_entry)
+            self.assertEqual(core_log.read_text(), "Core checks passed")
+
     def test_failed_verification_is_preserved_and_never_rerun(self):
         r=self.release(['ios'])
         with tempfile.TemporaryDirectory() as folder:

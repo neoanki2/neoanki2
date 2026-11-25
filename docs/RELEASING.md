@@ -85,8 +85,10 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
 2. Records that `main` SHA, then atomically reserves the version tag and a draft
    release. Builds run from a
    detached worktree pinned to that source, so later edits cannot contaminate them.
-3. Runs the headless test targets that depend on changed modules, once. A shared
-   Core change can select many unit suites; docs-only work selects no app release.
+3. Runs the headless test targets that depend on changed modules, once. The root
+   and Core packages run concurrently, and commands sharing a build directory
+   stay in order. A shared Core change can select many unit suites. Docs-only
+   work selects no app release.
 4. Builds unsigned Store archives and the notarized universal Homebrew DMG in
    parallel. Store exports use disposable signing Keychains. Signing contexts are
    serialized because Keychain search lists are shared OS state.
