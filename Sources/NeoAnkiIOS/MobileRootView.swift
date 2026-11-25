@@ -204,8 +204,11 @@ private struct MobileTabView: View {
             .toolbar(usesSidebar ? .hidden : .visible, for: .tabBar)
         }
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
-        .fullScreenCover(item: $model.activeStudy) { session in
-            StudySessionView(session: session, model: model)
+        .fullScreenCover(isPresented: Binding(
+            get: { model.activeStudy != nil },
+            set: { if !$0 { model.activeStudy = nil } }
+        )) {
+            ActiveStudyPresentation(model: model)
                 .dynamicTypeSize(dynamicTypeSize)
                 .environment(\.neoAnkiAccessibilityReduceMotionOverride, reduceMotionOverride)
         }
@@ -595,6 +598,18 @@ private struct ScopeRow: View {
 
 }
 
+/// Keeps one presentation mounted when a completed study opens an extra session.
+private struct ActiveStudyPresentation: View {
+    let model: MobileAppModel
+
+    var body: some View {
+        if let session = model.activeStudy {
+            StudySessionView(session: session, model: model)
+                .id(session.id)
+        }
+    }
+}
+
 private struct ScopeDetailView: View {
     @Environment(\.openWordCapture) private var openWordCapture
     @Environment(\.dismiss) private var dismiss
@@ -610,15 +625,32 @@ private struct ScopeDetailView: View {
         List {
             if let summary {
                 Section {
-                    DueNowCard(
-                        summary: summary,
-                        dueCount: model.dueCounts.count(for: scope.filter),
-                        loadState: model.dueCounts.state,
-                        hasStandaloneLesson: hasStandaloneLesson,
-                        retry: { Task { await model.dueCounts.refresh() } },
-                        isWorking: model.isStartingStudy,
-                        action: startStudy
-                    )
+                    VStack(alignment: .leading, spacing: 0) {
+                        DueNowCard(
+                            summary: summary,
+                            dueCount: model.dueCounts.count(for: scope.filter),
+                            loadState: model.dueCounts.state,
+                            hasStandaloneLesson: hasStandaloneLesson,
+                            retry: { Task { await model.dueCounts.refresh() } },
+                            isWorking: model.isStartingStudy,
+                            action: startStudy
+                        )
+                        if case .deck = scope, model.activeStudy == nil {
+                            ExtraStudyAction(
+                                revision: model.libraryRevision,
+                                regularStudyReady: (model.dueCounts.count(for: scope.filter) ?? 0) > 0 || hasStandaloneLesson,
+                                availability: { try await model.extraStudyAvailability(in: scope.filter) },
+                                prepare: { count in
+                                    let study = try await model.prepareExtraStudy(
+                                        scope: scope.filter, title: model.scopeTitle(scope), limit: count
+                                    )
+                                    return { model.activeStudy = study }
+                                }
+                            )
+                            .buttonStyle(.borderless)
+                            .padding(.horizontal, 20)
+                        }
+                    }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }

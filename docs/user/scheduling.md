@@ -92,7 +92,9 @@ reviews on their normal schedule.
 To pace unfamiliar material, Control-click a deck, choose **Deck Settings…**,
 and turn on **Limit new cards per day**. Existing decks are unlimited until you
 set a limit. A limit of **0** pauses new cards in that deck and its subdecks
-without hiding learning or review cards.
+without hiding learning or review cards. When you’re caught up,
+[Study Extra Cards](../studying/#study-extra-new-cards) can introduce a batch
+beyond that day’s limit, including a limit of **0**.
 
 The allowance is shared by the deck and its entire subtree. When you set a
 parent deck to 20, at most 20 new cards total are available from that parent and

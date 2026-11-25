@@ -61,8 +61,8 @@ struct StudySessionView: View {
                     } actions: {
                         Button("Try Again") { Task { await session.retryLoadingCards() } }
                     }
-                } else if session.isLoading {
-                    ProgressView("Preparing study session…")
+                } else if session.isLoading || (session.isExtraStudy && session.isPreparingQueue) {
+                    ProgressView(session.isExtraStudy ? "Loading extra cards…" : "Preparing study session…")
                 } else if session.isComplete {
                     completedSession
                 } else if let lesson = session.currentLesson {
@@ -78,8 +78,7 @@ struct StudySessionView: View {
                     studyCard(card)
                 }
             }
-            .navigationTitle(session.currentLesson != nil ? "Lesson" :
-                session.currentCard == nil ? session.title : "\(session.remainingCount) left")
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -177,6 +176,13 @@ struct StudySessionView: View {
         .onDisappear { recorder.cleanup() }
     }
 
+    private var navigationTitle: String {
+        if session.currentLesson != nil { return "Lesson" }
+        if session.currentCard == nil { return session.title }
+        let remaining = "\(session.remainingCount) left"
+        return session.isExtraStudy ? "Extra Study · \(remaining)" : remaining
+    }
+
     private var completedSession: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -184,12 +190,24 @@ struct StudySessionView: View {
                     .font(.largeTitle)
                     .foregroundStyle(.tint)
                     .accessibilityHidden(true)
-                Text("Session Complete")
+                Text(session.isExtraStudy ? "Extra Session Complete" : "Session Complete")
                     .font(.title.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
                 LearningTimeSaveStatusView()
 
                 VStack(alignment: .leading, spacing: 8) {
+                    if case .deck = session.sessionScope, !session.isExtraStudy {
+                        ExtraStudyAction(
+                            revision: model.libraryRevision,
+                            availability: { try await session.extraStudyAvailability() },
+                            prepare: { count in
+                                let study = try await model.prepareExtraStudy(
+                                    scope: session.sessionScope, title: session.title, limit: count
+                                )
+                                return { model.activeStudy = study }
+                            }
+                        )
+                    }
                     Button {
                         model.showStatistics(scope: session.sessionScope, sessionID: session.learningTime.sessionID)
                         dismiss()

@@ -147,6 +147,18 @@ opened on an empty queue shows **Nothing Due Right Now**.
 
 [![The revealed answer and grading controls]({{ site.baseurl }}/assets/screenshots/study-answer.png)]({{ site.baseurl }}/assets/screenshots/study-answer.png)
 
+## Study extra new cards
+
+When you’re caught up in a deck, choose **Study Extra Cards** on the deck
+screen or at the end of its regular study session. The action appears when a
+daily new-card limit is holding back cards in that deck or its subdecks.
+
+Choose the number of cards and select **Start Extra Session**. You can use this
+one-time override even when the deck’s limit is **0**. Your saved limit still
+applies to regular study. Extra cards follow the normal scheduling and spacing
+rules, and grades save as you go. If you end early, you can start another batch
+from the deck whenever extra cards are available.
+
 ## Study queue order
 
 Independent cards use learned-before-new ordering, with learning and repair

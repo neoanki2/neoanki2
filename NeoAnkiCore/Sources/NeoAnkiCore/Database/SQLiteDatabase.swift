@@ -279,6 +279,86 @@ actor SQLiteDatabase {
         }
     }
 
+    private func extraStudyScope(_ scope: DeckScope) throws -> CardScope {
+        guard case let .deck(id, includeDescendants) = scope else { return .decks([]) }
+        guard includeDescendants else { return .decks([id]) }
+        let rows = try query("""
+            WITH RECURSIVE subtree(id) AS (
+                SELECT id FROM decks WHERE id = ?
+                UNION
+                SELECT decks.id FROM decks JOIN subtree ON decks.parent_id = subtree.id
+            )
+            SELECT id FROM subtree;
+            """, bindings: [.text(id.uuidString)])
+        return .decks(Set(rows.compactMap { ($0["id"] as? String).flatMap(UUID.init(uuidString:)) }))
+    }
+
+    private func extraStudyCandidates(
+        scope: CardScope, asOf now: Date
+    ) throws -> (sql: String, bindings: [Binding])? {
+        guard case let .decks(ids) = scope, !ids.isEmpty else { return nil }
+        let day = StudyDay.key(for: now, rolloverMinutes: try studyDayRollover())
+        let regular = try eligibleDueCardsCTE(scope: scope, asOf: now, studyDay: day, countsOnly: true)
+        guard try query(regular.sql + " SELECT 1 FROM eligible_due LIMIT 1;", bindings: regular.bindings).isEmpty
+        else { return nil }
+        // With the regular queue empty, any candidate admitted by removing only
+        // the daily caps was held back by a cap.
+        return try uncappedNewStudyCandidates(scope: scope, asOf: now)
+    }
+
+    private func uncappedNewStudyCandidates(
+        scope: CardScope, asOf now: Date
+    ) throws -> (sql: String, bindings: [Binding]) {
+        let filter = scopeClause(scope, column: "cards.deck_id")
+        let family = try newFamilyEligibilitySQL(scope: scope, asOf: now)
+        return ("""
+            FROM cards
+            WHERE cards.phase = 'new' AND cards.is_suspended = 0 AND cards.due_at <= ?
+              AND \(filter.sql) AND \(usableStudyCardSQL()) AND (\(family))
+            """, [.double(now.timeIntervalSince1970)] + filter.bindings)
+    }
+
+    func countExtraStudyCards(scope: DeckScope, asOf now: Date) throws -> Int {
+        try inReadTransaction {
+            guard let candidates = try extraStudyCandidates(scope: extraStudyScope(scope), asOf: now) else { return 0 }
+            let rows = try query("SELECT COUNT(*) AS count " + candidates.sql, bindings: candidates.bindings)
+            return Int(rows.first?["count"] as? Int64 ?? 0)
+        }
+    }
+
+    func fetchExtraStudyCards(scope: DeckScope, asOf now: Date, limit: Int) throws -> [Card] {
+        guard limit > 0 else { return [] }
+        return try inReadTransaction {
+            let resolved = try extraStudyScope(scope)
+            guard let candidates = try extraStudyCandidates(scope: resolved, asOf: now) else { return [] }
+            let hasWork = try hasDueStudyWork(scope: resolved, asOf: now, newOnly: true)
+            let sql = "SELECT cards.* " + candidates.sql + " ORDER BY cards.due_at, cards.id"
+                + studyQueueLimitSQL(hasWork ? nil : limit)
+            var cards = try query(sql, bindings: candidates.bindings).map { try decodeCard(from: $0) }
+            if hasWork {
+                let relations = try studyRelations(itemIDs: Set(cards.map(\.itemID)))
+                StudyQueueOrdering.orderWorks(in: &cards, relations: relations)
+            }
+            return Array(cards.prefix(limit))
+        }
+    }
+
+    func isExtraStudyCardEligible(cardID: UUID, scope: DeckScope, asOf now: Date) throws -> Bool {
+        try inReadTransaction { try containsExtraStudyCard(cardID: cardID, scope: scope, asOf: now) }
+    }
+
+    private func containsExtraStudyCard(cardID: UUID, scope: DeckScope, asOf now: Date) throws -> Bool {
+        let candidates = try uncappedNewStudyCandidates(scope: extraStudyScope(scope), asOf: now)
+        return try !query("SELECT 1 " + candidates.sql + " AND cards.id = ? LIMIT 1;",
+                          bindings: candidates.bindings + [.text(cardID.uuidString)]).isEmpty
+    }
+
+    private func studyDayRollover() throws -> Int {
+        let stored = Int(try metadataValue(forKey: ItemStore.studyDayRolloverMetadataKeyForSync) ?? "")
+        return stored.flatMap { StudyDay.validRolloverMinutes.contains($0) ? $0 : nil }
+            ?? StudyDay.defaultRolloverMinutes
+    }
+
     func isOrderedWork(card: Card) throws -> Bool {
         try studyRelations(itemIDs: [card.itemID])[card.itemID]?.work != nil
     }
@@ -297,7 +377,7 @@ actor SQLiteDatabase {
     /// clock, not user text. Scope identifiers remain bound by scopeClause.
     private func newFamilyEligibilitySQL(scope: CardScope, asOf now: Date, compact: Bool = false) throws -> String {
         try refreshStudyRelationsIfNeeded()
-        let rollover = Int(try metadataValue(forKey: ItemStore.studyDayRolloverMetadataKeyForSync) ?? "") ?? StudyDay.defaultRolloverMinutes
+        let rollover = try studyDayRollover()
         let start = StudyDay.start(for: now, rolloverMinutes: rollover).timeIntervalSince1970
         let end = StudyDay.nextRollover(after: now, rolloverMinutes: rollover).timeIntervalSince1970
         let instant = now.timeIntervalSince1970
@@ -5010,9 +5090,15 @@ actor SQLiteDatabase {
         memoryAfter: MemoryState,
         log: ReviewLog,
         introducedDeckID: UUID?,
-        introductionStudyDay: String?
+        introductionStudyDay: String?,
+        extraStudyScope: DeckScope? = nil
     ) throws {
         try inTransaction {
+            if let extraStudyScope {
+                guard try containsExtraStudyCard(cardID: cardID, scope: extraStudyScope, asOf: log.reviewedAt),
+                      let live = try fetchCard(id: cardID), live.deckID == introducedDeckID,
+                      memoryBefore.phase == .new else { throw ExtraStudyCardUnavailable() }
+            }
             if let audit = log.schedulingAudit {
                 try updateCardSchedulingMemory(
                     cardID,
@@ -5184,18 +5270,7 @@ actor SQLiteDatabase {
         afterWorkGate: (() throws -> Void)? = nil
     ) throws -> [Card] {
         try refreshStudyRelationsIfNeeded()
-        let filter = scopeClause(scope, column: "cards.deck_id")
-        // Proving there are no works must not scan every ordinary due card.
-        // When works do exist retain the selective scoped/due plan: forcing a
-        // relation-first join can be worse for large future/suspended works.
-        let anyWork = try !query(Self.anyStudyWorkSQL).isEmpty
-        try afterWorkGate?()
-        let hasWork = try anyWork && !query("""
-            SELECT 1 FROM study_item_relations AS relation
-            JOIN cards ON cards.item_id = relation.item_id
-            WHERE relation.work_key IS NOT NULL AND cards.is_suspended = 0
-              AND cards.due_at <= ? AND \(filter.sql) LIMIT 1;
-            """, bindings: [.double(now.timeIntervalSince1970)] + filter.bindings).isEmpty
+        let hasWork = try hasDueStudyWork(scope: scope, asOf: now, afterWorkGate: afterWorkGate)
         // A limited head must be the same head as the complete ordered queue.
         // Ordinary libraries retain their indexed LIMIT fast path.
         var cards = try fetchStudyQueueCards(limit: hasWork ? nil : limit) { isNew, groupLimit in
@@ -5207,6 +5282,22 @@ actor SQLiteDatabase {
             StudyQueueOrdering.orderWorks(in: &cards, relations: relations)
         }
         return limit.map { Array(cards.prefix(max(0, $0))) } ?? cards
+    }
+
+    private func hasDueStudyWork(
+        scope: CardScope, asOf now: Date, newOnly: Bool = false, afterWorkGate: (() throws -> Void)? = nil
+    ) throws -> Bool {
+        let filter = scopeClause(scope, column: "cards.deck_id")
+        // Keep the global existence check and selective scoped due lookup.
+        let anyWork = try !query(Self.anyStudyWorkSQL).isEmpty
+        try afterWorkGate?()
+        let phaseFilter = newOnly ? "AND cards.phase = 'new'" : ""
+        return try anyWork && !query("""
+            SELECT 1 FROM study_item_relations AS relation
+            JOIN cards ON cards.item_id = relation.item_id
+            WHERE relation.work_key IS NOT NULL AND cards.is_suspended = 0
+              AND cards.due_at <= ? AND \(filter.sql) \(phaseFilter) LIMIT 1;
+            """, bindings: [.double(now.timeIntervalSince1970)] + filter.bindings).isEmpty
     }
 
     private static let anyStudyWorkSQL = """
@@ -5927,7 +6018,8 @@ actor SQLiteDatabase {
         reservationID: UUID,
         durationMilliseconds: Int,
         capturedAt: Date,
-        submittedAt: Date
+        submittedAt: Date,
+        extraStudyScope: DeckScope? = nil
     ) throws -> StudyResponse {
         if let existing = try fetchStudyResponse(id: id) {
             guard existing.cardID == cardID,
@@ -5945,6 +6037,10 @@ actor SQLiteDatabase {
         }
 
         try inTransaction {
+            if let extraStudyScope,
+               try !containsExtraStudyCard(cardID: cardID, scope: extraStudyScope, asOf: submittedAt) {
+                throw ExtraStudyCardUnavailable()
+            }
             guard let card = try fetchCard(id: cardID) else {
                 throw DatabaseError.cardNotFound(cardID)
             }

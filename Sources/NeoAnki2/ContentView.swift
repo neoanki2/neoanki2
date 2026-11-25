@@ -710,6 +710,7 @@ struct ContentView: View {
                 mediaStore: itemsModel.mediaStore,
                 endSessionTrigger: $endSessionTrigger,
                 isEditingCard: $isEditingStudyCard,
+                prepareExtraStudy: { try await prepareExtraStudy(scope: studyScope, limit: $0) },
                 onSessionStatistics: {
                     let sessionID = studyModel.learningTime.sessionID
                     let scope = studyScope.filter
@@ -720,6 +721,7 @@ struct ContentView: View {
             ) {
                 endStudy()
             }
+            .id(studyModel.session.id)
         } else if isAddingItem {
             NavigationStack {
                 AddItemView(model: itemsModel, decksModel: decksModel) {
@@ -760,11 +762,14 @@ struct ContentView: View {
                 onReady: { AppStartupTrace.mark("browse_ready") }
             )
         } else {
+            let scope = decksModel.studyScope
             ScopeHomeView(
                 itemsModel: itemsModel,
-                statistics: statisticsWorkspace.home(scope: decksModel.studyScope.filter),
-                scope: decksModel.studyScope,
+                statistics: statisticsWorkspace.home(scope: scope.filter),
+                scope: scope,
                 onStudy: { startStudy() },
+                extraStudyAvailability: { try await features.extraStudyAvailability(in: scope.filter) },
+                prepareExtraStudy: { try await prepareExtraStudy(scope: scope, limit: $0) },
                 onBrowse: { openBrowse() },
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },
                 onAddItem: { openAddItem() }
@@ -1152,6 +1157,20 @@ struct ContentView: View {
         studyScope = decksModel.studyScope
         studyModel = makeStudyModel()
         isStudying = true
+    }
+
+    private func prepareExtraStudy(scope: StudyScope, limit: Int) async throws -> (@MainActor () -> Void) {
+        let extra = makeStudyModel()
+        try await extra.session.startExtraStudy(scope: scope.filter, title: scope.label, limit: limit)
+        return {
+            let studiedItemIDs = studyModel?.reviewedItemIDs ?? []
+            if !studiedItemIDs.isEmpty {
+                Task { await refreshAfterStudy(studiedItemIDs: studiedItemIDs) }
+            }
+            studyScope = scope
+            studyModel = extra
+            isStudying = true
+        }
     }
 
     private func endStudy() {

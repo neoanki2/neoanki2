@@ -134,3 +134,25 @@ private struct CourseFixture {
     #expect(study.reviewedCount == (addDueCard ? 1 : 0))
     #expect(try await !library.hasStandaloneCourseLesson(in: scope))
 }
+
+@Test @MainActor func extraStudyWaitsForStandaloneLessonsAndKeepsBatchPrerequisites() async throws {
+    let fixture = try await CourseFixture.make(limit: 0)
+    defer { try? FileManager.default.removeItem(at: fixture.root) }
+    let scope = DeckScope.deck(fixture.course.id)
+    let library = fixture.library
+    #expect(try await library.availableExtraStudyCardCount(scope: scope, asOf: fixture.now) == 0)
+    let regular = StudyFeatureModel(library: library, scope: scope, title: fixture.course.name, clock: { fixture.now })
+    await regular.start()
+    await regular.completeLesson(fixture.lessons[0].id)
+    await regular.completeLesson(fixture.lessons[1].id)
+    #expect(regular.isComplete)
+    #expect(try await regular.extraStudyAvailability() == 3)
+    let extra = StudyFeatureModel(library: library, scope: scope, title: fixture.course.name, clock: { fixture.now })
+    try await extra.startExtraStudy(scope: scope, title: fixture.course.name, limit: 1)
+    #expect(extra.currentLesson?.id == fixture.lessons[2].id)
+    await extra.completeLesson(fixture.lessons[2].id)
+    #expect(extra.currentCard?.item.id == fixture.cards[0].id)
+    await extra.grade(.easy)
+    #expect(extra.isComplete)
+    #expect(try await library.studyCourseLessons(in: scope)[3].isRead == false)
+}

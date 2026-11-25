@@ -37,6 +37,10 @@ public struct LibraryFeatureFactory {
         .init(authoring: authoring, decks: library,
               safeguards: library as? any LibraryItemTypeEditingSafeguarding, deckID: deckID, onChanged: onChanged)
     }
+    public func extraStudyAvailability(in scope: DeckScope) async throws -> Int {
+        try await (library as? any LibraryExtraStudying)?.availableExtraStudyCardCount(scope: scope) ?? 0
+    }
+
     public func makeSavedResponses() -> SavedResponsesFeatureModel { .init(library: library) }
     public func makeStatistics(scope: DeckScope = .allDecks, sessionID: UUID? = nil) -> StatisticsFeatureModel {
         .init(library: library, scope: scope, sessionID: sessionID)

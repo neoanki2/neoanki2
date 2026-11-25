@@ -113,26 +113,46 @@ private actor SuspendedUploadTransport: CloudSyncTransport {
 /// request on the same client fails until stop/start replaces that client.
 private actor InvalidatedClientTransport: CloudSyncTransport {
     let failDuringSend: Bool
-    private var invalidated = true
+    private var stopObserver: CheckedContinuation<Void, Never>?
     private(set) var starts = 0
     private(set) var stops = 0
     private(set) var sent: [SyncRecordEnvelope] = []
 
     init(failDuringSend: Bool) { self.failDuringSend = failDuringSend }
     func start() async throws { starts += 1 }
-    func stop() async { stops += 1; invalidated = false }
-    private func checkConnection() throws {
-        if invalidated {
-            throw NSError(domain: CKErrorDomain, code: CKError.Code.internalError.rawValue,
-                userInfo: [NSLocalizedDescriptionKey: "Client went away before operation could be validated; failing"])
-        }
+    func stop() async {
+        stops += 1
+        stopObserver?.resume()
+        stopObserver = nil
     }
+
+    private var clientInvalidated: NSError {
+        NSError(domain: CKErrorDomain, code: CKError.Code.internalError.rawValue,
+                userInfo: [NSLocalizedDescriptionKey: "Client went away before operation could be validated; failing"])
+    }
+
+    // The chosen operation reports the invalidation. Its concurrent peer
+    // belongs to the same client and must wait for that client to be stopped.
+    private func waitForInvalidatedClientToStop() async throws -> Never {
+        if stops == 0 {
+            await withCheckedContinuation { stopObserver = $0 }
+        }
+        throw CancellationError()
+    }
+
     func enqueue(_ records: [SyncRecordEnvelope]) async throws {
-        if failDuringSend { try checkConnection() }
+        if starts == 1 {
+            if failDuringSend { throw clientInvalidated }
+            try await waitForInvalidatedClientToStop()
+        }
         sent += records
     }
+
     func fetchPendingChanges() async throws -> [SyncRecordEnvelope] {
-        try checkConnection()
+        if starts == 1 {
+            if !failDuringSend { throw clientInvalidated }
+            try await waitForInvalidatedClientToStop()
+        }
         return []
     }
 }

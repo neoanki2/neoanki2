@@ -744,6 +744,18 @@ public actor ItemStore {
         return try await database.isNewStudyCardEligible(cardID: cardID, scope: resolved, asOf: now, studyDay: day)
     }
 
+    public func extraStudyCardCount(scope: DeckScope, asOf now: Date = .now) async throws -> Int {
+        try await database.countExtraStudyCards(scope: scope, asOf: now)
+    }
+
+    public func fetchExtraStudyCards(scope: DeckScope, asOf now: Date = .now, limit: Int) async throws -> [DueCard] {
+        try await hydrateDueCards(database.fetchExtraStudyCards(scope: scope, asOf: now, limit: limit))
+    }
+
+    public func isExtraStudyCardEligible(cardID: UUID, scope: DeckScope, asOf now: Date = .now) async throws -> Bool {
+        try await database.isExtraStudyCardEligible(cardID: cardID, scope: scope, asOf: now)
+    }
+
     /// Returns all due cards regardless of deck assignment.
     public func fetchDueCards(asOf now: Date = .now, limit: Int? = nil) async throws -> [DueCard] {
         try await fetchDueCards(scope: .allDecks, asOf: now, limit: limit)
@@ -1082,7 +1094,8 @@ public actor ItemStore {
         cardID: UUID,
         rating: ReviewRating,
         now: Date = .now,
-        durationMs: Int = 0
+        durationMs: Int = 0,
+        extraStudyScope: DeckScope? = nil
     ) async throws -> ReviewSubmission {
         guard let persistedCard = try await database.fetchCard(id: cardID) else {
             throw DatabaseError.cardNotFound(cardID)
@@ -1137,7 +1150,8 @@ public actor ItemStore {
             memoryAfter: nextMemory,
             log: log,
             introducedDeckID: introducedDeckID,
-            introductionStudyDay: introductionStudyDay
+            introductionStudyDay: introductionStudyDay,
+            extraStudyScope: extraStudyScope
         )
         try await database.markSchedulerCohortsDirty(cardID: card.id, now: now)
         requestAutomaticSchedulingMaintenance()
