@@ -30,7 +30,8 @@ fields you fill in and the Card setups that generate study cards.
 With [iCloud sync](../sync-reminders-widgets/) enabled, a committed save starts
 syncing within a short upload window. Another active device refreshes its loaded
 Browse rows when the change arrives, even while attachments are still downloading.
-Offline edits remain queued locally.
+Offline edits remain queued locally. Browse refreshes saved items against your
+current search text and sort order.
 
 ## Known Words and vocabulary card sets
 

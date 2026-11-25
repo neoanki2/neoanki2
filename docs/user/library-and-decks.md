@@ -279,6 +279,8 @@ the surviving card identities.
 
 ## Browse and search items
 
+Search results follow your current sort order as saved items are added or removed.
+
 A course lesson can have reading and media fields without study cards. Open the
 lesson from Browse to see its content. Maturity appears when the item generates
 cards.

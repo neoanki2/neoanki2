@@ -121,10 +121,12 @@ final class ItemsModel {
         searchTask = nil
     }
 
-    /// Lets tests and performance probes include asynchronous filtering without
-    /// introducing a user-visible loading state.
+    /// Waits for the current search to settle, including a replacement scan
+    /// scheduled by a library refresh while the first scan was running.
     func waitForPendingSearch() async {
-        await searchTask?.value
+        while let searchTask {
+            await searchTask.value
+        }
     }
 
     func hasStandaloneCourseLesson(in scope: DeckScope) async -> Bool {
