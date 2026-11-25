@@ -196,8 +196,10 @@ off. Removing an attachment changes future authoring choices; it does not remove
 items, generated cards, maturity state, or review history. Moving an item keeps
 its type without adding it to the destination deck's new-item picker.
 
-The **Unassigned** empty state intentionally has no Add Item button; use the
-toolbar's **Add Item** action instead.
+On Mac, when a deck or All Decks has no items, choose **Add Item** in the
+center of the scope home or browser. When there are items, use **Add Item**
+in the toolbar. In **Unassigned**, the action is in the toolbar even when
+the scope is empty.
 Generated **Prose Unit** items stay together in their passage deck. Opening one
 for editing opens the whole source passage, where you can preview changed cues
 before saving.

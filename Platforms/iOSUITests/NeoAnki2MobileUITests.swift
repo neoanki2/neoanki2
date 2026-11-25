@@ -43,7 +43,8 @@ class NeoAnki2MobileUITestCase: XCTestCase {
 
     func launchApp(
         additionalArguments: [String] = [],
-        environment: [String: String] = [:]
+        environment: [String: String] = [:],
+        alternateFixtureDestination: String? = nil
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -57,7 +58,11 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         // first app gesture can trigger an interruption monitor.
         if environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
             allowBadgePermissionIfPresented(timeout: 10)
-            XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
+            let readyNavigationTitles = ["Home"] + [alternateFixtureDestination].compactMap { $0 }
+            let readyNavigationBar = app.navigationBars.matching(
+                NSPredicate(format: "identifier IN %@", readyNavigationTitles)
+            ).firstMatch
+            XCTAssertTrue(readyNavigationBar.waitUntilExists(timeout: 20))
             let fixtureFailure = app.alerts["Visual Fixture Failed"]
             XCTAssertFalse(fixtureFailure.exists, fixtureFailure.debugDescription)
         }
@@ -679,6 +684,10 @@ final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
 
     func testCreateBrowseAndStudyBasicCardJourney() throws {
         let app = launchApp()
+        open("Library", in: app)
+        XCTAssertTrue(app.buttons["Add First Item"].waitUntilExists(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Library"].buttons["Add Item"].exists)
+
         open("Create", in: app)
         app.buttons["New Item"].tap()
 
@@ -699,6 +708,8 @@ final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
             NSPredicate(format: "label BEGINSWITH %@", "Capital of France?")
         ).firstMatch
         XCTAssertTrue(itemLink.waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Library"].buttons["Add Item"].exists)
+        XCTAssertFalse(app.buttons["Add First Item"].exists)
         XCTAssertFalse(app.staticTexts["Paris"].exists, "Concealed answer leaked into Library")
         itemLink.tap()
         XCTAssertTrue(app.navigationBars["Basic"].waitUntilExists(timeout: 5))
@@ -713,6 +724,14 @@ final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(reveal.waitUntilExists(timeout: 15))
         reveal.tap()
         XCTAssertTrue(app.staticTexts["Paris"].waitUntilExists(timeout: 5))
+        app.buttons["Good"].tap()
+        XCTAssertTrue(app.staticTexts["Session Complete"].waitUntilExists(timeout: 15))
+        XCTAssertFalse(app.buttons["endStudySession"].exists)
+        XCTAssertTrue(app.buttons["View Session Statistics"].exists)
+        let undo = app.buttons["undoLastGrade"]
+        XCTAssertTrue(undo.isHittable)
+        undo.tap()
+        XCTAssertTrue(app.buttons["Good"].waitUntilExists(timeout: 5))
         app.buttons["Good"].tap()
         XCTAssertTrue(app.staticTexts["Session Complete"].waitUntilExists(timeout: 15))
         app.buttons["Done"].tap()
@@ -736,13 +755,8 @@ final class MobileAuthoringSurfaceUITests: NeoAnki2MobileUITestCase {
         }
         app.buttons["Vocabulary Packs"].tap()
         XCTAssertTrue(app.navigationBars["Vocabulary Packs"].waitUntilExists(timeout: 3))
-        XCTAssertTrue(
-            waitUntil(timeout: 5, condition: {
-                app.buttons["Install Pack…"].exists
-                    || app.buttons["Install Pack"].exists
-            }),
-            "Vocabulary pack install action is unavailable"
-        )
+        XCTAssertTrue(app.buttons["Install Pack…"].waitUntilExists(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Vocabulary Packs"].buttons["Install Pack"].exists)
 
         open("Settings", in: app)
         let enableSync = app.buttons["Enable iCloud Sync…"]
@@ -1339,8 +1353,14 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         let tree = XCTAttachment(string: app.debugDescription); tree.name = name + "-tree"; tree.lifetime = .keepAlways; add(tree)
     }
     func testJapaneseAcademyStudyAlternatesLessonsAndVocabulary() throws {
-        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign", "NEOANKI_TEST_COURSE_STUDY": "1"])
-        scrollToAndTap(app.staticTexts["Japanese Academy - Level 1"], in: app)
+        let course = "Japanese Academy - Level 1"
+        let app = launchApp(
+            environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign", "NEOANKI_TEST_COURSE_STUDY": "1"],
+            alternateFixtureDestination: course
+        )
+        if !app.navigationBars[course].exists {
+            scrollToAndTap(app.staticTexts[course], in: app)
+        }
         scrollToAndTap(app.buttons["Study"], in: app)
         let title = app.staticTexts["studyLessonTitle"]
         let next = app.buttons["continueStudyLesson"]
@@ -1350,6 +1370,20 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertFalse(app.buttons["Show Answer"].exists)
         capture("japanese-academy-lesson", app)
         XCTAssertTrue(waitUntil(timeout: 5) { next.exists && next.isEnabled })
+
+        let reader = app.scrollViews.firstMatch
+        let endOfLesson = reader.staticTexts["End of the noun lesson."]
+        let nextFrame = next.frame
+        XCTAssertTrue(endOfLesson.exists, "The reader should lay out the whole lesson before scrolling")
+        XCTAssertGreaterThan(endOfLesson.frame.minY, reader.frame.maxY)
+        let lessonHeight = endOfLesson.frame.minY - title.frame.minY
+        scrollTo(endOfLesson, in: app, surface: reader, preferredDirection: .towardBottom,
+                 bottomClearance: app.frame.maxY - reader.frame.maxY)
+        XCTAssertTrue(reader.images["Noun lesson illustration"].exists)
+        XCTAssertEqual(endOfLesson.frame.minY - title.frame.minY, lessonHeight, accuracy: 1)
+        XCTAssertEqual(next.frame, nextFrame)
+        XCTAssertTrue(next.isHittable)
+
         next.tap()
 
         XCTAssertTrue(app.staticTexts["学校"].waitUntilExists(timeout: 5))
@@ -1425,7 +1459,11 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
                 app.buttons["Check Answer"].tap()
             case "choose": app.buttons["Paris"].tap(); app.buttons["Check Choice"].tap()
             case "arrange": app.buttons["Down"].firstMatch.tap(); app.buttons["Check Order"].tap()
-            case "record": app.buttons["Compare Recording"].tap()
+            case "record":
+                XCTAssertTrue(app.buttons["Record Answer"].isHittable)
+                XCTAssertFalse(app.buttons["Compare Recording"].exists)
+                app.buttons["Reveal & Self-Grade"].tap()
+                XCTAssertFalse(app.buttons["Play My Recording"].exists)
             case "audioSubmission":
                 XCTAssertTrue(app.buttons["Start Recording"].isHittable)
                 XCTAssertFalse(app.buttons["Save & Complete"].isEnabled)

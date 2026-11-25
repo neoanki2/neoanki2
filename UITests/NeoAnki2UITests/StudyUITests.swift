@@ -94,6 +94,7 @@ extension FastFunctionalJourneyTests {
             revealAndGrade("gradeGood", in: caughtUpApp)
             revealAndGrade("gradeGood", in: caughtUpApp)
             revealAndGrade("gradeGood", in: caughtUpApp)
+            assertCompletionActionLayout(in: caughtUpApp)
             finishStudySession(in: caughtUpApp)
             assertNothingDue(in: caughtUpApp)
         }
@@ -549,10 +550,20 @@ extension FastFunctionalJourneyTests {
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
 
-        let undo = app.buttons.identified("undoLastGrade")
-        XCTAssertTrue(undo.waitUntilExists(timeout: 5))
-        undo.click()
+        assertCompletionActionLayout(in: app)
+        app.buttons.identified("undoLastGrade").click()
         XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 5))
         XCTAssertFalse(app.buttons.identified("studySessionDone").exists)
+    }
+
+    private func assertCompletionActionLayout(in app: XCUIApplication) {
+        let done = app.buttons.identified("studySessionDone")
+        let statistics = app.buttons.identified("studySessionStatistics")
+        let undo = app.buttons.identified("undoLastGrade")
+        XCTAssertTrue(done.waitUntilExists(timeout: 5))
+        XCTAssertTrue(statistics.waitUntilExists(timeout: 5))
+        XCTAssertTrue(undo.waitUntilExists(timeout: 5))
+        XCTAssertLessThanOrEqual(done.frame.maxY, statistics.frame.minY)
+        XCTAssertLessThanOrEqual(done.frame.maxY, undo.frame.minY)
     }
 }

@@ -74,8 +74,9 @@ of the session is preparing; grading waits until that preparation completes.
 
 Open **Japanese Academy - Level 1** and choose **Study**. The study session
 opens each unread lesson in the supplied course order before introducing its
-vocabulary. Read the lesson and choose **Continue** to save your place. Introductory
-and standalone lessons are included. You can also study just one chapter or lesson.
+vocabulary. Scroll through the lesson in its reading pane. **Continue** stays
+visible below the lesson and saves your place. Introductory and standalone
+lessons are included. You can also study just one chapter or lesson.
 
 Previously introduced vocabulary is reviewed when due. New vocabulary still
 follows your daily limits, and reading a lesson doesn't use a new-card slot or
@@ -89,8 +90,9 @@ recordings in order. Use **Play Audio** to replay either recording. With
 ## Session states
 
 Mac, iPhone, and iPad use the same session behavior. Loading failures do not
-count as completed sessions or erase saved reviews. On iPhone and iPad, **Try
-Again** reloads a failed session; **End** returns to the library.
+count as completed sessions or erase saved reviews. Choose **Try Again** to
+reload a failed session. To leave it, choose **Back to Library** on Mac or
+**End** on iPhone and iPad.
 
 The Home count can stay visible while iCloud finishes saving a change. When
 you start Study, the session checks current eligibility for the selected scope.
@@ -261,7 +263,13 @@ The footer keeps one primary recording action in a stable location: choose **Sta
 
 The first recording attempt may trigger the macOS microphone permission prompt. If access is denied or restricted, enable NeoAnki2 in **System Settings → Privacy & Security → Microphone**. Recordings are temporary: NeoAnki2 removes them when the card changes, the study view closes, or a new recording replaces the old one.
 
-Use Command-R to start or stop recording and Command-P to play or stop playback.
+On iPhone and iPad, tap **Record Answer**, then **Stop Recording**. Tap
+**Compare Recording** to reveal the answer once the recording is ready. You
+can replay your recording while grading. Choose **Reveal & Self-Grade** to
+study without recording.
+
+On Mac, use Command-R to start or stop recording and Command-P to play or
+stop playback.
 
 ### Audio Submission
 
@@ -386,8 +394,9 @@ Interaction-specific shortcuts are described above. Shortcuts are enabled only w
 
 ## Undo and ending a session
 
-Use **View Session Statistics** after completion to inspect active time, linked
-reviews, distinct cards/items, and saved responses. These reports use the same
+When **Session Complete** appears, choose **Done** to return to the library.
+Choose **View Session Statistics** to inspect active time, linked reviews,
+distinct cards and items, and saved responses. These reports use the same
 shared Activity view on Mac, iPhone, and iPad.
 
 After a grade is saved, a compact notice in the session header identifies the rating. Choose **Undo** or press Command-Z to revert that latest review and return to the same card with its answer revealed. You can dismiss the notice; completing another grade replaces the previous undo opportunity. **Undo Last Grade** also appears on the completion screen when the final grade can still be reverted.

@@ -220,7 +220,9 @@ Open **Library → Vocabulary Packs…** on Mac or **Create → Vocabulary Packs
 iOS. **On This Device** lists packs available offline. **In iCloud** shows the
 available dictionaries and their download sizes. Choose **Download** to install
 one, or cancel a download and resume it later. The catalog refreshes while the
-app is running; **Refresh** and **Sync Now** also check for changes.
+app is running. **Sync Now** also checks for changes. Use **Refresh** in the
+Vocabulary Packs toolbar when packs are listed. If the list is empty, use
+**Refresh from iCloud** or **Retry iCloud Sync** in the empty state.
 
 **Remove from Device** frees local storage and keeps the uploaded copy and saved
 cards. Disabling sync stops transfers; installed dictionaries remain available

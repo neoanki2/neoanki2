@@ -225,16 +225,18 @@ struct StudyView: View {
         } description: {
             Text(model.dueCheckError ?? model.errorMessage ?? "The due cards for this scope could not be read.")
         } actions: {
-            Button("Try Again") {
-                Task { await model.retryLoadingCards() }
-            }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("studyRetryLoad")
+            VStack(spacing: DesignSystem.Spacing.sm) {
+                Button("Try Again") {
+                    Task { await model.retryLoadingCards() }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .accessibilityIdentifier("studyRetryLoad")
 
-            Button("Back to Library") {
-                onEndSession()
+                Button("Back to Library", action: onEndSession)
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier("studyBackToLibrary")
             }
-            .accessibilityIdentifier("studyBackToLibrary")
         }
         .accessibilityIdentifier("studyLoadFailure")
     }
@@ -246,21 +248,39 @@ struct StudyView: View {
             Text("No more due cards in this session.")
             LearningTimeSaveStatusView()
         } actions: {
-            Button("View Session Statistics", systemImage: "chart.bar.xaxis", action: onSessionStatistics)
-            if model.canUndoLastGrade {
-                Button("Undo Last Grade") {
-                    Task { await model.undoLastGrade() }
-                }
-                .disabled(model.isGrading)
-                .accessibilityIdentifier("undoLastGrade")
-            }
+            VStack(spacing: DesignSystem.Spacing.md) {
+                Button("Done", action: onEndSession)
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("studySessionDone")
 
-            Button("Done") {
-                onEndSession()
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: DesignSystem.Spacing.md) {
+                        finishedSecondaryActions
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
+
+                    VStack(spacing: DesignSystem.Spacing.xs) {
+                        finishedSecondaryActions
+                    }
+                }
+                .buttonStyle(.borderless)
             }
-            .keyboardShortcut(.defaultAction)
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("studySessionDone")
+            .disabled(model.isGrading)
+        }
+    }
+
+    @ViewBuilder
+    private var finishedSecondaryActions: some View {
+        Button("View Session Statistics", systemImage: "chart.bar.xaxis", action: onSessionStatistics)
+            .accessibilityIdentifier("studySessionStatistics")
+        if model.pendingGradeUndo != nil {
+            Button("Undo Last Grade") {
+                Task { await model.undoLastGrade() }
+            }
+            .disabled(!model.canUndoLastGrade)
+            .accessibilityIdentifier("undoLastGrade")
         }
     }
 

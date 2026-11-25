@@ -209,9 +209,11 @@ menu offers recipes that apply to the current fields:
 
 The Answer method picker also supports Reveal, Type Answer, Choose, Arrange,
 Record, Audio Submission, and Cloze. Choose and Arrange need usable textual
-answers. Record is a temporary compare-and-grade exercise. Audio Submission
-has no expected answer: converting an existing setup asks before removing its
-answer. If you switch back before Save, the Studio restores the stashed answer.
+answers. Record is a temporary compare-and-grade exercise. During study,
+learners can record an answer or choose **Reveal & Self-Grade**. Audio
+Submission has no expected answer. Converting an existing setup asks before
+removing its answer. If you switch back before Save, the Studio restores the
+stashed answer.
 
 ## Use Advanced settings
 

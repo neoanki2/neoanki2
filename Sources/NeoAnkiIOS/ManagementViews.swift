@@ -390,23 +390,42 @@ struct VocabularyToolsView: View {
     @Bindable var model: MobileVocabularyLibraryModel
     @State private var isImporting = false
 
+    private var hasPacks: Bool { !model.installedPacks.isEmpty || !model.sync.catalog.isEmpty }
+
     var body: some View {
         Group {
             if model.isLoading {
                 ProgressView("Loading installed packs…")
-            } else if model.installedPacks.isEmpty && model.sync.catalog.isEmpty {
-                if model.sync.isRefreshing { ProgressView("Refreshing dictionary catalog…") }
+            } else if !hasPacks {
                 ContentUnavailableView {
                     Label("No Vocabulary Packs", systemImage: "books.vertical")
                 } description: {
                     Text(model.sync.isEnabled ? "Install a .neovocab package. Packs from your other devices appear here after their upload finishes." : "Install a .neovocab package, or enable iCloud sync in Settings to download packs from your other devices.")
                     if let error = model.sync.catalogError { Text(error).foregroundStyle(.red) }
+                    if model.sync.isRefreshing { ProgressView("Refreshing dictionary catalog…") }
                 } actions: {
-                    if model.sync.isEnabled {
-                        Button(model.sync.catalogError == nil ? "Refresh from iCloud" : "Retry iCloud Sync") { Task { await model.sync.refresh() } }.disabled(model.sync.isRefreshing)
+                    VStack(spacing: 12) {
+                        Button {
+                            isImporting = true
+                        } label: {
+                            Text("Install Pack…").frame(minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .neoAnkiMobilePrimaryActionTint()
+                        .disabled(model.isImporting)
+
+                        if model.sync.isEnabled {
+                            Button {
+                                Task { await model.sync.refresh() }
+                            } label: {
+                                Text(model.sync.catalogError == nil ? "Refresh from iCloud" : "Retry iCloud Sync")
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(model.sync.isRefreshing)
+                        }
                     }
-                    Button("Install Pack…") { isImporting = true }
-                        .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
                 }
             } else {
                 VocabularyPackCloudList(model: model.sync) { await model.load() }
@@ -414,14 +433,17 @@ struct VocabularyToolsView: View {
         }
         .navigationTitle("Vocabulary Packs")
         .toolbar {
-            if model.sync.isEnabled {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Refresh", systemImage: "arrow.clockwise") { Task { await model.sync.refresh() } }.disabled(model.sync.isRefreshing)
+            if !model.isLoading && hasPacks {
+                if model.sync.isEnabled {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Refresh", systemImage: "arrow.clockwise") { Task { await model.sync.refresh() } }
+                            .disabled(model.sync.isRefreshing)
+                    }
                 }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Install Pack", systemImage: "plus") { isImporting = true }
-                    .disabled(model.isImporting)
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Install Pack", systemImage: "plus") { isImporting = true }
+                        .disabled(model.isImporting)
+                }
             }
         }
         .overlay { if model.isImporting { ProgressView("Copying and validating…").padding().background(.regularMaterial, in: .rect(cornerRadius: 12)) } }
