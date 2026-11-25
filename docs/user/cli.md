@@ -43,6 +43,10 @@ non-empty `itemTypes` array; add `defaultType` when one choice should be
 recommended. Descendants inherit the nearest declaration unless they provide
 their own non-empty array.
 
+Template records may include the optional `fitStudyArea` boolean to preserve
+the Card setup's **Fit study area** display preference. When omitted, it
+defaults to `false` for compatibility with existing bundles.
+
 A valid bundle prints:
 
 ```text

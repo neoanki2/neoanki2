@@ -25,8 +25,8 @@ cards and their ordering. Moving an item retains its type and scheduling history
 
 Every active card uses a predefined **Study Stage**. Its flexible card region
 yields space to the response and status region, and the fixed interaction or
-grading footer reserves its full height with bottom breathing room. The stage
-does not scroll or scale. Text that exceeds the available card region scrolls
+grading footer reserves its full height with bottom breathing room. By default,
+the stage does not scroll or scale. Text that exceeds the available card region scrolls
 inside that region while the footer stays visible; visual media receives a finite
 height proposal so it can aspect-fit. On Mac, the study window is limited to the visible
 screen and keeps clearance above its bottom edge, so every region and the
@@ -46,6 +46,13 @@ by purpose even when an imported setup places it in an unusual region. A setup
 may also hide supporting content until reveal or blur compatible image and GIF
 content; **Show Answer** applies those reveal rules together without changing
 the card's place in the session.
+
+Text prompts can opt in to **Fit study area** in the Card setup editor. The
+prompt text scales to the available card region on Mac and iPhone, including
+when the study window is resized or the phone rotates. **Show Answer** remains
+visible, and the revealed answer and its supporting text use their normal
+reading size. Existing Card setups keep their current display unless this
+option is enabled.
 
 NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. The home screen shows the number of cards due, or **You’re caught up** when none are due; future cards are not included.
 

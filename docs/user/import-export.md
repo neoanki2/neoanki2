@@ -299,7 +299,7 @@ The file contains the selected deck and its subdecks, items, tags, required item
 types and templates, and referenced media. The selected deck becomes the root
 of the exported tree. Unrelated library items are not loaded into the export snapshot.
 
-`.neodeck` version 6 is deliberately **content-only**. It does not contain:
+`.neodeck` version 8 is deliberately **content-only**. It does not contain:
 
 - review history, due dates, or scheduler parameters;
 - card or memory state, suspension state, or study statistics; or
@@ -319,10 +319,15 @@ Choose **File → Import Deck…**, then select either format.
 
 ### Portable `.neodeck`
 
-Portable format 7 preserves deck-scoped type attachments, defaults, and explicit
+Portable format 8 preserves deck-scoped type attachments, defaults, and explicit
 empty inheritance overrides. Exporting a subtree materializes the root's inherited
 choices. Supported older formats remain readable; imported definitions stay
 scoped to their decks rather than expanding Available Everywhere.
+
+Template display preferences, including the opt-in **Fit study area** setting,
+are preserved with each item type. Older portable files and authored bundles
+that omit this setting retain the default, which leaves existing layouts
+unchanged.
 
 NeoAnki2 validates the entire portable database—including its format version,
 schema, limits, item-type digests, and media—before changing the library.

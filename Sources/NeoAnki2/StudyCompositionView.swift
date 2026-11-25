@@ -13,7 +13,7 @@ struct StudyCompositionView: View {
     var evaluation: AnswerEvaluation? = nil
 
     private var components: [ResolvedTemplateComponent] {
-        VocabularySet.studyComponents(for: template, from: item, clozeGroup: clozeGroup)
+        SideContent.resolvedComponents(for: template, from: item)
     }
 
     private var effectiveLayout: CardLayoutID {
@@ -54,7 +54,7 @@ struct StudyCompositionView: View {
             isAnswerRevealed: isAnswerRevealed,
             response: response,
             evaluation: evaluation,
-            enabled: [.type, .choose, .arrange].contains(template.interaction) || template.id == VocabularySet.productionID
+            enabled: [.type, .choose, .arrange].contains(template.interaction)
         ) { component, hole in
             let content = ContentValueView(
                 value: component.value,
