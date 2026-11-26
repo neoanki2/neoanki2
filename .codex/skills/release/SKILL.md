@@ -5,6 +5,33 @@ description: Merge release changes into main, publish affected NeoAnki2 apps to 
 
 # Release NeoAnki2
 
+## Time every release
+
+The first action on a release request is to capture the UTC start time, before
+inspecting the candidate, running checks, or invoking the controller. Append
+the start to `neoanki2-release-timings.jsonl` in the directory returned by
+`git rev-parse --path-format=absolute --git-common-dir`. Use this one append-only
+JSON Lines history across linked worktrees and releases. Read-only previews
+and status checks do not create timing entries.
+
+- Put `release_id`, UTC `timestamp`, `phase`, and `event` on every new line.
+  Assign the release ID before a version is reserved, then record the version,
+  build, and source revision as they become known. Log each attempt's start,
+  stop, and reason under the same release ID, including resumes and replacement
+  candidates pursued to finish the same release request.
+- Log phase starts, ends, and outcomes for candidate preparation, local checks,
+  GitHub checks and merge, builds and signing, publication, local installations,
+  cleanup, and the bottleneck fix. Use timestamps from controller logs and
+  receipts when available. Mark missing timings as unknown. Identify external
+  waits and count overlapping phases only once when assessing elapsed time.
+- Immediately before each final report, append its outcome and
+  `elapsed_seconds` measured from the first start. Include pauses, retries,
+  cleanup, and the bottleneck fix. Record blocked reports and leave their release
+  IDs open for resumption. A completed, abandoned, or no-op release closes its
+  entry. Report the total elapsed time and the absolute path to the timing log.
+
+## Integrate the release source
+
 Every release must come from `main`. Merge first, then build and publish from
 the resulting `main` revision:
 
@@ -16,9 +43,10 @@ the resulting `main` revision:
    or an open PR is insufficient.
 2. Update a clean local `main` checkout to the remote `main` revision containing
    those changes. Preserve unrelated working-tree changes when switching; do not
-   create a worktree or isolated checkout unless the user explicitly asks. Record the resulting `main` SHA as the release source;
-   after a squash or rebase merge, use the resulting main revision rather than
-   the original PR head.
+   create a worktree or isolated checkout unless the user explicitly asks.
+   Record the resulting `main` SHA as the release source; after a squash or
+   rebase merge, use the resulting main revision rather than the original PR
+   head.
 3. Run the unified controller from that checkout only after confirming that it
    enforces this ordering:
 
@@ -182,8 +210,23 @@ releases, and uncertain uploads must retain their recovery inputs.
   and reclaimed space in a small local cleanup receipt, verify retained evidence,
   and report the space recovered with the release result.
 
+## Fix one release bottleneck
+
+After delivery and cleanup, use this release's history and prior timings to find
+the largest delay the project can reduce on the path to completion. Record any
+longer external wait separately. Implement and validate one concrete fix before
+the final report. Keep it as a separate change ready for the next applicable
+release, and preserve required checks, signing, and installation verification.
+
+Log the cause, observed delay, change, and validation result. If measuring the
+savings requires another release, label the savings as an estimate and compare
+it with the actual timing of the next applicable release. If a concrete blocker
+prevents implementing or validating the fix, record it and explain it in the
+final report.
+
 Read [the release guide](../../../docs/RELEASING.md) for setup, version examples,
 checkpoint behavior, and recovery. Return selected versions/source, each channel's
-actual state, the local Mac and iPhone installed versions, cleanup result, and
-the receipt paths. Name concrete blockers without inventing
-acceptance passes or requesting confirmation already granted by the release request.
+actual state, the local Mac and iPhone installed versions, cleanup result,
+receipt paths, timing, and the bottleneck fix. Name concrete blockers without
+inventing acceptance passes or requesting confirmation already granted by the
+release request.
