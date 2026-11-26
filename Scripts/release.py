@@ -490,6 +490,55 @@ class Release:
         return errors, waiting
 
 
+def iphone_identity(state):
+    """The iOS version/build the phone receives once this release is published."""
+    if "ios" in state["selected"]:
+        return {"version": state["version"], "build": state["build"]}
+    ios = state["channels"]["ios"]
+    return {"version": ios["version"], "build": ios["build"]}
+
+
+def prepare_release_iphone(release):
+    """Build and sign the phone update while Store publication waits on Apple.
+
+    Needs no phone. Best effort: on failure no receipt is recorded, so
+    install_release_iphone prepares a fresh attempt after publication.
+    """
+    state = release.state
+    local = state.setdefault("local_iphone", {"status": "planned"})
+    if local.get("receipt") or local.get("status", "planned") != "planned":
+        return
+    identity = {**iphone_identity(state), "sourceRevision": state["revision"]}
+    attempt = int(local.get("attempt", 0)) + 1
+    try:
+        output = release.directory / f"iphone-{attempt}"
+        path = output / "deployment.json"
+        release.verify_source()
+        if output.exists():
+            raise RuntimeError(str(output) + " already exists; leaving it for post-publication recovery")
+        local.update(status="preparing", attempt=attempt, **identity)
+        release.save()
+        command = [str(ROOT / "Scripts/deploy-iphone.sh"), "--source-dir", str(release.source),
+                   "--output", str(output), "--version", identity["version"], "--build", identity["build"],
+                   "--signing-dir", str(release.signing), "--prepare-only"]
+        # Store exports have finished; keep Keychain search-list edits serialized anyway.
+        with (WORK / "signing.lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            run(command, log=release.directory / f"iphone-{attempt}-prepare.log")
+        receipt = json.loads(path.read_text())
+        if receipt.get("phase") != "prepared" or any(receipt.get(k) != v for k, v in identity.items()):
+            raise RuntimeError("Prepared iPhone update differs from the release identity")
+    except Exception as error:
+        local.update(status="planned", prepare_error=str(error))
+        release.save()
+        print("IPHONE_DEPLOY_PREPARE_DEFERRED=" + str(error), flush=True)
+        return
+    local.update(status="prepared", receipt=str(path))
+    local.pop("prepare_error", None)
+    release.save()
+    print("IPHONE_DEPLOY_STATUS=prepared", flush=True)
+
+
 def install_release_iphone(release, device=None):
     """Finish local delivery independently of the already published channels."""
     state = release.state
@@ -709,7 +758,11 @@ def main(argv=None):
             for channel in state["selected"]:
                 release.export(channel)
             release.save(remote=True)
-            errors, waiting = release.publish_until_ready(args.wait_seconds)
+            # Prepare the phone update during Apple upload/processing instead of after it.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                preparing = pool.submit(prepare_release_iphone, release)
+                errors, waiting = release.publish_until_ready(args.wait_seconds)
+                preparing.result()
         if state.get("complete"):
             try:
                 install_release_iphone(release, args.device)

@@ -111,9 +111,13 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
    library and settings are preserved. An iOS-only release with no newer Mac
    version skips this step. Local installation and Store availability are
    reported separately; Apple's review can still be pending.
-9. Once all selected channels are published/submitted, the controller runs
-   `./Scripts/deploy-iphone.sh` using its pinned source and the iOS channel's
-   exact marketing version and build number. It signs with the saved Ad Hoc
+9. While Apple processes the Store uploads, the controller prepares the phone
+   update with `./Scripts/deploy-iphone.sh --prepare-only`, using its pinned
+   source and the iOS version and build this release publishes (or the latest
+   released iOS version for a Mac-only release). The build is logged in
+   `iphone-N-prepare.log`; a failed preparation is retried after publication.
+   Once all selected channels are published/submitted, the controller resumes
+   that prepared update. It signs with the saved Ad Hoc
    profiles before contacting the phone, installs in place on the paired iPhone,
    and verifies the version/build reported by the device. An already-current
    phone skips installation. Both the app and widget versions are checked before
