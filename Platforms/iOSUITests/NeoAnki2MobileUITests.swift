@@ -617,6 +617,10 @@ final class MobileNavigationUITests: NeoAnki2MobileUITestCase {
         save.tap()
         XCTAssertTrue(add.waitUntilExists(timeout: 8))
         XCTAssertFalse(app.staticTexts["laguna"].exists)
+        // A word with cards is listed under Learning instead of disappearing.
+        let learning = app.buttons.matching(NSPredicate(format: "label == 'Learning' OR label BEGINSWITH 'Learning ('")).firstMatch
+        XCTAssertTrue(learning.waitUntilExists(timeout: 5)); learning.tap()
+        XCTAssertTrue(app.staticTexts["laguna"].waitUntilExists(timeout: 8))
 
         open("Home", in: app)
         let study = app.buttons["Study"]

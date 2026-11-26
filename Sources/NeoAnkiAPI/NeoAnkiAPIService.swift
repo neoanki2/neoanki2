@@ -248,6 +248,10 @@ public actor NeoAnkiAPIService {
                         "study.responses",
                         "vocabulary.lookup",
                         "vocabulary.known-words",
+                        "vocabulary.known-words.snapshot",
+                        "vocabulary.known-words.batches",
+                        "vocabulary.dictionary-forms",
+                        "vocabulary.frequency-bands",
                         "vocabulary.card-sets",
                         "vocabulary.pack-lifecycle",
                     ]
@@ -371,13 +375,31 @@ public actor NeoAnkiAPIService {
             return try await createExportJob(request, grant: grant)
         case (.get, "/v1/known-words"):
             return try await listKnownWords(request)
+        case (.get, "/v1/known-words/snapshot"):
+            return try await knownWordsSnapshot(request)
         case (.post, "/v1/known-words/judgments"):
             let input = try decodeVocabularyInput(VocabularyJudgmentInput.self, request: request)
+            try requireRecordable(input.judgment, pointer: "/judgment")
             let changeID = try vocabularyMutationID(request, grant: grant)
             return try await mapVocabularyErrors {
                 let result = try await personalVocabulary().setVocabularyJudgment(input.judgment, for: input.term, changeID: changeID)
-                return try .json(VocabularyJudgmentReceipt(id: result.id.uuidString.lowercased(),
-                    term: result.term, judgment: result.judgment, changedAt: result.changedAt))
+                return try .json(VocabularyJudgmentReceipt(result))
+            }
+        case (.post, "/v1/known-words/judgment-batches"):
+            let input = try decodeVocabularyInput(VocabularyJudgmentBatchInput.self, request: request)
+            guard (1 ... maximumVocabularyBatchSize).contains(input.entries.count) else {
+                throw APIServiceError.validation(
+                    "Send 1 to \(maximumVocabularyBatchSize) judgments in one batch.", pointer: "/entries"
+                )
+            }
+            for (index, entry) in input.entries.enumerated() {
+                try requireRecordable(entry.judgment, pointer: "/entries/\(index)/judgment")
+            }
+            let batchID = try vocabularyMutationID(request, grant: grant)
+            let entries = input.entries.map { VocabularyJudgmentEntry(term: $0.term, judgment: $0.judgment) }
+            return try await mapVocabularyErrors {
+                let receipt = try await personalVocabulary().setVocabularyJudgments(entries, batchID: batchID)
+                return try .json(status: 201, VocabularyBatchReceiptBody(receipt))
             }
         case (.post, "/v1/vocabulary-sets"):
             let input = try decodeVocabularyInput(VocabularySetDraft.self, request: request)
@@ -397,6 +419,16 @@ public actor NeoAnkiAPIService {
         }
 
         let components = request.path.split(separator: "/").map(String.init)
+        if components.count == 5, components[0] == "v1", components[1] == "known-words",
+           components[2] == "judgment-batches", components[4] == "undo", request.method == .post
+        {
+            let batchID = try parseUUID(components[3], pointer: "/id")
+            let undoID = try vocabularyMutationID(request, grant: grant)
+            return try await mapVocabularyErrors {
+                let receipt = try await personalVocabulary().undoVocabularyBatch(batchID, undoID: undoID)
+                return try .json(VocabularyBatchReceiptBody(receipt))
+            }
+        }
         if components.count >= 3, components[0] == "v1", components[1] == "vocabulary-packs" {
             let packID = try decodeVocabularyPathSegment(components[2], pointer: "/id")
             if components.count == 3 {
@@ -412,6 +444,12 @@ public actor NeoAnkiAPIService {
             } else if components.count == 4, components[3] == "entries", request.method == .get {
                 try require(grant, scope: .vocabularyRead)
                 return try await searchVocabularyEntries(packID: packID, request: request)
+            } else if components.count == 4, components[3] == "dictionary-forms", request.method == .post {
+                try require(grant, scope: .vocabularyRead)
+                return try await resolveDictionaryForms(packID: packID, request: request)
+            } else if components.count == 4, components[3] == "frequency-band", request.method == .get {
+                try require(grant, scope: .vocabularyRead)
+                return try await vocabularyFrequencyBand(packID: packID, request: request)
             } else if components.count == 4, components[3] == "media",
                       request.method == .get || request.method == .head {
                 try require(grant, scope: .vocabularyRead)
@@ -2938,11 +2976,50 @@ public actor NeoAnkiAPIService {
         let judgment: VocabularyJudgment
     }
 
-    private struct VocabularyJudgmentReceipt: Encodable {
+    private struct VocabularyJudgmentBatchInput: Decodable {
+        let entries: [VocabularyJudgmentInput]
+    }
+
+    /// The API form of a judgment change. The synchronized record writes Ignored as Not known plus
+    /// a flag older releases skip; clients of this API always see the judgment itself.
+    private struct VocabularyJudgmentReceipt: Encodable, Sendable {
         let id: String
         let term: VocabularyTerm
         let judgment: VocabularyJudgment
         let changedAt: Date
+        let batchId: String?
+        let origin: VocabularyJudgmentOrigin?
+
+        init(_ change: VocabularyJudgmentChange) {
+            id = change.id.uuidString.lowercased()
+            term = change.term
+            judgment = change.judgment
+            changedAt = change.changedAt
+            batchId = change.batchID?.uuidString.lowercased()
+            origin = change.origin
+        }
+    }
+
+    private struct VocabularyBatchReceiptBody: Encodable, Sendable {
+        let batchId: String
+        let recorded: Int
+        let unchanged: Int
+        let changes: [VocabularyJudgmentReceipt]
+
+        init(_ receipt: VocabularyBatchReceipt) {
+            batchId = receipt.batchID.uuidString.lowercased()
+            recorded = receipt.recorded
+            unchanged = receipt.unchanged
+            changes = receipt.changes.map(VocabularyJudgmentReceipt.init)
+        }
+    }
+
+    private struct KnownWordsSnapshotBody: Encodable, Sendable {
+        let version: String
+        let language: String
+        let unchanged: Bool?
+        let expressions: [String: VocabularyReadingState]?
+        let lemmas: [String: VocabularyReadingState]?
     }
 
     private struct VocabularySetReceipt: Encodable {
@@ -2969,11 +3046,53 @@ public actor NeoAnkiAPIService {
                 throw APIServiceError.validation("Choose a learning language.", pointer: "/query/language")
             }
         }
-        let statuses = try await personalVocabulary().vocabularyStatuses(language: language)
+        let expression = request.query["expression"]?.first
+        if let expression {
+            guard language != nil else {
+                throw APIServiceError.validation(
+                    "Choose a learning language to filter by expression.", pointer: "/query/language", fieldCode: "required"
+                )
+            }
+            guard !expression.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, expression.utf8.count <= 1_024 else {
+                throw APIServiceError.validation(
+                    "Enter a word or phrase of at most 1024 UTF-8 bytes.", pointer: "/query/expression"
+                )
+            }
+        }
+        let statuses = try await personalVocabulary().vocabularyStatuses(language: language, expression: expression)
         let values = Array(statuses.dropFirst(offset).prefix(limit))
         let next = offset + values.count
         let cursor = next < statuses.count ? try await encodedCursor(route: route, offset: next) : nil
         return try .json(APICollection(data: values, page: .init(nextCursor: cursor, limit: limit)))
+    }
+
+    private func knownWordsSnapshot(_ request: APIRequest) async throws -> APIResponse {
+        guard let language = request.query["language"]?.first else {
+            throw APIServiceError.validation("Choose a learning language.", pointer: "/query/language", fieldCode: "required")
+        }
+        guard VocabularyTerm.isLanguageCode(language) else {
+            throw APIServiceError.validation("Choose a learning language.", pointer: "/query/language")
+        }
+        let snapshot = try await personalVocabulary().vocabularySnapshot(language: language)
+        if let since = request.query["since"]?.first, since == snapshot.version {
+            return try .json(KnownWordsSnapshotBody(version: snapshot.version, language: snapshot.language,
+                unchanged: true, expressions: nil, lemmas: nil))
+        }
+        return try .json(KnownWordsSnapshotBody(version: snapshot.version, language: snapshot.language,
+            unchanged: nil, expressions: snapshot.expressions, lemmas: snapshot.lemmas))
+    }
+
+    /// Language codes as Known Words stores them, for vocabulary pack requests.
+    func isVocabularyLanguageCode(_ code: String) -> Bool { VocabularyTerm.isLanguageCode(code) }
+
+    /// Unknown judgment values decode as `unrecognized` so stored data from newer releases stays
+    /// readable; a client may only record the values this release understands.
+    private func requireRecordable(_ judgment: VocabularyJudgment, pointer: String) throws {
+        guard VocabularyJudgment.recordable.contains(judgment) else {
+            throw APIServiceError.validation(
+                "Choose known, unfamiliar, ignored, or reviewHistory.", pointer: pointer
+            )
+        }
     }
 
     private func decodeVocabularyInput<T: Decodable>(_ type: T.Type, request: APIRequest) throws -> T {
@@ -3000,6 +3119,9 @@ public actor NeoAnkiAPIService {
     private func mapVocabularyErrors<T>(_ operation: () async throws -> T) async throws -> T {
         do { return try await operation() }
         catch VocabularySetError.idConflict { throw DatabaseError.idempotencyConflict }
+        catch VocabularySetError.batchNotFound {
+            throw APIServiceError.notFound(VocabularySetError.batchNotFound.localizedDescription)
+        }
         catch let error as VocabularySetError { throw APIServiceError.validation(error.localizedDescription) }
         catch let error as ClozeValidationError { throw APIServiceError.validation(error.localizedDescription) }
     }

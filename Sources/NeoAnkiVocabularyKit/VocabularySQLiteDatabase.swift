@@ -459,3 +459,62 @@ final class VocabularySQLiteDatabase: @unchecked Sendable {
 }
 
 private let vocabularySQLiteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+// MARK: - Known Words lookups
+
+extension VocabularySQLiteDatabase {
+    /// Canonical forms whose stored forms have one of `keys` as their search key, by key. Reuses one
+    /// prepared statement because pack connections allow only a few bound variables.
+    func canonicalForms(searchKeys keys: [String], languagePrimary: String) throws -> [String: [String]] {
+        var result: [String: [String]] = [:]
+        let statement = try prepare("""
+            SELECT DISTINCT e.canonical FROM entry_forms f JOIN entries e ON e.id = f.entry_id
+            WHERE f.search_key = ?
+              AND (COALESCE(f.language, e.language) = ? OR COALESCE(f.language, e.language) LIKE ?)
+            ORDER BY e.canonical;
+            """)
+        defer { sqlite3_finalize(statement) }
+        for key in Set(keys) {
+            sqlite3_reset(statement)
+            sqlite3_clear_bindings(statement)
+            try bindText(key, at: 1, to: statement)
+            try bindText(languagePrimary, at: 2, to: statement)
+            try bindText(languagePrimary + "-%", at: 3, to: statement)
+            while true {
+                let code = sqlite3_step(statement)
+                if code == SQLITE_DONE { break }
+                guard code == SQLITE_ROW, let text = sqlite3_column_text(statement, 0) else { throw sqliteError(code) }
+                result[key, default: []].append(String(cString: text))
+            }
+        }
+        return result
+    }
+
+    /// Canonical forms ranked by descending frequency, from `offset` for up to `limit` entries, plus
+    /// the number of ranked entries in the language.
+    func rankedCanonicalForms(languagePrimary: String, offset: Int, limit: Int) throws -> (words: [String], total: Int) {
+        let filter = "frequency IS NOT NULL AND (language = ? OR language LIKE ?)"
+        let count = try prepare("SELECT COUNT(*) FROM entries WHERE \(filter);")
+        defer { sqlite3_finalize(count) }
+        try bindText(languagePrimary, at: 1, to: count)
+        try bindText(languagePrimary + "-%", at: 2, to: count)
+        guard sqlite3_step(count) == SQLITE_ROW else { throw sqliteError() }
+        let total = Int(sqlite3_column_int64(count, 0))
+        let statement = try prepare("""
+            SELECT canonical FROM entries WHERE \(filter) ORDER BY frequency DESC, canonical, id LIMIT ? OFFSET ?;
+            """)
+        defer { sqlite3_finalize(statement) }
+        try bindText(languagePrimary, at: 1, to: statement)
+        try bindText(languagePrimary + "-%", at: 2, to: statement)
+        guard sqlite3_bind_int64(statement, 3, Int64(limit)) == SQLITE_OK,
+              sqlite3_bind_int64(statement, 4, Int64(offset)) == SQLITE_OK else { throw sqliteError() }
+        var words: [String] = []
+        while true {
+            let code = sqlite3_step(statement)
+            if code == SQLITE_DONE { break }
+            guard code == SQLITE_ROW, let text = sqlite3_column_text(statement, 0) else { throw sqliteError(code) }
+            words.append(String(cString: text))
+        }
+        return (words, total)
+    }
+}

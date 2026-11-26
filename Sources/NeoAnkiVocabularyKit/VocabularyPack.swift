@@ -193,7 +193,7 @@ public actor VocabularyPack {
     public nonisolated let manifest: VocabularyPackManifest
     public nonisolated let packageURL: URL
 
-    private let database: VocabularySQLiteDatabase
+    let database: VocabularySQLiteDatabase
     private let limits: VocabularyPackLimits
 
     private init(

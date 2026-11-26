@@ -47,9 +47,24 @@ occurrence with a native Cloze blank. Recall the missing form aloud or type it
 to compare, then choose your grade. Both cards have their own review schedules.
 
 Words can become **Known · From reviews** after spaced, successful meaning
-recall. **Cloze recall** reflects production separately. Use **Remove from Known**
-to correct a reading judgment and **Use Review History** to return to the
-automatic estimate.
+recall. **Cloze recall** reflects production separately. Known words from
+deleted card sets stay known and show **Kept from deleted cards**.
+
+Choose **Known**, **Learning**, **Not known**, or **Ignored** above the list to
+see each group. Open a word's actions to correct it: **I Know This**, **Remove
+from Known**, or **Ignore** for names, brands, and loanwords you don't want
+highlighted while reading. **Use Review History** discards your judgment and
+returns the word to the automatic estimate. **Undo** reverses the last change.
+
+**I Know This** marks the word itself, so it counts as known in every meaning.
+A card set still practices the meaning you gave it.
+
+Use **Word List → Import Word List…** to add a text, CSV, or TSV file with one
+word or phrase per line, or **Paste Word List…** to paste one. The preview shows
+how many words will be marked known and which lines were skipped. A CSV or TSV
+file with a header row can also set `judgment`, `sense`, and `lemma` columns.
+After importing, choose **Undo** to reverse the whole import. **Export Word
+List…** saves the selected language as a CSV file you can import again.
 
 ## Add an item
 

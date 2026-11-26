@@ -135,6 +135,8 @@ actor SQLiteDatabase {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     var vocabularyObservers: [UUID: AsyncStream<Void>.Continuation] = [:]
+    /// Vocabulary statuses for every language, valid while the connection's cache token is unchanged.
+    var vocabularyStatusCache: (token: DatabaseCacheToken, statuses: [VocabularyStatus])?
     private var learningTimeObservers: [UUID: AsyncStream<Void>.Continuation] = [:]
     var maturityProjection = MaturityProjection()
     var maturityStatistics = MaturityReadStatistics()
@@ -3074,6 +3076,7 @@ actor SQLiteDatabase {
 
     func deleteItemWithMediaWithoutTransaction(id: UUID, deletedAt: Date) throws -> Bool {
         guard let persisted = try fetchItem(id: id) else { return false }
+        try archiveVocabularyEvidence(beforeDeleting: persisted.item, now: deletedAt)
         try deactivateReviewHistory(
             cardIDs: try fetchCards(for: id).map(\.id),
             revertedAt: deletedAt

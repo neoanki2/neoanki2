@@ -27,6 +27,16 @@
       <p class="hint">Suggestions come from your local NeoAnki2 vocabulary packs. You can always edit the answer.</p>
       <p id="dictionary-status" class="hint" role="status"></p>
     </section>
+    <section id="placement" aria-labelledby="placement-heading" hidden>
+      <h2 id="placement-heading">Estimate my level</h2>
+      <p>See 20 words from each frequency band of your vocabulary pack and tick the ones you know. If you know most of a band, mark its common words as known in one step.</p>
+      <label for="placement-language">Language</label>
+      <select id="placement-language"></select>
+      <div class="actions"><button id="placement-start" type="button">Show sample words</button></div>
+      <div id="placement-bands"></div>
+      <div class="actions"><button id="placement-mark" type="button" hidden></button><button id="placement-undo" class="secondary" type="button" hidden>Undo</button></div>
+      <p id="placement-status" class="hint" role="status" aria-live="polite"></p>
+    </section>
     <section aria-labelledby="capture-heading">
       <h2 id="capture-heading">Add your first card</h2>
       <p>Pin this extension in Chrome. Highlight a word or phrase, then click its toolbar icon. Review the answer, choose a deck, and save.</p>
