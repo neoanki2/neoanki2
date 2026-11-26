@@ -267,24 +267,41 @@ class Release:
             commands.append(("", ["swift", "run", "neoanki-api-reference", "check"]))
         environment = os.environ.copy()
         environment["SDKROOT"] = run(["xcrun", "--sdk", "macosx", "--show-sdk-path"])
-        evidence = self.state.get("validation_progress", [])
-        for index, (prefix, command) in enumerate(commands):
-            log = self.directory / f"verify-{index}.log"
-            if index < len(evidence):
-                if sha(log) != evidence[index]["sha256"]:
-                    raise RuntimeError("Validation evidence changed")
-                continue
-            print("Verifying " + " ".join(command), flush=True)
-            try:
-                run(command, cwd=self.source / prefix, log=log, env=environment)
-            except Exception:
-                self.state["validation_failure"] = {"command": command, "log": log.name,
-                    "sha256": sha(log) if log.exists() else None}
-                self.save(remote=True)
-                raise
-            evidence.append({"command": command, "package": prefix, "log": log.name, "sha256": sha(log)})
-            self.state["validation_progress"] = evidence
-            self.save()
+        evidence = list(self.state.get("validation_progress", []))
+        evidence.extend([None] * (len(commands) - len(evidence)))
+        work = {}
+        for index, (package, command) in enumerate(commands):
+            saved = evidence[index]
+            if saved is None:
+                work.setdefault(package, []).append((index, command))
+            elif saved["command"] != command or sha(self.directory / saved["log"]) != saved["sha256"]:
+                raise RuntimeError("Validation evidence changed")
+
+        def verify_package(package, checks):
+            for index, command in checks:
+                log = self.directory / f"verify-{index}.log"
+                print("Verifying " + " ".join(command), flush=True)
+                try:
+                    run(command, cwd=self.source / package, log=log, env=environment)
+                except Exception:
+                    with self.lock:
+                        if "validation_failure" not in self.state:
+                            self.state["validation_failure"] = {"command": command, "log": log.name,
+                                "sha256": sha(log) if log.exists() else None}
+                            self.save(remote=True)
+                    raise
+                with self.lock:
+                    evidence[index] = {"command": command, "package": package, "log": log.name, "sha256": sha(log)}
+                    self.state["validation_progress"] = evidence
+                    self.save()
+
+        # The packages have separate SwiftPM build directories. Preserve
+        # command order within each package and checkpoint by original index.
+        if work:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(work)) as pool:
+                checks = [pool.submit(verify_package, package, commands) for package, commands in work.items()]
+                for check in concurrent.futures.as_completed(checks):
+                    check.result()
         self.state["validation"] = evidence
         self.save()
 
@@ -471,6 +488,55 @@ class Release:
             time.sleep(min(5, max(0, deadline - time.monotonic())))
             errors, waiting = self.publish()
         return errors, waiting
+
+
+def iphone_identity(state):
+    """The iOS version/build the phone receives once this release is published."""
+    if "ios" in state["selected"]:
+        return {"version": state["version"], "build": state["build"]}
+    ios = state["channels"]["ios"]
+    return {"version": ios["version"], "build": ios["build"]}
+
+
+def prepare_release_iphone(release):
+    """Build and sign the phone update while Store publication waits on Apple.
+
+    Needs no phone. Best effort: on failure no receipt is recorded, so
+    install_release_iphone prepares a fresh attempt after publication.
+    """
+    state = release.state
+    local = state.setdefault("local_iphone", {"status": "planned"})
+    if local.get("receipt") or local.get("status", "planned") != "planned":
+        return
+    identity = {**iphone_identity(state), "sourceRevision": state["revision"]}
+    attempt = int(local.get("attempt", 0)) + 1
+    try:
+        output = release.directory / f"iphone-{attempt}"
+        path = output / "deployment.json"
+        release.verify_source()
+        if output.exists():
+            raise RuntimeError(str(output) + " already exists; leaving it for post-publication recovery")
+        local.update(status="preparing", attempt=attempt, **identity)
+        release.save()
+        command = [str(ROOT / "Scripts/deploy-iphone.sh"), "--source-dir", str(release.source),
+                   "--output", str(output), "--version", identity["version"], "--build", identity["build"],
+                   "--signing-dir", str(release.signing), "--prepare-only"]
+        # Store exports have finished; keep Keychain search-list edits serialized anyway.
+        with (WORK / "signing.lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            run(command, log=release.directory / f"iphone-{attempt}-prepare.log")
+        receipt = json.loads(path.read_text())
+        if receipt.get("phase") != "prepared" or any(receipt.get(k) != v for k, v in identity.items()):
+            raise RuntimeError("Prepared iPhone update differs from the release identity")
+    except Exception as error:
+        local.update(status="planned", prepare_error=str(error))
+        release.save()
+        print("IPHONE_DEPLOY_PREPARE_DEFERRED=" + str(error), flush=True)
+        return
+    local.update(status="prepared", receipt=str(path))
+    local.pop("prepare_error", None)
+    release.save()
+    print("IPHONE_DEPLOY_STATUS=prepared", flush=True)
 
 
 def install_release_iphone(release, device=None):
@@ -692,7 +758,11 @@ def main(argv=None):
             for channel in state["selected"]:
                 release.export(channel)
             release.save(remote=True)
-            errors, waiting = release.publish_until_ready(args.wait_seconds)
+            # Prepare the phone update during Apple upload/processing instead of after it.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                preparing = pool.submit(prepare_release_iphone, release)
+                errors, waiting = release.publish_until_ready(args.wait_seconds)
+                preparing.result()
         if state.get("complete"):
             try:
                 install_release_iphone(release, args.device)

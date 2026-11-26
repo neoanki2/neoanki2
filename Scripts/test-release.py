@@ -191,6 +191,7 @@ class PlanningTests(unittest.TestCase):
              patch.object(controller.AppInputs,'load',return_value=self.inputs),\
              patch.object(controller,'preflight'),patch.object(controller,'make_api',return_value=(API(),'app')),\
              patch.object(controller,'install_release_iphone',side_effect=install),\
+             patch.object(controller,'prepare_release_iphone',side_effect=lambda r:calls.append(('prepare-iphone',r.state['complete']))),\
              patch.object(controller,'status',return_value={}):
             self.write('.gitignore','.build/\n')
             self.git('add','.');self.git('commit','-qm','merged release input')
@@ -206,6 +207,9 @@ class PlanningTests(unittest.TestCase):
         self.assertIn(('verify',{'':['MobileTests']}),calls)
         self.assertEqual([c for c in calls if c[0]=='publish'],[('publish',['ios'])])
         self.assertEqual([c for c in calls if c[0]=='iphone'],[('iphone','1.0.320')] * (2 if block_phone else 1))
+        # The phone update is prepared once, after exports and before publication completes.
+        self.assertEqual([c for c in calls if c[0]=='prepare-iphone'],[('prepare-iphone',False)])
+        self.assertLess(calls.index(('export','ios')),calls.index(('prepare-iphone',False)))
 
 
     def test_clean_synchronized_main_is_the_release_source(self):
@@ -327,6 +331,72 @@ class LocalIPhoneTests(unittest.TestCase):
                    'installed': True, 'installedVersionVerified': True, 'launched': False, 'phase': 'complete'}
         controller.write_json(output / 'deployment.json', receipt)
         Path(kwargs['log']).write_text('IPHONE_DEPLOY_ELAPSED_SECONDS=12\n')
+
+    def prepare(self, command, **kwargs):
+        self.calls.append(command)
+        self.assertIn('--prepare-only', command)
+        output = Path(command[command.index('--output') + 1]); output.mkdir()
+        controller.write_json(output / 'deployment.json', {
+            'version': command[command.index('--version') + 1], 'build': command[command.index('--build') + 1],
+            'sourceRevision': 'merged-sha', 'phase': 'prepared', 'installed': False})
+
+    def test_phone_update_is_prepared_during_publication_and_then_only_installed(self):
+        self.release.state.update(selected=['ios'], build='322')
+        with patch.object(controller, 'WORK', self.directory), patch.object(controller, 'run', side_effect=self.prepare):
+            controller.prepare_release_iphone(self.release)
+            controller.prepare_release_iphone(self.release)
+        self.assertEqual(len(self.calls), 1)
+        command = self.calls[0]
+        self.assertEqual((command[command.index('--version') + 1], command[command.index('--build') + 1]), ('1.0.322', '322'))
+        self.assertEqual(self.release.state['local_iphone']['status'], 'prepared')
+        # Publication then records the new iOS version; installation reuses the prepared artifact.
+        self.release.state['channels']['ios'] = {'version': '1.0.322', 'build': '322'}
+        path = self.directory / 'iphone-1' / 'deployment.json'
+        def deliver(command, **kwargs):
+            self.assertNotIn('--prepare-only', command); self.assertNotIn('--output', command)
+            self.assertEqual(command[command.index('--resume') + 1], str(path.parent))
+            receipt = json.loads(path.read_text())
+            receipt.update(installed=True, installedVersionVerified=True, device='My phone')
+            controller.write_json(path, receipt)
+        with patch.object(controller, 'run', side_effect=deliver):
+            controller.install_release_iphone(self.release)
+        self.assertEqual(self.release.state['local_iphone']['attempt'], 1)
+        self.assertEqual(self.release.state['local_iphone']['status'], 'installed')
+
+    def test_mac_only_release_prepares_the_latest_released_ios_version(self):
+        self.release.state.update(selected=['mac', 'homebrew'], build='322')
+        with patch.object(controller, 'WORK', self.directory), patch.object(controller, 'run', side_effect=self.prepare):
+            controller.prepare_release_iphone(self.release)
+        command = self.calls[0]
+        self.assertEqual((command[command.index('--version') + 1], command[command.index('--build') + 1]), ('1.0.321', '321'))
+
+    def test_failed_preparation_defers_to_a_fresh_attempt_after_publication(self):
+        self.release.state.update(selected=['ios'], build='322')
+        with patch.object(controller, 'WORK', self.directory), \
+             patch.object(controller, 'run', side_effect=RuntimeError('signing failed')), \
+             contextlib.redirect_stdout(io.StringIO()):
+            controller.prepare_release_iphone(self.release)
+        local = self.release.state['local_iphone']
+        self.assertEqual((local['status'], local['attempt']), ('planned', 1))
+        self.assertNotIn('receipt', local)
+        self.release.state['channels']['ios'] = {'version': '1.0.322', 'build': '322'}
+        with patch.object(controller, 'run', side_effect=self.deploy):
+            controller.install_release_iphone(self.release)
+        self.assertEqual(self.calls[0][self.calls[0].index('--output') + 1], str(self.directory / 'iphone-2'))
+        self.assertEqual(self.release.state['local_iphone']['status'], 'installed')
+
+    def test_prepared_identity_mismatch_is_not_reused(self):
+        self.release.state.update(selected=['ios'], build='322')
+        def stale(command, **kwargs):
+            self.prepare(command, **kwargs)
+            path = Path(command[command.index('--output') + 1]) / 'deployment.json'
+            receipt = json.loads(path.read_text()); receipt['sourceRevision'] = 'other'
+            controller.write_json(path, receipt)
+        with patch.object(controller, 'WORK', self.directory), patch.object(controller, 'run', side_effect=stale), \
+             contextlib.redirect_stdout(io.StringIO()):
+            controller.prepare_release_iphone(self.release)
+        self.assertEqual(self.release.state['local_iphone']['status'], 'planned')
+        self.assertNotIn('receipt', self.release.state['local_iphone'])
 
     def test_delivery_streams_readiness_and_preserves_the_original_log(self):
         log = self.directory / 'delivery.log'
@@ -663,6 +733,55 @@ class RecoveryTests(unittest.TestCase):
         with patch.object(controller.time,'sleep',side_effect=AssertionError('error retried')):
             self.assertEqual(r.publish_until_ready(600),({'ios':'invalid binary'},{}))
         self.assertEqual(calls,['publish'])
+    def test_independent_packages_overlap_but_api_check_waits_for_root_tests(self):
+        release = self.release(["ios", "mac"])
+        with tempfile.TemporaryDirectory() as directory:
+            release.directory = release.source = Path(directory)
+            release.state.update(tests={"": ["RootTests"], "NeoAnkiCore": ["CoreTests"]},
+                                 changed_paths=["Sources/NeoAnkiAPI/Registry.swift"])
+            packages_started = threading.Barrier(2, timeout=5)
+            root_finished = threading.Event()
+
+            def run(args, *, cwd=None, log=None, env=None):
+                if args[0] == "xcrun":
+                    return "/SDK"
+                if args[1] == "test":
+                    packages_started.wait()
+                    if cwd == release.source:
+                        root_finished.set()
+                else:
+                    self.assertEqual(args, ["swift", "run", "neoanki-api-reference", "check"])
+                    self.assertTrue(root_finished.is_set())
+                log.write_text("passed")
+
+            with patch.object(controller, "run", side_effect=run):
+                release.validate()
+            self.assertEqual([item["package"] for item in release.state["validation"]], ["", "NeoAnkiCore", ""])
+            self.assertEqual([item["log"] for item in release.state["validation"]],
+                             ["verify-0.log", "verify-1.log", "verify-2.log"])
+
+    def test_resume_reuses_completed_core_check_while_root_is_pending(self):
+        release = self.release(["ios"])
+        with tempfile.TemporaryDirectory() as directory:
+            release.directory = release.source = Path(directory)
+            core_log = release.directory / "verify-1.log"
+            core_log.write_text("Core checks passed")
+            core_entry = {"command": ["swift", "test", "--parallel", "--filter", "CoreTests"],
+                          "package": "NeoAnkiCore", "log": core_log.name, "sha256": controller.sha(core_log)}
+            release.state.update(tests={"": ["RootTests"], "NeoAnkiCore": ["CoreTests"]}, changed_paths=[],
+                                 validation_progress=[None, core_entry])
+
+            def run(args, *, cwd=None, log=None, env=None):
+                if args[0] == "xcrun":
+                    return "/SDK"
+                self.assertEqual(cwd, release.source)
+                log.write_text("Root checks passed")
+
+            with patch.object(controller, "run", side_effect=run):
+                release.validate()
+            self.assertEqual(release.state["validation"][1], core_entry)
+            self.assertEqual(core_log.read_text(), "Core checks passed")
+
     def test_failed_verification_is_preserved_and_never_rerun(self):
         r=self.release(['ios'])
         with tempfile.TemporaryDirectory() as folder:

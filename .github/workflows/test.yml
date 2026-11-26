@@ -19,7 +19,9 @@ jobs:
   swift-unit:
     name: Unit tests (${{ matrix.package }})
     runs-on: macos-26-intel
-    timeout-minutes: 15
+    # A cold app build alone exceeded 14 minutes on macos-26-intel (run
+    # 45769518375 reached 419/470 compile steps); budget for build plus tests.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -34,14 +36,19 @@ jobs:
           persist-credentials: false
       - name: Identify compiler, SDK and workspace for compiled-test cache
         id: toolchain
+        # Reads version files only; launching xcodebuild hung a runner for 20 minutes.
+        timeout-minutes: 2
         env:
           UNIT_MANIFESTS: ${{ matrix.package == 'app' && hashFiles('Package.swift', 'NeoAnkiCore/Package.swift', '**/Package.resolved') || hashFiles('NeoAnkiCore/Package.swift', 'NeoAnkiCore/Package.resolved') }}
           UNIT_RUNNER: ${{ hashFiles('Scripts/test-unit.sh') }}
         run: |
+          sdk="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
           {
-            xcodebuild -version
-            swift --version
-            xcrun --sdk macosx --show-sdk-build-version
+            # The Xcode build pins its bundled Swift toolchain.
+            plutil -extract CFBundleShortVersionString raw "$DEVELOPER_DIR/../version.plist"
+            plutil -extract ProductBuildVersion raw "$DEVELOPER_DIR/../version.plist"
+            plutil -extract Version raw "$sdk/SDKSettings.plist"
+            plutil -extract ProductBuildVersion raw "$sdk/System/Library/CoreServices/SystemVersion.plist"
             printf '%s\n' "$DEVELOPER_DIR" "$GITHUB_WORKSPACE" "$UNIT_MANIFESTS" "$UNIT_RUNNER"
           } > "$RUNNER_TEMP/unit-toolchain.txt"
           digest=$(shasum -a 256 "$RUNNER_TEMP/unit-toolchain.txt" | cut -d ' ' -f 1)

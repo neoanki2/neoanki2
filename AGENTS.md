@@ -13,6 +13,18 @@
 Preserve unrelated working-tree changes. API changes must update the typed
 endpoint registry, tests, and generated `docs/api/` artifacts together.
 
+## Working copies
+
+- Work only in this main checkout. Never create a Git worktree, clone, or
+  other isolated checkout unless the user explicitly requests one in the
+  current conversation. Use branches, commits, or a uniquely named stash
+  instead, and preserve unrelated working-tree changes when switching.
+- The only exception is the detached source worktree that
+  `./Scripts/release.sh` itself pins under `.build/releases/VERSION/source`;
+  do not create others for releases, and remove it during release cleanup.
+- Release history, receipts, and production debug symbols live in this
+  checkout's `.build/releases/`. Do not move or delete them.
+
 ## GitHub check failures
 
 - Do not rerun an unchanged failed check to obtain a green result.
