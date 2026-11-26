@@ -18,14 +18,18 @@ concurrency:
 jobs:
   swift-unit:
     name: Unit tests (${{ matrix.package }})
-    runs-on: macos-26-intel
-    # A cold app build alone exceeded 14 minutes on macos-26-intel (run
-    # 45769518375 reached 419/470 compile steps); budget for build plus tests.
+    runs-on: ${{ matrix.runner }}
+    # Keep the cold-build budget when the app lane first populates its arm64 cache.
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        package: [app, core]
+        include:
+          # App compilation and tests are the longest path to CI Gate.
+          - package: app
+            runner: macos-26
+          - package: core
+            runner: macos-26-intel
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       UNIT_PACKAGE: ${{ matrix.package }}

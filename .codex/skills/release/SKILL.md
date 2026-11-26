@@ -28,7 +28,13 @@ and status checks do not create timing entries.
   `elapsed_seconds` measured from the first start. Include pauses, retries,
   cleanup, and the bottleneck fix. Record blocked reports and leave their release
   IDs open for resumption. A completed, abandoned, or no-op release closes its
-  entry. Report the total elapsed time and the absolute path to the timing log.
+  entry.
+- Include a timing table in every release report with the current release and
+  the four most recent completed releases before it. Give the version and total
+  elapsed time for each, plus the absolute path to the timing log. Use the last
+  completed timing entry for each version and skip abandoned releases. Label
+  reconstructed intervals with their start and end milestones, and mark missing
+  measurements as unknown.
 
 ## Integrate the release source
 
@@ -214,15 +220,20 @@ releases, and uncertain uploads must retain their recovery inputs.
 
 After delivery and cleanup, use this release's history and prior timings to find
 the largest delay the project can reduce on the path to completion. Record any
-longer external wait separately. Implement and validate one concrete fix before
-the final report. Keep it as a separate change ready for the next applicable
-release, and preserve required checks, signing, and installation verification.
+longer external wait separately. Implement and validate one concrete fix.
+Submit it in a separate PR from the shipped product changes, run the local
+pre-push checks, and merge it into `main` after required GitHub checks pass.
+Verify that GitHub reports the PR as `MERGED` and that remote `main` contains the
+fix before reporting the release complete. Preserve required checks, signing,
+and installation verification. Keep the published release pinned to its original
+source revision.
 
-Log the cause, observed delay, change, and validation result. If measuring the
-savings requires another release, label the savings as an estimate and compare
-it with the actual timing of the next applicable release. If a concrete blocker
-prevents implementing or validating the fix, record it and explain it in the
-final report.
+Log the cause, observed delay, change, validation result, and merge time. If
+measuring the savings requires another release, label the savings as an
+estimate and compare it with the actual timing of the next applicable release.
+If a concrete blocker prevents implementing, validating, or merging the fix,
+report the shipped channels and the remaining blocker. Keep the release timing
+entry open until the fix is merged.
 
 Read [the release guide](../../../docs/RELEASING.md) for setup, version examples,
 checkpoint behavior, and recovery. Return selected versions/source, each channel's
