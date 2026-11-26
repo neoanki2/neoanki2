@@ -87,7 +87,9 @@ if [ "$NOTARIZE" -eq 1 ] && [ "$SIGNED" -ne 1 ]; then
 fi
 SIGNING_ARGUMENTS=()
 [ "$NOTARIZE" -eq 1 ] || SIGNING_ARGUMENTS+=(--sign-only)
-if [ "$SIGNED" -eq 1 ]; then
+# The controller already checked this identity before reserving a new
+# release. Standalone builds and resumed builds still check it here.
+if [ "$SIGNED" -eq 1 ] && [ "${NEOANKI_RELEASE_SIGNING_PREFLIGHTED:-0}" != "1" ]; then
   python3 "$ROOT/Scripts/sign-macos-app.py" --check ${SIGNING_ARGUMENTS[@]+"${SIGNING_ARGUMENTS[@]}"}
 fi
 

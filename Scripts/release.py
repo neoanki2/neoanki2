@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import threading
@@ -73,6 +74,7 @@ class GitHub:
     def __init__(self):
         run(["gh", "auth", "status"])
         self.repository = run(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])
+        self.published_checkpoints = {}
 
     def api(self, path, method="GET", body=None):
         args = ["gh", "api", "repos/" + self.repository + "/" + path, "--method", method]
@@ -143,6 +145,39 @@ class GitHub:
             if comparison.get("status") not in ("ahead", "identical"):
                 raise ValueError("Release source is not contained in remote main; publication blocked")
 
+    def unit_validation(self, revision):
+        """Find a successful PR workflow that tested the exact release tree."""
+        tree_id = run(["git", "rev-parse", revision + "^{tree}"])
+        for pr in self.api(f"commits/{revision}/pulls"):
+            if (not pr.get("merged_at") or pr.get("merge_commit_sha") != revision
+                    or pr["base"]["ref"] != "main"):
+                continue
+            head = pr["head"]["sha"]
+            if not re.fullmatch(r"[0-9a-f]{40}", head):
+                continue
+            path = f"actions/workflows/test.yml/runs?head_sha={head}&status=success&per_page=10"
+            for workflow in self.api(path)["workflow_runs"]:
+                if (workflow.get("path", "").split("@", 1)[0] != ".github/workflows/test.yml"
+                        or workflow.get("event") not in ("pull_request", "workflow_dispatch")
+                        or workflow.get("head_sha") != head
+                        or workflow.get("status") != "completed" or workflow.get("conclusion") != "success"
+                        or workflow.get("repository", {}).get("full_name") != self.repository):
+                    continue
+                run_id, attempt = workflow["id"], workflow["run_attempt"]
+                name = f"unit-tested-tree-{attempt}"
+                artifacts = self.api(f"actions/runs/{run_id}/artifacts?name={name}")["artifacts"]
+                if len([a for a in artifacts if a["name"] == name and not a["expired"]]) != 1:
+                    continue
+                with tempfile.TemporaryDirectory(prefix="neoanki-unit-evidence-") as folder:
+                    run(["gh", "run", "download", str(run_id), "--repo", self.repository,
+                         "--name", name, "--dir", folder])
+                    receipt = Path(folder) / "tested-tree.txt"
+                    if not receipt.is_file() or receipt.read_text().strip() != tree_id:
+                        continue
+                return {"revision": revision, "tree": tree_id, "pull_request": pr["number"],
+                        "workflow_run": run_id, "workflow_attempt": attempt, "url": workflow["html_url"]}
+        return None
+
     def reserve(self, state):
         self.verify_release_source(state)
         tag = "v" + state["version"]
@@ -165,9 +200,14 @@ class GitHub:
     def checkpoint(self, path, state):
         public = {k: v for k, v in state.items() if k not in ("directory", "worktree", "local_iphone")}
         asset = Path(path).parent / STATE_ASSET
+        snapshot = json.dumps(public, sort_keys=True)
+        version = state["version"]
+        if self.published_checkpoints.get(version) == snapshot:
+            return
         write_json(asset, public)
-        run(["gh", "release", "upload", "v" + state["version"], str(asset),
+        run(["gh", "release", "upload", "v" + version, str(asset),
              "--repo", self.repository, "--clobber"])
+        self.published_checkpoints[version] = snapshot
 
     def assets(self, version):
         return json.loads(run(["gh", "release", "view", "v" + version, "--repo", self.repository,
@@ -231,6 +271,7 @@ class Release:
         self.config, self.signing = config, signing
         self.path = self.directory / "release.json"
         self.lock = threading.RLock()
+        self.signing_preflighted = False
         self.source = self.directory / "source"
         if not self.source.exists():
             run(["git", "worktree", "add", "--detach", str(self.source), state["revision"]])
@@ -257,16 +298,27 @@ class Release:
                 if sha(self.directory / item["log"]) != item["sha256"]:
                     raise RuntimeError("Validation evidence changed")
             return
+        ci = self.state.get("validation_ci")
+        if ci is None and self.state["tests"] and not self.state.get("validation_progress"):
+            receipt = self.github.unit_validation(self.state["revision"])
+            if receipt:
+                log = self.directory / "ci-unit.json"
+                write_json(log, receipt)
+                ci = {"log": log.name, "sha256": sha(log), "kind": "github_unit_tests"}
+                self.state["validation_ci"] = ci
+                self.save()
+                print("Reusing exact-tree unit tests from " + receipt["url"], flush=True)
+        if ci and sha(self.directory / ci["log"]) != ci["sha256"]:
+            raise RuntimeError("Validation evidence changed")
         commands = []
-        for prefix, names in self.state["tests"].items():
-            cmd = ["swift", "test", "--parallel", "--filter", "|".join(names)]
-            if not prefix:
-                cmd += ["--skip", "AppLaunchSmokeTests"]
-            commands.append((prefix, cmd))
+        if ci is None:
+            for prefix, names in self.state["tests"].items():
+                cmd = ["swift", "test", "--parallel", "--filter", "|".join(names)]
+                if not prefix:
+                    cmd += ["--skip", "AppLaunchSmokeTests"]
+                commands.append((prefix, cmd))
         if any(p.startswith("Sources/NeoAnkiAPI/") for p in self.state["changed_paths"]):
             commands.append(("", ["swift", "run", "neoanki-api-reference", "check"]))
-        environment = os.environ.copy()
-        environment["SDKROOT"] = run(["xcrun", "--sdk", "macosx", "--show-sdk-path"])
         evidence = list(self.state.get("validation_progress", []))
         evidence.extend([None] * (len(commands) - len(evidence)))
         work = {}
@@ -298,11 +350,13 @@ class Release:
         # The packages have separate SwiftPM build directories. Preserve
         # command order within each package and checkpoint by original index.
         if work:
+            environment = os.environ.copy()
+            environment["SDKROOT"] = run(["xcrun", "--sdk", "macosx", "--show-sdk-path"])
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(work)) as pool:
                 checks = [pool.submit(verify_package, package, commands) for package, commands in work.items()]
                 for check in concurrent.futures.as_completed(checks):
                     check.result()
-        self.state["validation"] = evidence
+        self.state["validation"] = ([ci] if ci else []) + evidence
         self.save()
 
     def builder(self, channel):
@@ -358,6 +412,7 @@ class Release:
             environment.update(NEOANKI_RELEASE_VERSION=self.state["version"],
                                NEOANKI_RELEASE_BUILD_NUMBER=self.state["build"],
                                NEOANKI_SIGNING_DIR=str(self.signing))
+            environment["NEOANKI_RELEASE_SIGNING_PREFLIGHTED"] = "1" if self.signing_preflighted else "0"
             # Developer ID signing and App Store exports both touch the user's
             # Keychain search list. Serialize those short-lived signing contexts.
             with (WORK / "signing.lock").open("w") as lock:
@@ -459,9 +514,16 @@ class Release:
         if history and version_tuple(history[0]["tagName"]) > version_tuple(self.state["version"]):
             raise RuntimeError("A newer release was reserved; refusing to publish an older candidate")
         errors, pending = {}, {}
+        # A receipt can be final before its channel baseline is saved. Keep
+        # reconciling those receipts, but leave already reconciled channels alone.
+        outstanding = [
+            channel for channel in self.state["selected"]
+            if self.state["phases"][channel].get("status") not in ("published", "submitted", "available")
+            or self.state["channels"].get(channel, {}).get("version") != self.state["version"]
+        ]
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
             futures = {pool.submit(self.publish_homebrew if c == "homebrew" else self.publish_store,
-                                   *([] if c == "homebrew" else [c])): c for c in self.state["selected"]}
+                                   *([] if c == "homebrew" else [c])): c for c in outstanding}
             for future in concurrent.futures.as_completed(futures):
                 channel = futures[future]
                 try:
@@ -747,6 +809,7 @@ def main(argv=None):
             write_json(WORK / state["version"] / "release.json", state)
             github.checkpoint(WORK / state["version"] / "release.json", state)
         release = Release(github, api, app_id, state, WORK / state["version"], args.config.resolve(), args.signing_dir.resolve())
+        release.signing_preflighted = resume is None
         print("Release " + state["version"] + ": " + ", ".join(state["selected"]), flush=True)
         errors, waiting = {}, {}
         if not state.get("complete"):

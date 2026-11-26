@@ -35,9 +35,9 @@ Use `./Scripts/test-fast.sh` for the broader local headless run, including
 Core flows, the sync campaigns, generated API freshness, and documentation
 validation. Performance benchmarks and native XCTest UI journeys are opt-in.
 
-Strict documentation/API freshness checks run before release pushes. Documentation
-publishing runs separately after every merge into `main`, including code-only
-merges; it does not launch another Swift API-test build or block PR acceptance.
+Strict documentation checks run before release pushes. The controller checks
+generated API reference freshness for API source changes. Documentation
+publishing runs separately for changes to site inputs.
 
 ## Focused suites
 
@@ -457,13 +457,14 @@ swift run neoanki-api-reference check
 swift Scripts/validate-docs.swift --require-screenshots
 ```
 
-Run these checks locally before release pushes; **CI Gate** is the required
-unit-test gate. The former **Documentation and screenshot gate** is retired from
-PR acceptance. See [maintaining documentation](../documentation/) for generation
+Run the strict documentation check before release pushes. Run the API freshness
+check locally when changing reference tooling or generated docs. The controller
+runs it for released API source changes. **CI Gate** remains the required unit
+test gate. See [maintaining documentation](../documentation/) for generation
 and screenshot ownership.
 
-The separate documentation publication workflow builds and crawls Jekyll output
-after every merge into `main`, then runs
+The separate documentation publication workflow validates coverage after merges
+into `main`. For changes to site inputs it builds and crawls Jekyll output and runs
 `Scripts/check-docs-responsive.mjs` in headless Chromium at 375, 768, and 1024
 pixels. It checks keyboard navigation, contained code blocks, and the absence
 of page-level horizontal overflow.

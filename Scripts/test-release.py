@@ -484,6 +484,7 @@ class LocalIPhoneTests(unittest.TestCase):
     def test_device_details_are_excluded_from_public_checkpoint(self):
         self.release.state['local_iphone'] = {'device': 'private phone', 'status': 'installed'}
         hub = object.__new__(controller.GitHub); hub.repository = 'example/app'
+        hub.published_checkpoints = {}
         with patch.object(controller, 'run'):
             hub.checkpoint(self.directory / 'release.json', self.release.state)
         public = json.loads((self.directory / controller.STATE_ASSET).read_text())
@@ -677,6 +678,61 @@ class StoreTests(unittest.TestCase):
         self.assertFalse(any(m[1]=='reviewSubmissions/saved' for m in self.api.mutations))
 
 
+class GitHubEvidenceTests(unittest.TestCase):
+    def test_only_a_passing_workflow_for_the_exact_tree_is_reusable(self):
+        revision, head, tree_id = "a" * 40, "b" * 40, "c" * 40
+        hub = object.__new__(controller.GitHub)
+        hub.repository = "owner/repo"
+        pr = {"number": 10, "merged_at": "now", "merge_commit_sha": revision,
+              "base": {"ref": "main"}, "head": {"sha": head}}
+        workflow = {"id": 20, "run_attempt": 2, "html_url": "https://github.com/owner/repo/actions/runs/20",
+                    "path": ".github/workflows/test.yml", "event": "pull_request", "head_sha": head,
+                    "status": "completed", "conclusion": "success", "repository": {"full_name": hub.repository}}
+
+        for tree_match, passed in ((True, True), (False, True), (True, False)):
+            with self.subTest(tree_match=tree_match, passed=passed):
+                workflow["conclusion"] = "success" if passed else "failure"
+                name = "unit-tested-tree-2"
+
+                def api(path):
+                    if path == f"commits/{revision}/pulls":
+                        return [pr]
+                    if path.startswith("actions/workflows/test.yml/runs?"):
+                        self.assertIn(f"head_sha={head}", path)
+                        return {"workflow_runs": [workflow]}
+                    self.assertTrue(passed)
+                    self.assertEqual(path, f"actions/runs/20/artifacts?name={name}")
+                    return {"artifacts": [{"name": name, "expired": False}]}
+
+                def run(args):
+                    if args[0] == "git":
+                        return tree_id
+                    self.assertIn(name, args)
+                    (Path(args[-1]) / "tested-tree.txt").write_text(tree_id if tree_match else "d" * 40)
+
+                with patch.object(hub, "api", side_effect=api), patch.object(controller, "run", side_effect=run):
+                    proof = hub.unit_validation(revision)
+                if tree_match and passed:
+                    self.assertEqual((proof["tree"], proof["workflow_run"], proof["workflow_attempt"]), (tree_id, 20, 2))
+                else:
+                    self.assertIsNone(proof)
+
+    def test_checkpoint_only_reuploads_changed_public_state(self):
+        hub = object.__new__(controller.GitHub)
+        hub.repository = "owner/repo"
+        hub.published_checkpoints = {}
+        state = {"version": "1.0.320", "status": "uploaded"}
+        with tempfile.TemporaryDirectory() as folder, patch.object(controller, "run") as upload:
+            path = Path(folder) / "release.json"
+            hub.checkpoint(path, state)
+            state["local_iphone"] = {"status": "prepared"}
+            hub.checkpoint(path, state)
+            self.assertEqual(upload.call_count, 1)
+            state["status"] = "submitted"
+            hub.checkpoint(path, state)
+            self.assertEqual(upload.call_count, 2)
+
+
 class RecoveryTests(unittest.TestCase):
     def release(self,selected):
         value=object.__new__(controller.Release)
@@ -685,7 +741,9 @@ class RecoveryTests(unittest.TestCase):
                      'channels':{},'phases':{c:{'status':'uploaded'} for c in selected},'notes':'Fix'}
         value.api=object();value.app_id='app';value.save=lambda remote=False:None
         value.verify_source=lambda:None
-        value.github=type('Hub',(),{'history':lambda self:[{'tagName':'v1.0.320'}],'verify_release_source':lambda self,state:None})()
+        value.github=type('Hub',(),{'history':lambda self:[{'tagName':'v1.0.320'}],
+                                    'verify_release_source':lambda self,state:None,
+                                    'unit_validation':lambda self,revision:None})()
         return value
     def test_lost_main_provenance_blocks_every_publication_channel(self):
         r=self.release(['ios','mac','homebrew'])
@@ -699,11 +757,19 @@ class RecoveryTests(unittest.TestCase):
             calls.append(c)
             if c=='ios':raise Pending('processing')
             r.state['phases'][c]['status']='submitted'
-        r.publish_store=store;r.publish_homebrew=lambda:r.state['phases']['homebrew'].update(status='published')
+            r.state['channels'][c]={'version':r.state['version']}
+        def homebrew():
+            calls.append('homebrew')
+            r.state['phases']['homebrew'].update(status='published')
+            r.state['channels']['homebrew']={'version':r.state['version']}
+        r.publish_store=store;r.publish_homebrew=homebrew
         errors,pending=r.publish();self.assertEqual(errors,{})
         self.assertEqual(pending,{'ios':'processing'})
         self.assertEqual(r.state['phases']['homebrew']['status'],'published')
         self.assertFalse(r.state['complete'])
+        calls.clear()
+        self.assertEqual(r.publish(), ({}, {'ios':'processing'}))
+        self.assertEqual(calls, ['ios'])
     def test_ios_only_never_calls_mac_or_homebrew(self):
         r=self.release(['ios']);r.publish_store=lambda c:(_ for _ in ()).throw(Pending('processing'))
         r.publish_homebrew=lambda:(_ for _ in ()).throw(AssertionError('Homebrew called'))
@@ -796,6 +862,41 @@ class RecoveryTests(unittest.TestCase):
             self.assertIn('validation_failure',r.state)
             with patch.object(controller,'run',side_effect=AssertionError('failed check rerun')):
                 with self.assertRaisesRegex(RuntimeError,'failed verification'):r.validate()
+
+    def test_exact_tree_evidence_skips_swift_test_and_is_reused_on_resume(self):
+        release = self.release(["mac", "homebrew"])
+        with tempfile.TemporaryDirectory() as directory:
+            release.directory = Path(directory)
+            release.state.update(tests={"": ["RootTests"], "NeoAnkiCore": ["CoreTests"]}, changed_paths=[])
+            receipt = {"url": "https://github.com/owner/repo/actions/runs/1", "revision": release.state["revision"]}
+            with patch.object(release.github, "unit_validation", return_value=receipt) as evidence, \
+                 patch.object(controller, "run", side_effect=AssertionError("tests or SDK lookup repeated")):
+                release.validate()
+                release.validate()
+            evidence.assert_called_once_with(release.state["revision"])
+            entry, = release.state["validation"]
+            self.assertEqual(entry["kind"], "github_unit_tests")
+            (release.directory / entry["log"]).write_text("changed")
+            with self.assertRaisesRegex(RuntimeError, "evidence changed"):
+                release.validate()
+
+    def test_ci_unit_evidence_does_not_replace_generated_api_check(self):
+        release = self.release(["mac"])
+        with tempfile.TemporaryDirectory() as directory:
+            release.directory = Path(directory)
+            release.state.update(tests={"": ["RootTests"]}, changed_paths=["Sources/NeoAnkiAPI/Registry.swift"])
+            commands = []
+
+            def run(args, *, cwd=None, log=None, env=None):
+                if args[0] == "xcrun":
+                    return "/SDK"
+                commands.append(args)
+                log.write_text("passed")
+
+            with patch.object(release.github, "unit_validation", return_value={"url": "run"}), \
+                 patch.object(controller, "run", side_effect=run):
+                release.validate()
+            self.assertEqual(commands, [["swift", "run", "neoanki-api-reference", "check"]])
     def test_resume_downloads_original_homebrew_artifact_instead_of_resigning(self):
         r=self.release(['homebrew'])
         with tempfile.TemporaryDirectory() as folder:

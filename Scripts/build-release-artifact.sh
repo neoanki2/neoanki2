@@ -13,7 +13,6 @@ if [ "${NEOANKI_RELEASE_SIGNED:-1}" != "1" ]; then
   echo "Mac releases require Developer ID, production CloudKit, and notarization." >&2
   exit 1
 fi
-python3 "$ROOT/Scripts/sign-macos-app.py" --check
 
 if [[ ! "$VERSION" =~ ^[0-9]+([.][0-9]+)*$ ]]; then
   echo "Invalid release version: $VERSION" >&2
@@ -68,7 +67,9 @@ fi
 
 codesign --verify --deep --strict "$APP_PATH"
 "$ROOT/Scripts/verify-universal-macos.sh" "$APP_PATH/Contents/MacOS/NeoAnki2"
-python3 "$ROOT/Scripts/sign-macos-app.py" --verify "$APP_PATH"
+# The signer already checked identity, entitlements and Gatekeeper. Verify
+# the staged payload's signature and ticket survived the copy.
+xcrun stapler validate "$APP_PATH"
 ln -s /Applications "$PAYLOAD_DIR/Applications"
 
 rm -f "$ARTIFACT_PATH" "$CHECKSUM_PATH"

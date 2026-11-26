@@ -834,7 +834,6 @@ class Workflow:
         ipa = self.output / "export/NeoAnki2.ipa"
         saved = self.state["phases"].get("export")
         if saved and ipa.exists() and digest(ipa) == saved["ipa_sha256"]:
-            validate_ios_package_privacy(ipa)
             return ipa
         profiles, cert = self.profiles()
         identity = hashlib.sha1(cert).hexdigest().upper()

@@ -21,12 +21,12 @@ and status checks do not create timing entries.
   candidates pursued to finish the same release request.
 - Log phase starts, ends, and outcomes for candidate preparation, local checks,
   GitHub checks and merge, builds and signing, publication, local installations,
-  cleanup, and the bottleneck fix. Use timestamps from controller logs and
+  and cleanup. Use timestamps from controller logs and
   receipts when available. Mark missing timings as unknown. Identify external
   waits and count overlapping phases only once when assessing elapsed time.
 - Immediately before each final report, append its outcome and
   `elapsed_seconds` measured from the first start. Include pauses, retries,
-  cleanup, and the bottleneck fix. Record blocked reports and leave their release
+  and cleanup. Record blocked reports and leave their release
   IDs open for resumption. A completed, abandoned, or no-op release closes its
   entry.
 - Include a timing table in every release report with the current release and
@@ -87,11 +87,13 @@ git diff --check "${release_base_sha}...HEAD"
 swift Scripts/validate-docs.swift --require-screenshots --base-ref "$release_base_sha"
 ```
 
-- For application or Swift changes, run `./Scripts/test-fast.sh`. It covers Core,
-  root-package tests, API-reference freshness, architecture, and tooling contracts.
-  For docs-, skill-, or tooling-only changes, run the relevant validators/tests
-  instead of rebuilding unaffected apps. The strict documentation comparison
-  above remains required; the fast suite's ordinary docs check does not replace it.
+- The required GitHub CI Gate owns the broad unit suites. Avoid running the same
+  suites locally as a routine pre-push step. Use focused local checks to diagnose
+  a failure or exercise changed behavior that CI does not cover.
+- The controller checks generated API reference freshness for API source
+  changes. Run that check locally for changes to reference tooling or docs
+  that the release planner will not select. Run the architecture scan when
+  the change affects module boundaries.
 - GitHub's `.github/workflows/test.yml` is unit-only. Keep broader checks local
   before pushing: use the relevant campaign path filters in the manual
   `.github/workflows/validation.yml` to select additional headless checks, such
@@ -103,8 +105,7 @@ swift Scripts/validate-docs.swift --require-screenshots --base-ref "$release_bas
   mutation campaigns out of automatic unit-test CI.
 - For changed scheduling/cache or asynchronous behavior, ensure the relevant
   regression coverage uses explicit clock boundaries and observable operation
-  gates. Include it in the selected checks; do not repeat suites already covered
-  by a passing fast run or use retries to make timing-dependent failures disappear.
+  gates. Keep those regressions in CI or the relevant manual campaign.
 
 Keep the candidate HEAD, base SHA, commands, outcomes, and original logs under
 `.build/release-prepush/`. Reuse passing evidence only when the relevant source,
@@ -112,8 +113,9 @@ build inputs, and toolchain are unchanged. After a fix, recommit and rerun affec
 checks. A failure blocks the push until its cause is corrected; never rerun an
 unchanged failed check just to obtain green. Before pushing, verify that HEAD
 still matches the checked candidate and that no intended edits remain uncommitted.
-Local checks do not replace required GitHub unit-test CI or the controller's
-validation of the merged release source. When retiring a required check, reconcile
+The controller reuses a successful CI Gate result when it can prove that the
+workflow tested the exact merged tree. Otherwise it runs the affected suites
+from the pinned source. When retiring a required check, reconcile
 its GitHub branch-protection context through `gh` without weakening other rules;
 the unit-only workflow retains the **CI Gate** context. Do not dispatch the retired
 Documentation PR gate or manual extended validation just to satisfy old check names.
@@ -139,7 +141,8 @@ edit the release process.
 - Every selected artifact uses the same marketing version and build. Unchanged
   apps retain their last version and skip that release number. Do not allocate
   independent Store/Homebrew versions.
-- The controller runs relevant headless tests once. Do not add broad UI journeys,
+- The controller reuses exact-tree CI evidence or runs relevant headless tests
+  when that evidence is unavailable. Do not add broad UI journeys,
   screenshot capture, fresh privacy browser reviews, physical acceptance, or
   independent review ceremonies to routine publication. Add checks only for the
   actual changed behavior or an explicit request.
@@ -216,28 +219,16 @@ releases, and uncertain uploads must retain their recovery inputs.
   and reclaimed space in a small local cleanup receipt, verify retained evidence,
   and report the space recovered with the release result.
 
-## Fix one release bottleneck
+## Record release bottlenecks
 
-After delivery and cleanup, use this release's history and prior timings to find
-the largest delay the project can reduce on the path to completion. Record any
-longer external wait separately. Implement and validate one concrete fix.
-Submit it in a separate PR from the shipped product changes, run the local
-pre-push checks, and merge it into `main` after required GitHub checks pass.
-Verify that GitHub reports the PR as `MERGED` and that remote `main` contains the
-fix before reporting the release complete. Preserve required checks, signing,
-and installation verification. Keep the published release pinned to its original
-source revision.
-
-Log the cause, observed delay, change, validation result, and merge time. If
-measuring the savings requires another release, label the savings as an
-estimate and compare it with the actual timing of the next applicable release.
-If a concrete blocker prevents implementing, validating, or merging the fix,
-report the shipped channels and the remaining blocker. Keep the release timing
-entry open until the fix is merged.
+Use the timing history to identify avoidable delays and record external waits
+separately. A completed delivery and cleanup closes the release timing entry.
+Treat process changes and their PRs as separate work so their checks do not
+extend the release itself.
 
 Read [the release guide](../../../docs/RELEASING.md) for setup, version examples,
 checkpoint behavior, and recovery. Return selected versions/source, each channel's
 actual state, the local Mac and iPhone installed versions, cleanup result,
-receipt paths, timing, and the bottleneck fix. Name concrete blockers without
+receipt paths, timing, and any material delay. Name concrete blockers without
 inventing acceptance passes or requesting confirmation already granted by the
 release request.
