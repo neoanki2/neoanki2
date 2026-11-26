@@ -35,12 +35,16 @@ current search text and sort order.
 
 ## Known Words and vocabulary card sets
 
-Open **Library → Known Words** and choose the language you’re learning. Use
-**Add Word** to record a word or phrase you already understand. You can also mark
-words while using **Add Word**, **Learn in Context**, or [Chrome Reading Mode](../chrome-companion/#use-reading-mode).
-Known Words tracks each language separately.
+Open **Library → Known Words** and choose the language you’re learning. Known
+Words tracks each language separately. On Mac, open the filter menu to switch
+between **Known**, **Learning**, **Not known**, and **Ignored**. The menu shows
+how many words are in each group for the selected language.
 
-Choose **Create Card Set** to practice a term in context. Give it a short
+Use **Add Word** and choose **Mark Known** to record a word or phrase you already
+understand. You can also mark words from **Learn in Context** or
+[Chrome Reading Mode](../chrome-companion/#use-reading-mode).
+
+Choose **Create Cards** in **Add Word** to practice a term in context. Give it a short
 meaning and a sentence containing the term. **Understand in context** asks
 what the highlighted term means. **Complete the sentence** hides the exact
 occurrence with a native Cloze blank. Recall the missing form aloud or type it

@@ -58,6 +58,41 @@ extension FastFunctionalJourneyTests {
         leaveBrowseMode(in: app)
         let deckRows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'deckRow-'"))
         XCTAssertEqual(deckRows.count, 1, "Word capture must not create child decks")
+
+        checkKnownWordsFilter(in: app)
+    }
+
+    private func checkKnownWordsFilter(in app: XCUIApplication) {
+        showSidebar(in: app)
+        let knownWords = app.descendants(matching: .any).identified("knownWordsSidebar")
+        XCTAssertTrue(knownWords.waitUntilHittable(timeout: 5))
+        knownWords.click()
+        let language = app.popUpButtons.identified("known-words-language")
+        XCTAssertTrue(language.waitUntilHittable(timeout: 5))
+        language.click()
+        app.menuItems["Ukrainian"].click()
+
+        let filter = app.popUpButtons.identified("known-words-filter")
+        XCTAssertTrue(filter.waitUntilHittable(timeout: 5))
+        let add = app.buttons.identified("known-words-add")
+        XCTAssertTrue(add.waitUntilHittable(timeout: 5))
+        add.click()
+        let wordField = app.textFields.identified("vocabulary-set-word")
+        XCTAssertTrue(wordField.waitUntilHittable(timeout: 5))
+        let word = "книга"
+        enterText(word, into: wordField, app: app)
+        let save = app.buttons.identified("vocabulary-set-save")
+        XCTAssertTrue(waitUntil(timeout: 5) { save.isHittable && save.isEnabled })
+        save.click()
+
+        let row = app.staticTexts[word]
+        XCTAssertTrue(row.waitUntilExists(timeout: 5))
+        filter.click()
+        app.menuItems["Ignored (0)"].click()
+        XCTAssertTrue(app.staticTexts["No Ignored Words"].waitUntilExists(timeout: 5))
+        filter.click()
+        app.menuItems.matching(NSPredicate(format: "label BEGINSWITH %@", "Known (")).firstMatch.click()
+        XCTAssertTrue(row.waitUntilExists(timeout: 5))
     }
 
     private func makeVocabularyPackFixture() throws -> URL {

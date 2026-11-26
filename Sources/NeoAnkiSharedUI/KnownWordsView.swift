@@ -70,7 +70,9 @@ public struct KnownWordsView: View {
     private let decks: any LibraryDeckManaging
     private let onCreated: @MainActor () async -> Void
     @Environment(\.scenePhase) private var scenePhase
+#if !os(macOS)
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+#endif
     @AppStorage("vocabularyLearningLanguage") private var language = ""
     @State private var rows: [VocabularyStatus] = []
     @State private var counts: [VocabularyReadingState: Int] = [:]
@@ -111,6 +113,7 @@ public struct KnownWordsView: View {
             Section {
                 VocabularyLanguagePicker(title: "Learning language", selection: $language,
                                          available: Locale.LanguageCode.isoLanguageCodes.map(\.identifier) + savedLanguages)
+                    .accessibilityIdentifier("known-words-language")
                 if !language.isEmpty { filterControl }
             }
             if let error {
@@ -254,6 +257,11 @@ public struct KnownWordsView: View {
     }
 
     @ViewBuilder private var filterControl: some View {
+#if os(macOS)
+        // AppKit can query the enclosing List's accessibility children while
+        // SwiftUI is updating a segmented picker, reentering the same view graph.
+        filterPicker(counted: true).pickerStyle(.menu)
+#else
         if dynamicTypeSize.isAccessibilitySize {
             filterPicker(counted: true).pickerStyle(.menu)
         } else {
@@ -262,6 +270,7 @@ public struct KnownWordsView: View {
                 filterPicker(counted: false).pickerStyle(.segmented)
             }
         }
+#endif
     }
 
     private func filterPicker(counted: Bool) -> some View {
@@ -563,7 +572,9 @@ public struct VocabularyComposerView: View {
     private let selectingCard: Bool
     private let markOnly: Bool
     @Environment(\.dismiss) private var dismiss
+#if !os(macOS)
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+#endif
     private enum FocusedField { case word, sentence, meaning }
     @FocusState private var focusedField: FocusedField?
     @AppStorage("vocabularyLearningLanguage") private var activeLanguage = ""
@@ -600,11 +611,15 @@ public struct VocabularyComposerView: View {
                         .focused($focusedField, equals: .word)
                         .accessibilityIdentifier("vocabulary-set-word")
                     if !selectingCard && !markOnly {
+#if os(macOS)
+                        intentionPicker.pickerStyle(.menu)
+#else
                         if dynamicTypeSize.isAccessibilitySize {
                             intentionPicker.pickerStyle(.menu)
                         } else {
                             intentionPicker.pickerStyle(.segmented)
                         }
+#endif
                     }
                 }
                 if makingCards {
