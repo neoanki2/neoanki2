@@ -15,8 +15,8 @@ the resulting `main` revision:
    `main`. Confirm that GitHub reports the PR as `MERGED`; an auto-merge request
    or an open PR is insufficient.
 2. Update a clean local `main` checkout to the remote `main` revision containing
-   those changes. Preserve unrelated working-tree changes when switching or use
-   an isolated checkout. Record the resulting `main` SHA as the release source;
+   those changes. Preserve unrelated working-tree changes when switching; do not
+   create a worktree or isolated checkout unless the user explicitly asks. Record the resulting `main` SHA as the release source;
    after a squash or rebase merge, use the resulting main revision rather than
    the original PR head.
 3. Run the unified controller from that checkout only after confirming that it
@@ -40,7 +40,8 @@ or bypass branch protection to proceed.
 
 Resolve the latest target `main` revision through authenticated `gh` and make
 that exact commit available locally. Record it as `release_base_sha`; do not use
-a stale tracking ref. Preserve unrelated edits or use an isolated checkout.
+a stale tracking ref. Preserve unrelated edits in the main checkout; do not
+create a worktree unless the user explicitly asks.
 Commit the intended changes locally before validating: the strict documentation
 comparison examines `BASE...HEAD`, not uncommitted edits.
 
