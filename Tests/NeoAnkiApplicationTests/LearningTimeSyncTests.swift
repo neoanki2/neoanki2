@@ -175,3 +175,30 @@ private func activitySegment(_ item: Item, source: UUID = UUID(), id: UUID = UUI
     #expect(try await remote.vocabularyStatuses(language: "de").isEmpty)
     #expect(await incoming.sentRecords().isEmpty)
 }
+
+@Test func knownWordsSyncSkipsDataFromNewerReleasesInsteadOfStopping() async throws {
+    let (remote, remoteDirectory, _) = try await activityRepository()
+    defer { try? FileManager.default.removeItem(at: remoteDirectory) }
+    let ignored = VocabularyJudgmentChange(id: UUID(), term: .init(language: "uk", expression: "Київ"),
+                                           judgment: .ignored, changedAt: Date(timeIntervalSince1970: 1_767_225_600))
+    let futureID = UUID()
+    let future = Data("""
+        {"id":"\(futureID.uuidString)","term":{"language":"uk","expression":"слово"},"judgment":"partlyKnown","changedAt":800000000}
+        """.utf8)
+    func record(_ id: UUID, kind: String = "vocabularyJudgment", payload: Data, order: Int64) -> SyncRecordEnvelope {
+        .init(id: id.uuidString, resourceKind: kind, revision: 1, deviceID: "newer-device", order: order,
+              isTombstone: false, payload: payload)
+    }
+    let incoming = ActivityTransport()
+    await incoming.receive([
+        record(ignored.id, payload: try JSONEncoder().encode(ignored), order: 1),
+        record(futureID, payload: future, order: 2),
+        record(UUID(), kind: "vocabularyEncounter", payload: Data("{}".utf8), order: 3),
+    ])
+    let recipient = VocabularyJudgmentSyncService(repository: remote, transport: incoming,
+        metadata: SyncMetadataStore(directory: remoteDirectory.appendingPathComponent("known-words-sync")))
+    try await recipient.synchronize()
+    let statuses = try await remote.vocabularyStatuses(language: "uk")
+    #expect(statuses.map(\.term.expression) == ["Київ"])
+    #expect(statuses.first?.judgment == .ignored)
+}

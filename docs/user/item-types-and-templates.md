@@ -103,7 +103,8 @@ editor; changing a unit's cue or answer retires that card and creates a new one.
 Creating a **Vocabulary Set** adds an item with two Card setups, one for
 recognition in context and one for Cloze production. The Cloze field stores
 the selected span from your example sentence and uses it to generate the
-production answer.
+production answer. Deleting a Vocabulary Set whose meaning card is mature
+keeps that word in Known Words, marked **Kept from deleted cards**.
 
 ## Edit fields and Card setups together
 

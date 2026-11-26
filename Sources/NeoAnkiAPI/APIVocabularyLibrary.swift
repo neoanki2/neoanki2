@@ -64,6 +64,20 @@ struct APIVocabularyEntryCollection: Codable, Sendable {
     let data: [LexicalEntry]
 }
 
+struct DictionaryFormsInput: Decodable {
+    let language: String
+    let words: [String]
+}
+
+struct APIDictionaryForms: Codable, Sendable {
+    let data: [String: [String]]
+}
+
+struct APIVocabularyFrequencyBand: Codable, Sendable {
+    let words: [String]
+    let total: Int
+}
+
 struct VocabularyImportFileInput: Decodable {
     let id: String
     let path: String
@@ -176,6 +190,35 @@ actor APIVocabularyLibrary {
         let (pack, _) = try await pack(id: packID)
         do {
             return try await pack.search(query: query, mode: mode, limit: limit, language: language)
+        } catch {
+            throw vocabularyValidationError(error)
+        }
+    }
+
+    func dictionaryForms(packID: String, words: [String], language: String) async throws -> [String: [String]] {
+        let (pack, _) = try await pack(id: packID)
+        do {
+            return try await pack.resolveDictionaryForms(of: words, language: language)
+        } catch let error as VocabularyPackError {
+            throw vocabularyLimitError(error, pointer: "/words")
+        } catch {
+            throw vocabularyValidationError(error)
+        }
+    }
+
+    func frequencyBand(
+        packID: String,
+        language: String,
+        offset: Int,
+        limit: Int,
+        sample: Int?
+    ) async throws -> APIVocabularyFrequencyBand {
+        let (pack, _) = try await pack(id: packID)
+        do {
+            let band = try await pack.frequencyBand(language: language, offset: offset, limit: limit, sample: sample)
+            return APIVocabularyFrequencyBand(words: band.words, total: band.total)
+        } catch let error as VocabularyPackError {
+            throw vocabularyLimitError(error, pointer: "/query/limit")
         } catch {
             throw vocabularyValidationError(error)
         }
@@ -663,6 +706,11 @@ actor APIVocabularyLibrary {
         .validation("The vocabulary pack or lookup input is invalid.")
     }
 
+    private func vocabularyLimitError(_ error: VocabularyPackError, pointer: String) -> APIServiceError {
+        guard case .limitExceeded = error else { return vocabularyValidationError(error) }
+        return .validation(error.localizedDescription, pointer: pointer, fieldCode: "limit_exceeded")
+    }
+
     private func installedLibraryInvalid() -> APIServiceError {
         .problem(
             status: 409,
@@ -730,6 +778,60 @@ extension NeoAnkiAPIService {
             language: language
         )
         return try .json(APIVocabularyEntryCollection(data: values))
+    }
+
+    func resolveDictionaryForms(packID: String, request: APIRequest) async throws -> APIResponse {
+        let input: DictionaryFormsInput
+        do {
+            input = try APIJSON.decodeStrict(
+                DictionaryFormsInput.self, from: request.body, allowedKeys: ["language", "words"]
+            )
+        } catch let error as APIServiceError {
+            throw error
+        } catch {
+            throw APIServiceError.validation("The request body must be a JSON object.")
+        }
+        guard isVocabularyLanguageCode(input.language) else {
+            throw APIServiceError.validation("Choose a learning language.", pointer: "/language")
+        }
+        guard (1 ... VocabularyPack.maximumResolvedWords).contains(input.words.count) else {
+            throw APIServiceError.validation(
+                "Send 1 to \(VocabularyPack.maximumResolvedWords) words at a time.", pointer: "/words"
+            )
+        }
+        if let index = input.words.firstIndex(where: { $0.isEmpty || $0.utf8.count > 256 }) {
+            throw APIServiceError.validation(
+                "Each word must be 1 to 256 UTF-8 bytes.", pointer: "/words/\(index)"
+            )
+        }
+        let forms = try await vocabularyLibrary.dictionaryForms(
+            packID: packID, words: input.words, language: input.language
+        )
+        return try .json(APIDictionaryForms(data: forms))
+    }
+
+    func vocabularyFrequencyBand(packID: String, request: APIRequest) async throws -> APIResponse {
+        guard let language = try singleVocabularyQuery(request, name: "language", required: true),
+              isVocabularyLanguageCode(language) else {
+            throw APIServiceError.validation("Choose a learning language.", pointer: "/query/language")
+        }
+        func integer(_ name: String, in range: ClosedRange<Int>, default value: Int?) throws -> Int? {
+            guard let text = try singleVocabularyQuery(request, name: name, required: false) else { return value }
+            guard let number = Int(text), range.contains(number) else {
+                throw APIServiceError.validation(
+                    "The \(name) query parameter must be from \(range.lowerBound) through \(range.upperBound).",
+                    pointer: "/query/\(name)"
+                )
+            }
+            return number
+        }
+        let offset = try integer("offset", in: 0 ... Int(Int32.max), default: 0) ?? 0
+        let limit = try integer("limit", in: 1 ... 20_000, default: 1_000) ?? 1_000
+        let sample = try integer("sample", in: 1 ... 20_000, default: nil)
+        let band = try await vocabularyLibrary.frequencyBand(
+            packID: packID, language: language, offset: offset, limit: limit, sample: sample
+        )
+        return try .json(band)
     }
 
     func getVocabularyEntry(packID: String, entryID: String) async throws -> APIResponse {

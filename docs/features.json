@@ -57,18 +57,24 @@
       "article": "user/authoring-items.md",
       "sources": [
         "NeoAnkiCore/Sources/NeoAnkiCore/Study/VocabularySet.swift",
+        "NeoAnkiCore/Sources/NeoAnkiCore/Study/VocabularyListFormat.swift",
         "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase+Vocabulary.swift",
+        "Sources/NeoAnkiVocabularyKit/VocabularyKnownWords.swift",
         "Sources/NeoAnkiApplication/PersonalVocabulary.swift",
         "Sources/NeoAnkiCloudSync/VocabularyJudgmentSyncService.swift",
         "Sources/NeoAnkiSharedUI/KnownWordsView.swift",
+        "Extensions/Chrome/reading-model.js",
         "Extensions/Chrome/reading-worker.js",
         "Extensions/Chrome/reading-page.js"
       ],
       "tests": [
         "NeoAnkiCore/Tests/NeoAnkiCoreTests/PersonalVocabularyTests.swift",
+        "NeoAnkiCore/Tests/NeoAnkiCoreTests/KnownWordsImprovementTests.swift",
+        "Tests/NeoAnkiVocabularyKitTests/VocabularyKnownWordsTests.swift",
         "Tests/NeoAnkiApplicationTests/LearningTimeSyncTests.swift",
         "Tests/NeoAnkiAPITests/APIVocabularyTests.swift",
         "Platforms/iOSUITests/NeoAnki2MobileUITests.swift",
+        "Extensions/Chrome/tests/unit.test.js",
         "Extensions/Chrome/tests/integration.mjs"
       ]
     },

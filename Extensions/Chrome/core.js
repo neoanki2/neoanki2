@@ -53,6 +53,31 @@ export function makeAPI(config, fetcher = fetch) {
   };
 }
 
+// What the running app supports, from `GET /v1/meta`, cached per port for the life of this
+// worker or page. A failed or insufficient check is not kept, so updating the app takes effect.
+export const READING_CAPABILITIES = ['vocabulary.known-words.snapshot', 'vocabulary.known-words.batches'];
+export const PLACEMENT_CAPABILITIES = [...READING_CAPABILITIES, 'vocabulary.frequency-bands'];
+const capabilityCache = new Map();
+export async function capabilities(config, fetcher = fetch) {
+  const port = Number(config.port);
+  if (!capabilityCache.has(port)) {
+    capabilityCache.set(port, makeAPI({ port }, fetcher)('/v1/meta').then(meta => new Set(meta?.capabilities || [])));
+  }
+  try { return await capabilityCache.get(port); }
+  catch (error) { capabilityCache.delete(port); throw error; }
+}
+
+export async function hasCapabilities(config, needed, fetcher = fetch) {
+  const available = await capabilities(config, fetcher);
+  if (needed.every(capability => available.has(capability))) return true;
+  capabilityCache.delete(Number(config.port));
+  return false;
+}
+
+export async function requireCapabilities(config, needed, message, fetcher = fetch) {
+  if (!(await hasCapabilities(config, needed, fetcher))) throw new Error(message);
+}
+
 export async function revokeClient(api) {
   const client = await api('/v1/clients/current');
   await api('/v1/clients/current', { method: 'DELETE', ifMatch: `"revision-${client.revision}"` });
@@ -70,6 +95,35 @@ export async function allPages(api, path) {
     visited.add(cursor);
   } while (cursor);
   return values;
+}
+
+// Bulk judgments go out in batches of at most 20,000 entries, one Idempotency-Key each.
+// Keep the keys with the entries so a retry replays the same batches instead of adding new ones.
+export const BATCH_LIMIT = 20000;
+export const batchKeys = (count, uuid = () => crypto.randomUUID()) =>
+  Array.from({ length: Math.ceil(count / BATCH_LIMIT) }, () => uuid());
+
+export async function postJudgmentBatches(api, entries, keys) {
+  const receipts = [];
+  for (let index = 0; index * BATCH_LIMIT < entries.length; index++) {
+    if (!keys[index]) throw new Error('Missing batch key.');
+    receipts.push(await api('/v1/known-words/judgment-batches', { method: 'POST', key: keys[index], timeout: 60000,
+      body: { entries: entries.slice(index * BATCH_LIMIT, (index + 1) * BATCH_LIMIT) } }));
+  }
+  return { batchIds: receipts.map(receipt => receipt.batchId ?? receipt.batchID),
+    recorded: receipts.reduce((sum, receipt) => sum + (receipt.recorded || 0), 0),
+    unchanged: receipts.reduce((sum, receipt) => sum + (receipt.unchanged || 0), 0) };
+}
+
+export async function undoJudgmentBatches(api, batchIds, keys) {
+  let recorded = 0;
+  for (let index = batchIds.length - 1; index >= 0; index--) {
+    if (!keys[index]) throw new Error('Missing undo key.');
+    const receipt = await api(`/v1/known-words/judgment-batches/${encodeURIComponent(batchIds[index])}/undo`,
+      { method: 'POST', key: keys[index], timeout: 60000 });
+    recorded += receipt?.recorded || 0;
+  }
+  return { recorded };
 }
 
 export function basicFields(types) {

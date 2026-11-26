@@ -50,19 +50,72 @@ capture, AI generation, audio, and bulk imports are outside this version.
 
 Open the companion on a web page, expand **Reading Mode**, and choose your
 learning language and the language you want to use for meanings. Select
-**Start Reading Mode**. Dotted underlines mark unassessed vocabulary and solid
-underlines mark words you’re studying. Known words appear as ordinary text.
-Reading Mode stays on as you follow links on the same site in this tab. Use
-**Stop** to remove the highlights.
+**Start Reading Mode**. Underlines show what you still need:
 
-Click an underlined word or select a phrase to open its actions. **I know this**
-records that you understand it while reading. Use **Undo** if you tapped by
-mistake. **Create card set** uses the selected word and its sentence to make
-one meaning-recall card and one Cloze card for producing the word. Review the
-meaning and Cloze preview before saving. The dictionary is optional.
+- Dotted: words you haven't assessed yet.
+- Dashed: words you marked as not known.
+- Solid: words you're studying with cards.
+
+Known words, ignored words, and numbers appear as ordinary text. The badge in
+the corner shows how much of the page you know, such as
+"Reading · Ukrainian · 82% known · 14 new". Ignored words and numbers don't
+count. Reading Mode stays on as you follow links on the same site in this tab.
+Use **Stop** to remove the highlights.
+
+Click an underlined word or select a phrase to open its panel. It shows the
+word's status (Known, Learning, Not known, Unassessed, or Ignored), why a word
+is known (marked by you, from reviews, or kept from deleted cards), and
+**Cloze recall** once you can produce the word. Known and ignored words open
+with Option-click (Alt-click), so an ordinary click still selects text.
+
+- **I know this** marks the word known while reading. **Remove from Known**
+  marks it not known again.
+- **Ignore** hides names, brands, and loanwords from underlines and from the
+  coverage count.
+- **Use review history** clears your choice and lets your reviews decide.
+- **Undo** reverses your last change in the panel.
+- **Create card set** uses the selected word and its sentence to make one
+  meaning-recall card and one Cloze card for producing the word. Review the
+  meaning and Cloze preview before saving.
+
+These choices apply to the word as a whole. When the dictionary offers several
+meanings, choose one only for **Create card set**.
+
+### Mark the rest of a page as known
+
+After you've opened the words you don't know, choose **Mark the rest as known**
+in the badge. The panel shows how many words it will mark, with examples. It
+skips words you opened on this page, words you're studying, and words you
+marked not known or ignored. Choose **Mark as known**, or **Undo** afterward to
+reverse the whole step.
+
+### Dictionary forms
+
+With a vocabulary pack selected, Reading Mode recognizes other forms of a word
+you know. If you know *книжка*, then *книжку* on a page counts as known too.
+Words you mark are saved with their dictionary form when the pack has exactly
+one. Without a pack, only the same spelling matches.
+
+### Estimate your level
+
+In extension **Settings**, **Estimate my level** shows 20 sample words from
+each frequency band of your pack: the most common 1,000 words, then 1,001–3,000,
+3,001–5,000, and 5,001–10,000. Tick the words you know. If you know at least
+80% of the samples in the first bands, choose **Mark the top N words as known**.
+Words that already have a status and sample words you left unticked are skipped.
+**Undo** reverses the step.
+
+### When NeoAnki2 isn't running
+
+Reading Mode keeps a copy of your known words in Chrome. If NeoAnki2 is closed,
+the badge says "NeoAnki2 is not running — showing saved words" and the
+underlines use that copy. Changes need NeoAnki2 running.
 
 If you paired the companion before Reading Mode was added, reconnect in
-**Settings** and approve Known Words access in NeoAnki2.
+**Settings** and approve Known Words access in NeoAnki2. If the companion says
+"Update NeoAnki2 to use this version of Reading Mode", the app is older than
+the extension; update NeoAnki2, then start Reading Mode or open **Settings**
+again.
 
 ## Recover an unfinished card
 
@@ -84,8 +137,10 @@ change your card setups.
 
 The extension reads selected text when invoked and connects only to IPv4
 loopback (`127.0.0.1`). It requests `library.read`, `items.write`, and
-`vocabulary.read`. Reading Mode also uses \`known-words.read\` and \`known-words.write\`. Its token and unfinished draft are stored locally in Chrome,
-with access restricted to trusted extension contexts, rather than Chrome sync.
+`vocabulary.read`. Reading Mode and **Estimate my level** also use
+`known-words.read` and `known-words.write`. Its token, unfinished draft, and the
+saved copy of your known words are stored locally in Chrome, with access
+restricted to trusted extension contexts, rather than Chrome sync.
 Cards saved into NeoAnki2 follow the app's sync settings.
 
 Use **Disconnect** in extension Settings while NeoAnki2 is reachable to revoke

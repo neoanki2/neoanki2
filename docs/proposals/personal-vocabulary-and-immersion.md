@@ -100,3 +100,25 @@ The first end-to-end milestone is a user marking a term Known in NeoAnki2,
 seeing the judgment in Chrome, and saving a new sentence with no change to
 their review queue. Test that the same spelling in another language has its
 own status and that removing a deck or pack preserves the term.
+
+## Implementation status
+
+Status from November 26, 2026, after the Known Words improvements branch.
+
+| Area | Status |
+| --- | --- |
+| Judgments from newer releases | Unknown judgment values decode as unrecognized, are stored unchanged, and read as no judgment. Sync skips record kinds it does not know instead of stopping. Ignored is written as `unfamiliar` plus a flag, so earlier releases show it as not known. |
+| One status rule | `VocabularyStatus.combinedState` decides the state of a spelling across its meanings. The API returns it as `expressionState`, and Chrome no longer keeps its own copy of the rule. Reading judgments apply to the word, not a meaning. |
+| Ignored, bulk changes, and Undo | Ignored hides names and loanwords from highlights and counts. Bulk judgments are idempotent per batch and undo together without overriding later changes. Known Words imports and exports word lists, and Chrome can mark the rest of a page as known. |
+| Dictionary forms | Terms can carry a `lemma`. Packs resolve words on a page to dictionary forms, including unstressed text against stressed dictionary forms. Match keys ignore stress marks and apostrophe variants for Ukrainian, Russian, and Belarusian; shared vectors live in `NeoAnkiCore/Tests/Fixtures/vocabulary-match-keys.json`. |
+| Durable evidence | Suspended cards keep the evidence they earned. Deleting the last mature set records a known judgment with the `archivedReviews` origin. |
+| Performance | Statuses are computed in a few bounded queries and cached until the database changes. Chrome reads a compact snapshot whose version is a digest of one language's states, caches it, and redraws incrementally. |
+| Level placement | The Chrome companion settings sample frequency bands from a pack and can mark the most frequent words as known. |
+
+Not yet implemented:
+
+- Suggestions that group earlier surface-form records under a dictionary form. New judgments from Chrome include the dictionary form when the pack resolves it unambiguously.
+- A fallback lemmatizer for words a pack lacks. Check Apple NaturalLanguage lemma support for each language before relying on it.
+- Review evidence from item types other than Vocabulary Set. This needs an explicit target-field mapping on item types, which touches item type sync, portable decks, and the editor.
+- Keeping review evidence across small sentence edits. Evidence is tied to a fingerprint of the card content, so any edit to the sentence starts it over.
+- The saved-sentence inbox, several contexts per card set, and separate listening or production judgments.

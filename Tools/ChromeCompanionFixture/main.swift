@@ -38,6 +38,9 @@ struct ChromeCompanionFixture {
             entry("bank", "A financial institution.", id: "bank:finance"),
             entry("bank", "Land beside a river.", id: "bank:river"),
             entry("їжак 🦔", "A hedgehog."),
+            // Inflected, stress-marked Ukrainian with frequencies, for dictionary forms and frequency bands.
+            entry("кни́жка", "A small book.", language: "uk", forms: ["кни́жку", "кни́жки"], frequency: 50),
+            entry("ха́та", "A house.", language: "uk", forms: ["ха́ту"], frequency: 80),
         ]
         let jsonl = root.appendingPathComponent("entries.jsonl")
         var bytes = Data()
@@ -52,7 +55,7 @@ struct ChromeCompanionFixture {
             to: pack,
             descriptor: .init(
                 id: "companion-fixture", title: "Companion Test Dictionary",
-                languages: ["en", "uk"], capabilities: [.lexicon, .pronunciation]
+                languages: ["en", "uk"], capabilities: [.lexicon, .pronunciation, .morphology, .frequency]
             )
         )
         try await InstalledVocabularyPackStore(rootURL: vocabularyRoot).install(from: pack)
@@ -70,12 +73,17 @@ struct ChromeCompanionFixture {
         await server.stop()
     }
 
-    private static func entry(_ word: String, _ meaning: String, id: String? = nil, pronunciation: String? = nil) -> LexicalEntry {
+    private static func entry(
+        _ word: String, _ meaning: String, id: String? = nil, pronunciation: String? = nil,
+        language: String? = nil, forms: [String] = [], frequency: Double? = nil
+    ) -> LexicalEntry {
         LexicalEntry(
-            id: id ?? word, language: word.hasPrefix("ї") ? "uk" : "en",
+            id: id ?? word, language: language ?? (word.hasPrefix("ї") ? "uk" : "en"),
             canonicalForm: LexicalForm(text: LocalizedText(word)),
+            forms: forms.map { LexicalForm(text: LocalizedText($0), kind: "inflected") },
             pronunciations: pronunciation.map { [Pronunciation(scheme: "ipa", representations: [.text(LocalizedText($0))])] } ?? [],
-            senses: [LexicalSense(id: "sense-1", definitions: [Definition(text: LocalizedText(meaning))])]
+            senses: [LexicalSense(id: "sense-1", definitions: [Definition(text: LocalizedText(meaning))])],
+            frequency: frequency
         )
     }
 

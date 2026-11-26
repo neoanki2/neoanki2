@@ -41,7 +41,7 @@ try {
   });
   sourceServer = http.createServer((request, response) => {
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
-    response.end('<!doctype html><html lang="en"><title>Vocabulary reading</title><p id="word">serendipity</p><p id="unicode">їжак 🦔</p><p id="contextual">The novel revealed a <em>subtlety</em> she had missed.</p><textarea id="input">selected phrase</textarea><button id="focus">Focus</button></html>');
+    response.end('<!doctype html><html lang="en"><title>Vocabulary reading</title><p id="word">serendipity</p><p id="unicode">їжак 🦔</p><p id="contextual">The novel revealed a <em>subtlety</em> she had missed.</p><p id="bank">bank</p><p id="name">Zorblax</p><p id="count">Chapter 42</p><textarea id="input">selected phrase</textarea><button id="focus">Focus</button></html>');
   });
   sourceServer.listen(0, '127.0.0.1'); await once(sourceServer, 'listening');
   const sourceURL = `http://127.0.0.1:${sourceServer.address().port}/watch?v=fixture`;
@@ -271,6 +271,9 @@ try {
   await card.close(); await context.unroute(base + '/v1/item-types?*', missingBasic);
   await discardStoredDraft();
 
+  // Reading Mode uses the pack for meanings and dictionary forms; "bank" has two meanings.
+  await settings.locator('#pack').selectOption('companion-fixture');
+  await waitForStored(settings, 'config', 'packId', 'companion-fixture');
   await select('#word');
   const reading = await popup();
   const readingAction = type => reading.evaluate(async ({ type, sourceURL }) => {
@@ -302,6 +305,13 @@ try {
     await sourceCDP.send('DOM.focus', { backendNodeId });
     await source.keyboard.press('Enter');
   }
+  const underlines = ['neoanki-unassessed', 'neoanki-unfamiliar', 'neoanki-learning'];
+  const underlined = (word, expected = true, names = underlines) => source.waitForFunction(({ word, expected, names }) =>
+    names.some(name => Array.from(CSS.highlights.get(name) || [], String).includes(word)) === expected, { word, expected, names });
+  async function badgeText() {
+    const { nodes } = await sourceCDP.send('Accessibility.getFullAXTree');
+    return nodes.map(node => node.name?.value || '').find(name => name.startsWith('Reading · '));
+  }
   await source.locator('#word').evaluate(element => document.getSelection().removeAllRanges());
   await source.locator('#word').click({ position: { x: 14, y: 10 } });
   await tap('button', 'I know this');
@@ -312,6 +322,30 @@ try {
   await source.waitForFunction(() => Array.from(CSS.highlights.get('neoanki-unassessed') || [], String).includes('serendipity'));
   known = (await apiCall(settings, '/v1/known-words?language=en')).data;
   assert.ok(!known.some(row => row.term.expression === 'serendipity' && row.judgment === 'known'));
+  await underlined('42', false);
+  assert.match(await badgeText(), /\d+% known · \d+ new/, 'The badge shows page coverage.');
+
+  // A word with several meanings is known as a whole; choosing a meaning is only for card sets.
+  await source.keyboard.press('Escape');
+  await source.locator('#bank').click({ position: { x: 10, y: 10 } });
+  await tap('button', 'I know this');
+  await underlined('bank', false);
+  known = (await apiCall(settings, '/v1/known-words?language=en&expression=bank')).data;
+  assert.ok(known.some(row => !row.term.sense && row.judgment === 'known'), 'The judgment is saved without a meaning.');
+  assert.ok(known.every(row => row.expressionState === 'known'));
+
+  // A plain click on a known word opens nothing; Option/Alt-click reopens it.
+  await source.keyboard.press('Escape');
+  await source.locator('#bank').click({ position: { x: 10, y: 10 }, modifiers: ['Alt'] });
+  await tap('button', 'Remove from Known');
+  await underlined('bank', true, ['neoanki-unfamiliar']);
+
+  await source.keyboard.press('Escape');
+  await source.locator('#name').click({ position: { x: 10, y: 10 } });
+  await tap('button', 'Ignore');
+  await underlined('Zorblax', false);
+  known = (await apiCall(settings, '/v1/known-words?language=en&expression=zorblax')).data;
+  assert.equal(known.find(row => !row.term.sense)?.judgment, 'ignored');
 
   await source.keyboard.press('Escape');
   await source.locator('#contextual em').click();
@@ -322,12 +356,27 @@ try {
   await source.waitForFunction(() => Array.from(CSS.highlights.get('neoanki-learning') || [], String).includes('subtlety'));
   const sets = (await apiCall(settings, '/v1/items?limit=200')).data.filter(item => item.cardIds.length === 2);
   assert.equal(sets.length, 1);
+
+  // Mark the rest as known skips words opened on this page, learning, not-known, and ignored words.
+  await source.keyboard.press('Escape');
+  await tap('button', 'Mark the rest as known');
+  await tap('button', 'Mark as known');
+  await underlined('revealed', false);
+  await underlined('serendipity', true, ['neoanki-unassessed']);
+  await underlined('subtlety', true, ['neoanki-learning']);
+  await underlined('bank', true, ['neoanki-unfamiliar']);
+  known = (await apiCall(settings, '/v1/known-words?language=en&expression=revealed')).data;
+  assert.equal(known.find(row => !row.term.sense)?.judgment, 'known');
+  await tap('button', 'Undo');
+  await underlined('revealed', true, ['neoanki-unassessed']);
+  known = (await apiCall(settings, '/v1/known-words?language=en&expression=revealed')).data;
+  assert.ok(!known.some(row => row.judgment === 'known'), 'Undo restores the earlier judgments.');
   await source.goto(new URL('/next', sourceURL).href);
   await source.waitForFunction(() => Array.from(CSS.highlights.get('neoanki-learning') || [], String).includes('subtlety'));
   await readingAction('neoankiReadingStop');
-  await source.waitForFunction(() => !CSS.highlights.has('neoanki-unassessed') && !CSS.highlights.has('neoanki-learning'));
+  await source.waitForFunction(() => ['unassessed', 'unfamiliar', 'learning'].every(state => !CSS.highlights.has(`neoanki-${state}`)));
   await reading.close();
-  console.log('PASS: opt-in Reading Mode, mark and undo, contextual Cloze set, same-origin navigation, and cleanup');
+  console.log('PASS: opt-in Reading Mode, mark and undo, meanings, Ignore, Option-click, mark the rest, Cloze set, navigation, and cleanup');
 
   await settings.evaluate(async () => { window.fixtureConfig = (await chrome.storage.local.get('config')).config; });
   await settings.locator('#disconnect').click();

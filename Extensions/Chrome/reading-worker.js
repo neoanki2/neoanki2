@@ -1,6 +1,12 @@
-import { allPages, makeAPI, safeSource } from './core.js';
-import { readState, writeState } from './storage.js';
+import './reading-model.js';
+import { allPages, APIError, hasCapabilities, makeAPI, postJudgmentBatches, READING_CAPABILITIES, requireCapabilities, safeSource,
+  undoJudgmentBatches } from './core.js';
+import { readState, storageReady, writeState } from './storage.js';
 
+const model = globalThis.NeoAnkiReadingModel;
+const recordable = ['known', 'unfamiliar', 'ignored', 'reviewHistory'];
+const snapshots = new Map();
+const resolvedForms = new Map();
 const keyFor = tabId => `reading-mode:${tabId}`;
 const languageCode = value => String(value || '').trim().toLowerCase().replaceAll('_', '-');
 function originOf(url) {
@@ -18,7 +24,7 @@ async function modeFor(tabId) {
 async function inject(tabId, mode) {
   const target = { tabId };
   await chrome.scripting.insertCSS({ target, files: ['reading.css'] });
-  await chrome.scripting.executeScript({ target, files: ['reading-page.js'] });
+  await chrome.scripting.executeScript({ target, files: ['reading-model.js', 'reading-page.js'] });
   await chrome.tabs.sendMessage(tabId, { type: 'neoankiReadingStart', mode }, { frameId: 0 });
 }
 
@@ -30,13 +36,57 @@ async function stop(tabId) {
   ]);
 }
 
-async function readFor(tabId, mode) {
+// One request per refresh: the app answers `unchanged` while the cached version is current.
+// If NeoAnki2 is unreachable, Reading Mode keeps showing the saved snapshot, read-only.
+async function snapshotFor(mode, since) {
   const state = await readState();
-  const api = makeAPI(state.config);
-  const request = `/v1/known-words?language=${encodeURIComponent(mode.language)}`;
-  const rows = await allPages(api, request);
-  return { rows, lastDeck: state.lastDeck || '' };
+  const key = `known-words-snapshot:${mode.language}`;
+  await storageReady;
+  let snapshot = snapshots.get(key) || (await chrome.storage.local.get(key))[key];
+  let offline = false;
+  try {
+    const query = new URLSearchParams({ language: mode.language, ...(snapshot ? { since: snapshot.version } : {}) });
+    const fresh = await makeAPI(state.config)(`/v1/known-words/snapshot?${query}`);
+    if (!fresh.unchanged || !snapshot) {
+      snapshot = { version: fresh.version, language: mode.language, expressions: fresh.expressions || {}, lemmas: fresh.lemmas || {} };
+      await writeState({ [key]: snapshot }).catch(() => {});
+    }
+  } catch (error) {
+    if (error instanceof APIError || !snapshot) throw error;
+    offline = true;
+  }
+  snapshots.set(key, snapshot);
+  const result = { version: snapshot.version, offline, dictionary: Boolean(state.config.packId), lastDeck: state.lastDeck || '' };
+  return since && since === snapshot.version ? { ...result, unchanged: true } : { ...result, snapshot };
 }
+
+async function details(message, mode) {
+  const { config } = await readState();
+  const query = new URLSearchParams({ language: mode.language, expression: String(message.expression || '') });
+  return allPages(makeAPI(config), `/v1/known-words?${query}`);
+}
+
+// Dictionary forms of words the snapshot doesn't list, cached for this pack and language.
+async function dictionaryForms(message, mode) {
+  const { config } = await readState();
+  if (!config.packId || !(await hasCapabilities(config, ['vocabulary.dictionary-forms']))) return {};
+  const cacheKey = `${config.packId}\u001f${mode.language}`;
+  const cache = resolvedForms.get(cacheKey) || new Map();
+  if (cache.size > 50000) cache.clear();
+  resolvedForms.set(cacheKey, cache);
+  const words = [...new Set(message.words)].filter(word => typeof word === 'string' && word
+    && new TextEncoder().encode(word).length <= 256).slice(0, 20000);
+  const api = makeAPI(config);
+  for (const chunk of model.chunks(words.filter(word => !cache.has(word)), 2000)) {
+    const { data } = await api(`/v1/vocabulary-packs/${encodeURIComponent(config.packId)}/dictionary-forms`,
+      { method: 'POST', body: { language: mode.language, words: chunk } });
+    for (const word of chunk) cache.set(word, model.formsIn(data, word));
+  }
+  return Object.fromEntries(words.map(word => [word, cache.get(word)]));
+}
+
+const termFor = (term, mode) => ({ language: mode.language, expression: String(term?.expression || ''),
+  ...(term?.lemma ? { lemma: String(term.lemma) } : {}) });
 
 async function captureOptions(message, mode) {
   const state = await readState();
@@ -61,7 +111,7 @@ async function captureOptions(message, mode) {
           example: example?.text?.value || '', form: example?.target?.exactText || '' });
       }
     }
-    return { decks, meanings };
+    return { decks, meanings, lemma: model.lemmaFromEntries(data, mode.language) };
   } catch { return { decks, meanings: [] }; }
 }
 
@@ -80,7 +130,8 @@ async function handle(message, sender) {
     if (!origin) throw new Error('Reading Mode works on ordinary web pages.');
     const next = { origin, language: languageCode(message.language), meaningLanguage: languageCode(message.meaningLanguage) };
     if (!next.language || !next.meaningLanguage) throw new Error('Choose the learning and meaning languages.');
-    await readFor(tabId, next);
+    await requireCapabilities((await readState()).config, READING_CAPABILITIES, 'Update NeoAnki2 to use this version of Reading Mode.');
+    await snapshotFor(next);
     await chrome.storage.session.set({ [keyFor(tabId)]: next });
     try {
       await inject(tabId, next);
@@ -93,14 +144,26 @@ async function handle(message, sender) {
   }
   if (!mode || originOf(sender.url) !== mode.origin) throw new Error('Start Reading Mode from the companion.');
   if (message.type === 'neoankiReadingStop') { await stop(tabId); return null; }
-  if (message.type === 'neoankiReadingSnapshot') return readFor(tabId, mode);
+  if (message.type === 'neoankiReadingSnapshot') return snapshotFor(mode, message.since);
+  if (message.type === 'neoankiReadingDetails') return details(message, mode);
+  if (message.type === 'neoankiReadingForms') return dictionaryForms(message, mode);
   if (message.type === 'neoankiReadingOptions') return captureOptions(message, mode);
   const { config } = await readState();
   const api = makeAPI(config);
+  if (['neoankiReadingJudge', 'neoankiReadingBatch'].includes(message.type)
+      && ![message.judgment, ...(message.entries || []).map(entry => entry.judgment)].filter(Boolean).every(value => recordable.includes(value))) {
+    throw new Error('Unknown vocabulary judgment.');
+  }
+  // Reading judgments apply to the word as a whole, never to one meaning.
   if (message.type === 'neoankiReadingJudge') {
     return api('/v1/known-words/judgments', { method: 'POST', key: message.key,
-      body: { term: { ...message.term, language: mode.language }, judgment: message.judgment } });
+      body: { term: termFor(message.term, mode), judgment: message.judgment } });
   }
+  if (message.type === 'neoankiReadingBatch') {
+    const entries = message.entries.map(entry => ({ term: termFor(entry.term, mode), judgment: entry.judgment }));
+    return postJudgmentBatches(api, entries, message.keys);
+  }
+  if (message.type === 'neoankiReadingUndoBatches') return undoJudgmentBatches(api, message.batchIds, message.keys);
   if (message.type !== 'neoankiReadingCreate') throw new Error('Unknown Reading Mode action.');
   const { draft } = message;
   const source = safeSource({ url: sender.url, title: sender.tab?.title });

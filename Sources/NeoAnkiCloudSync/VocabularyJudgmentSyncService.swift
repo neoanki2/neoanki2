@@ -48,13 +48,16 @@ public actor VocabularyJudgmentSyncService {
         var state = try await metadata.load()
         let staged = state.stagedInbound
         if !staged.isEmpty {
-            let changes = try staged.map { record in
-                guard record.resourceKind == "vocabularyJudgment", !record.isTombstone, record.revision == 1,
-                      let change = try? JSONDecoder().decode(VocabularyJudgmentChange.self, from: record.payload),
+            // Records of kinds or revisions added by newer releases are acknowledged and skipped, so
+            // one newer device cannot stop every older device from syncing. Judgment values this
+            // release does not understand decode as `unrecognized` and are stored unchanged.
+            let payloads = try staged.compactMap { record -> Data? in
+                guard record.resourceKind == "vocabularyJudgment", !record.isTombstone, record.revision == 1 else { return nil }
+                guard let change = try? JSONDecoder().decode(VocabularyJudgmentChange.self, from: record.payload),
                       change.id.uuidString == record.id else { throw SQLiteLibrarySyncError.invalidPayload(record.id) }
-                return change
+                return record.payload
             }
-            try await repository.mergeVocabularyJudgments(changes)
+            try await repository.mergeVocabularyJudgmentPayloads(payloads)
             try check(generation)
             state = try await metadata.completeIncoming(staged, metadata: state)
         }

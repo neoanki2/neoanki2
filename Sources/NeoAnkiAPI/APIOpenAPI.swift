@@ -55,6 +55,10 @@ package enum APIOpenAPI {
             case ("query", "limit"): "Maximum number of results to return."
             case ("query", "after"): "Return durable changes after this cursor."
             case ("query", "query"): "Search text."
+            case ("query", "expression"): "Spelling to match as a reader would. Requires language."
+            case ("query", "since"): "Version of a snapshot the caller already holds."
+            case ("query", "offset"): "Number of most frequent words to skip."
+            case ("query", "sample"): "Number of evenly spaced words to return from the band."
             default: "The \(name) \(location) parameter."
             }
         }
@@ -151,13 +155,20 @@ package enum APIOpenAPI {
                     schema = [
                         "type": "integer", "minimum": 1,
                         "maximum": path == "/v1/changes" ? 1_000
-                            : path.contains("/vocabulary-packs/{id}/entries") ? 500 : 200,
+                            : path.contains("/vocabulary-packs/{id}/entries") ? 500
+                            : path.hasSuffix("/frequency-band") ? 20_000 : 200,
                     ]
+                }
+                if name == "offset" {
+                    schema = ["type": "integer", "minimum": 0]
+                }
+                if name == "sample" {
+                    schema = ["type": "integer", "minimum": 1, "maximum": 20_000]
                 }
                 if name == "mode" {
                     schema = ["type": "string", "enum": ["exact", "prefix"]]
                 }
-                if ["query", "language", "path"].contains(name) {
+                if ["query", "language", "path", "expression", "since"].contains(name) {
                     schema["minLength"] = 1
                     schema["maxLength"] = 65_536
                 }
@@ -174,6 +185,8 @@ package enum APIOpenAPI {
                 let required = [
                     "POST /v1/items", "POST /v1/items/bulk", "POST /v1/reviews",
                     "POST /v1/known-words/judgments", "POST /v1/vocabulary-sets",
+                    "POST /v1/known-words/judgment-batches",
+                    "POST /v1/known-words/judgment-batches/{id}/undo",
                     "POST /v1/media", "POST /v1/cards/{id}/resets",
                     "DELETE /v1/study-responses/{id}",
                     "POST /v1/deck-deletion-plans/{id}/commits",
@@ -342,8 +355,11 @@ package enum APIOpenAPI {
         add("/v1/media/{sha256}", .get, .downloadMedia, authorization: .scope(.libraryRead), response: "Binary", responseContentType: "application/octet-stream")
         add("/v1/media/{sha256}/metadata", .get, .mediaMetadata, authorization: .scope(.libraryRead), response: "MediaMetadata")
 
-        add("/v1/known-words", .get, .listKnownWords, authorization: .scope(.knownWordsRead), response: "KnownWordCollection", query: ["language", "limit", "cursor"])
+        add("/v1/known-words", .get, .listKnownWords, authorization: .scope(.knownWordsRead), response: "KnownWordCollection", query: ["language", "expression", "limit", "cursor"])
+        add("/v1/known-words/snapshot", .get, .getKnownWordsSnapshot, authorization: .scope(.knownWordsRead), response: "KnownWordsSnapshot", query: ["language", "since"], requiredQuery: ["language"])
         add("/v1/known-words/judgments", .post, .recordVocabularyJudgment, authorization: .scope(.knownWordsWrite), request: "VocabularyJudgmentInput", response: "VocabularyJudgmentChange")
+        add("/v1/known-words/judgment-batches", .post, .recordVocabularyJudgmentBatch, authorization: .scope(.knownWordsWrite), success: 201, request: "VocabularyJudgmentBatchInput", response: "VocabularyJudgmentBatchReceipt")
+        add("/v1/known-words/judgment-batches/{id}/undo", .post, .undoVocabularyJudgmentBatch, authorization: .scope(.knownWordsWrite), response: "VocabularyJudgmentBatchReceipt")
         add("/v1/vocabulary-sets", .post, .createVocabularySet, authorization: .scope(.itemsWrite), success: 201, request: "VocabularySetInput", response: "VocabularySetReceipt")
 
         add("/v1/vocabulary-packs", .get, .listVocabularyPacks, authorization: .scope(.vocabularyRead), response: "VocabularyPackCollection")
@@ -351,6 +367,8 @@ package enum APIOpenAPI {
         add("/v1/vocabulary-packs/{id}", .delete, .deleteVocabularyPack, authorization: .scope(.vocabularyWrite), success: 204, response: nil)
         add("/v1/vocabulary-packs/{id}/entries", .get, .searchVocabularyEntries, authorization: .scope(.vocabularyRead), response: "LexicalEntryCollection", query: ["query", "mode", "limit", "language"], requiredQuery: ["query"])
         add("/v1/vocabulary-packs/{id}/entries/{entryId}", .get, .getVocabularyEntry, authorization: .scope(.vocabularyRead), response: "LexicalEntry")
+        add("/v1/vocabulary-packs/{id}/dictionary-forms", .post, .resolveDictionaryForms, authorization: .scope(.vocabularyRead), request: "DictionaryFormsInput", response: "DictionaryForms")
+        add("/v1/vocabulary-packs/{id}/frequency-band", .get, .getVocabularyFrequencyBand, authorization: .scope(.vocabularyRead), response: "VocabularyFrequencyBand", query: ["language", "offset", "limit", "sample"], requiredQuery: ["language"])
         add("/v1/vocabulary-packs/{id}/media", .get, .downloadVocabularyMedia, authorization: .scope(.vocabularyRead), response: "Binary", responseContentType: "application/octet-stream", query: ["path"], requiredQuery: ["path"], successHeaders: vocabularyMediaHeaders)
         add("/v1/vocabulary-packs/{id}/media", .head, .headVocabularyMedia, authorization: .scope(.vocabularyRead), response: nil, responseContentType: "application/octet-stream", query: ["path"], requiredQuery: ["path"], successHeaders: vocabularyMediaHeaders)
 
@@ -650,21 +668,39 @@ package enum APIOpenAPI {
             ]),
             "VocabularyTerm": object(["language", "expression"], [
                 "language": ["type": "string", "minLength": 2], "expression": ["type": "string", "minLength": 1],
-                "sense": ["type": ["string", "null"]],
+                "sense": ["type": ["string", "null"]], "lemma": ["type": ["string", "null"], "maxLength": 250],
             ]),
-            "KnownWord": object(["term", "readingMature", "clozeMature", "hasCards"], [
+            "KnownWord": object(["term", "readingMature", "clozeMature", "hasCards", "state", "expressionState"], [
                 "term": reference("VocabularyTerm"), "judgment": reference("VocabularyJudgment"),
                 "readingMature": ["type": "boolean"], "clozeMature": ["type": "boolean"], "hasCards": ["type": "boolean"],
+                "state": reference("VocabularyReadingState"), "expressionState": reference("VocabularyReadingState"),
+                "origin": reference("VocabularyJudgmentOrigin"), "judgedAt": timestamp,
             ]),
             "KnownWordCollection": object(["data", "page"], [
                 "data": array(reference("KnownWord")), "page": reference("PageInfo"),
             ]),
-            "VocabularyJudgment": ["type": "string", "enum": ["known", "unfamiliar", "reviewHistory"]],
+            "KnownWordsSnapshot": object(["version", "language"], [
+                "version": ["type": "string", "minLength": 1], "language": ["type": "string", "minLength": 2],
+                "unchanged": ["type": "boolean", "const": true],
+                "expressions": ["type": "object", "additionalProperties": reference("VocabularyReadingState")],
+                "lemmas": ["type": "object", "additionalProperties": reference("VocabularyReadingState")],
+            ]),
+            "VocabularyJudgment": ["type": "string", "enum": ["known", "unfamiliar", "ignored", "reviewHistory"]],
+            "VocabularyReadingState": ["type": "string", "enum": ["known", "learning", "unfamiliar", "unassessed", "ignored"]],
+            "VocabularyJudgmentOrigin": ["type": "string", "enum": ["archivedReviews"]],
             "VocabularyJudgmentInput": object(["term", "judgment"], [
                 "term": reference("VocabularyTerm"), "judgment": reference("VocabularyJudgment"),
             ]),
             "VocabularyJudgmentChange": object(["id", "term", "judgment", "changedAt"], [
                 "id": uuid, "term": reference("VocabularyTerm"), "judgment": reference("VocabularyJudgment"), "changedAt": timestamp,
+                "batchId": uuid, "origin": reference("VocabularyJudgmentOrigin"),
+            ]),
+            "VocabularyJudgmentBatchInput": object(["entries"], [
+                "entries": array(reference("VocabularyJudgmentInput"), min: 1, max: maximumVocabularyBatchSize),
+            ]),
+            "VocabularyJudgmentBatchReceipt": object(["batchId", "recorded", "unchanged", "changes"], [
+                "batchId": uuid, "recorded": nonnegative, "unchanged": nonnegative,
+                "changes": array(reference("VocabularyJudgmentChange"), max: maximumVocabularyBatchSize),
             ]),
             "VocabularySetInput": object(["term", "meaning", "meaningLanguage", "sentence", "occurrence"], [
                 "term": reference("VocabularyTerm"), "meaning": ["type": "string"], "meaningLanguage": ["type": "string"],
@@ -720,6 +756,16 @@ package enum APIOpenAPI {
             ],
             "LexicalEntryCollection": object(["data"], [
                 "data": array(reference("LexicalEntry"), max: 500),
+            ]),
+            "DictionaryFormsInput": object(["language", "words"], [
+                "language": ["type": "string", "minLength": 2],
+                "words": array(["type": "string", "minLength": 1, "maxLength": 256], min: 1, max: 2_000),
+            ]),
+            "DictionaryForms": object(["data"], [
+                "data": ["type": "object", "additionalProperties": array(["type": "string"], min: 1, max: 8)],
+            ]),
+            "VocabularyFrequencyBand": object(["words", "total"], [
+                "words": array(["type": "string"], max: 20_000), "total": nonnegative,
             ]),
             "VocabularyPackImportFileInput": object(["id", "path", "byteSize", "sha256"], [
                 "id": uuid, "path": ["type": "string", "minLength": 1, "maxLength": 65_536],

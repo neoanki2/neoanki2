@@ -5,17 +5,25 @@ public struct VocabularyTerm: Codable, Hashable, Sendable, Identifiable {
     public let language: String
     public let expression: String
     public let sense: String?
+    /// The dictionary form this spelling belongs to, such as *книга* for *книжки*. It groups
+    /// inflected forms without changing the term's identity.
+    public let lemma: String?
 
-    public init(language: String, expression: String, sense: String? = nil) {
+    public init(language: String, expression: String, sense: String? = nil, lemma: String? = nil) {
         self.language = Self.languageCode(language)
         self.expression = expression.trimmingCharacters(in: .whitespacesAndNewlines)
         self.sense = sense?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lemma = lemma?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.lemma = lemma?.isEmpty == false ? lemma : nil
     }
 
     public var id: String {
         let parts = [language, Self.normalized(expression), Self.normalized(sense ?? "")]
         return parts.map { "\($0.utf8.count):\($0)" }.joined()
     }
+
+    /// The same term without a meaning, which is what a reading judgment applies to.
+    public var withoutSense: Self { Self(language: language, expression: expression, lemma: lemma) }
 
     public static func languageCode(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "_", with: "-").lowercased()
@@ -26,10 +34,36 @@ public struct VocabularyTerm: Codable, Hashable, Sendable, Identifiable {
             .split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
+    /// Languages whose dictionaries mark stress with combining accents that ordinary text omits.
+    static let stressMarkedLanguages: Set<String> = ["uk", "ru", "be"]
+    /// Languages that write the same apostrophe with several characters.
+    static let apostropheLanguages: Set<String> = ["uk", "be"]
+
+    /// Compare spellings as a reader would. Matching ignores case, spacing, and, for some languages,
+    /// stress marks and apostrophe variants. Keep in sync with `VocabularyMatchKey` in
+    /// NeoAnkiVocabularyKit and `matchKey` in the Chrome companion (`docs/vocabulary-match-keys.json`).
+    public static func matchKey(_ text: String, language: String) -> String {
+        let primary = languageCode(language).split(separator: "-").first.map(String.init) ?? ""
+        // Lowercasing maps a final capital sigma to σ in Swift but to ς in JavaScript; use σ everywhere.
+        var value = normalized(text).replacingOccurrences(of: "\u{3C2}", with: "\u{3C3}")
+        if stressMarkedLanguages.contains(primary) {
+            let scalars = value.decomposedStringWithCanonicalMapping.unicodeScalars
+                .filter { $0.value != 0x301 && $0.value != 0x300 }
+            value = String(String.UnicodeScalarView(scalars)).precomposedStringWithCanonicalMapping
+        }
+        if apostropheLanguages.contains(primary) {
+            value = value.replacingOccurrences(of: "\u{2019}", with: "'").replacingOccurrences(of: "\u{02BC}", with: "'")
+        }
+        return value
+    }
+
+    public var matchKey: String { Self.matchKey(expression, language: language) }
+    public var lemmaKey: String { Self.matchKey(lemma ?? expression, language: language) }
+
     public func validated() throws -> Self {
-        let value = Self(language: language, expression: expression, sense: sense)
+        let value = Self(language: language, expression: expression, sense: sense, lemma: lemma)
         guard Self.isLanguageCode(value.language), !value.expression.isEmpty, value.expression.count <= 250,
-              (value.sense?.count ?? 0) <= 250 else { throw VocabularySetError.invalidTerm }
+              (value.sense?.count ?? 0) <= 250, (value.lemma?.count ?? 0) <= 250 else { throw VocabularySetError.invalidTerm }
         return value
     }
 
@@ -44,8 +78,23 @@ public struct VocabularyTerm: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
-public enum VocabularyJudgment: String, Codable, Sendable {
+public enum VocabularyJudgment: String, Codable, Sendable, CaseIterable {
     case known, unfamiliar, reviewHistory
+    /// Hide the term from reading highlights and word counts, for names, brands, and loanwords.
+    case ignored
+    /// A judgment written by a newer NeoAnki2 version. It is stored unchanged and read as no judgment.
+    case unrecognized
+
+    public init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .unrecognized
+    }
+
+    /// Values a person or client may record. `unrecognized` exists only to read newer data.
+    public static let recordable: [Self] = [.known, .unfamiliar, .ignored, .reviewHistory]
+
+    /// A judgment that overrides the estimate from reviews.
+    public var isExplicit: Bool { self == .known || self == .unfamiliar || self == .ignored }
 }
 
 public struct VocabularyJudgmentChange: Codable, Equatable, Identifiable, Sendable {
@@ -53,6 +102,59 @@ public struct VocabularyJudgmentChange: Codable, Equatable, Identifiable, Sendab
     public let term: VocabularyTerm
     public let judgment: VocabularyJudgment
     public let changedAt: Date
+    /// Groups the changes of one bulk action so it can be undone together.
+    public let batchID: UUID?
+    /// Why the judgment was recorded when a person did not record it directly.
+    public let origin: VocabularyJudgmentOrigin?
+
+    public init(id: UUID, term: VocabularyTerm, judgment: VocabularyJudgment, changedAt: Date,
+                batchID: UUID? = nil, origin: VocabularyJudgmentOrigin? = nil) {
+        self.id = id
+        self.term = term
+        self.judgment = judgment
+        self.changedAt = changedAt
+        self.batchID = batchID
+        self.origin = origin
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, term, judgment, changedAt, batchID, origin, ignored
+    }
+
+    // Releases before Ignored reject unknown judgment values and would stop syncing. Ignored is
+    // therefore written as `unfamiliar` plus a flag those releases skip, so they show the term
+    // as not known instead of failing.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        term = try container.decode(VocabularyTerm.self, forKey: .term)
+        let decoded = try container.decode(VocabularyJudgment.self, forKey: .judgment)
+        judgment = try container.decodeIfPresent(Bool.self, forKey: .ignored) == true ? .ignored : decoded
+        changedAt = try container.decode(Date.self, forKey: .changedAt)
+        batchID = try container.decodeIfPresent(UUID.self, forKey: .batchID)
+        origin = try? container.decodeIfPresent(VocabularyJudgmentOrigin.self, forKey: .origin)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(term, forKey: .term)
+        try container.encode(judgment == .ignored ? .unfamiliar : judgment, forKey: .judgment)
+        if judgment == .ignored { try container.encode(true, forKey: .ignored) }
+        try container.encode(changedAt, forKey: .changedAt)
+        try container.encodeIfPresent(batchID, forKey: .batchID)
+        try container.encodeIfPresent(origin, forKey: .origin)
+    }
+}
+
+public enum VocabularyJudgmentOrigin: String, Codable, Sendable {
+    /// Kept from review evidence when the cards that supplied it were deleted.
+    case archivedReviews
+}
+
+/// What a learner sees for a term while reading.
+public enum VocabularyReadingState: String, Codable, Sendable, CaseIterable {
+    case known, learning, unfamiliar, unassessed, ignored
 }
 
 public struct VocabularyStatus: Codable, Equatable, Identifiable, Sendable {
@@ -61,10 +163,192 @@ public struct VocabularyStatus: Codable, Equatable, Identifiable, Sendable {
     public var readingMature = false
     public var clozeMature = false
     public var hasCards = false
+    /// The state used when this spelling appears in text, combining every meaning of the term.
+    public var expressionState: VocabularyReadingState?
+    public var origin: VocabularyJudgmentOrigin?
+    /// When the latest explicit judgment was recorded.
+    public var judgedAt: Date?
     public var id: String { term.id }
-    public var isKnown: Bool {
-        judgment == .known || (judgment != .unfamiliar && readingMature)
+
+    public init(term: VocabularyTerm, judgment: VocabularyJudgment? = nil, readingMature: Bool = false,
+                clozeMature: Bool = false, hasCards: Bool = false, expressionState: VocabularyReadingState? = nil,
+                origin: VocabularyJudgmentOrigin? = nil, judgedAt: Date? = nil) {
+        self.term = term
+        self.judgment = judgment
+        self.readingMature = readingMature
+        self.clozeMature = clozeMature
+        self.hasCards = hasCards
+        self.expressionState = expressionState
+        self.origin = origin
+        self.judgedAt = judgedAt
     }
+
+    /// The learner's explicit judgment, ignoring review-history resets and values from newer releases.
+    public var explicitJudgment: VocabularyJudgment? {
+        judgment.flatMap { $0.isExplicit ? $0 : nil }
+    }
+
+    public var isKnown: Bool {
+        switch explicitJudgment {
+        case .known: true
+        case .unfamiliar, .ignored: false
+        default: readingMature
+        }
+    }
+
+    /// The state of this exact term, before meanings of the same spelling are combined.
+    public var state: VocabularyReadingState {
+        switch explicitJudgment {
+        case .ignored: .ignored
+        case .known: .known
+        case .unfamiliar: hasCards ? .learning : .unfamiliar
+        default: readingMature ? .known : hasCards ? .learning : .unassessed
+        }
+    }
+
+    /// One rule for every surface: an explicit judgment of the word as a whole wins; otherwise the
+    /// spelling is known if any meaning is known and learning if any meaning has cards.
+    public static func combinedState(of statuses: [VocabularyStatus]) -> VocabularyReadingState {
+        switch latestGeneral(in: statuses)?.explicitJudgment {
+        case .known: return .known
+        case .ignored: return .ignored
+        case .unfamiliar: return statuses.contains(where: \.hasCards) ? .learning : .unfamiliar
+        default: break
+        }
+        let states = statuses.map(\.state)
+        if states.contains(.known) { return .known }
+        if states.contains(.learning) { return .learning }
+        if states.contains(.unfamiliar) { return .unfamiliar }
+        return .unassessed
+    }
+
+    /// The sense-less row whose explicit judgment is the most recent. Several can exist when spellings
+    /// differ only in what matching ignores, such as stress marks.
+    static func latestGeneral(in statuses: [VocabularyStatus]) -> VocabularyStatus? {
+        statuses.filter { ($0.term.sense ?? "").isEmpty }.max { left, right in
+            let l = left.explicitJudgment == nil ? Date.distantPast : left.judgedAt ?? .distantPast
+            let r = right.explicitJudgment == nil ? Date.distantPast : right.judgedAt ?? .distantPast
+            return l != r ? l < r : left.term.id > right.term.id
+        }
+    }
+
+    /// The key that groups the meanings of one spelling in one language.
+    public var expressionKey: String { term.language + "\u{1F}" + term.matchKey }
+    /// The key that groups the inflected forms of one dictionary form in one language.
+    public var lemmaKey: String { term.language + "\u{1F}" + term.lemmaKey }
+
+    /// The state of a dictionary form: a judgment written on the dictionary form itself wins;
+    /// otherwise the best-supported state among its forms applies. Ignoring a form never hides others.
+    public static func lemmaState(of statuses: [VocabularyStatus]) -> VocabularyReadingState {
+        let own = statuses.filter { $0.term.matchKey == $0.term.lemmaKey }
+        if latestGeneral(in: own)?.explicitJudgment != nil {
+            return combinedState(of: own)
+        }
+        let states = Set(statuses.map(\.state))
+        for state in [VocabularyReadingState.known, .learning, .unfamiliar] where states.contains(state) { return state }
+        return states == [.ignored] && !own.isEmpty ? .ignored : .unassessed
+    }
+
+    /// Fill `expressionState` for every row.
+    public static func combiningExpressions(_ statuses: [VocabularyStatus]) -> [VocabularyStatus] {
+        let groups = Dictionary(grouping: statuses, by: \.expressionKey).mapValues(combinedState(of:))
+        return statuses.map { status in
+            var status = status
+            status.expressionState = groups[status.expressionKey]
+            return status
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case term, judgment, readingMature, clozeMature, hasCards, state, expressionState, origin, judgedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        term = try container.decode(VocabularyTerm.self, forKey: .term)
+        judgment = try container.decodeIfPresent(VocabularyJudgment.self, forKey: .judgment)
+        readingMature = try container.decodeIfPresent(Bool.self, forKey: .readingMature) ?? false
+        clozeMature = try container.decodeIfPresent(Bool.self, forKey: .clozeMature) ?? false
+        hasCards = try container.decodeIfPresent(Bool.self, forKey: .hasCards) ?? false
+        expressionState = try? container.decodeIfPresent(VocabularyReadingState.self, forKey: .expressionState)
+        origin = try? container.decodeIfPresent(VocabularyJudgmentOrigin.self, forKey: .origin)
+        judgedAt = try container.decodeIfPresent(Date.self, forKey: .judgedAt)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(term, forKey: .term)
+        try container.encodeIfPresent(judgment == .unrecognized ? nil : judgment, forKey: .judgment)
+        try container.encode(readingMature, forKey: .readingMature)
+        try container.encode(clozeMature, forKey: .clozeMature)
+        try container.encode(hasCards, forKey: .hasCards)
+        try container.encode(state, forKey: .state)
+        try container.encode(expressionState ?? state, forKey: .expressionState)
+        try container.encodeIfPresent(origin, forKey: .origin)
+        try container.encodeIfPresent(judgedAt, forKey: .judgedAt)
+    }
+}
+
+/// A compact view of a language's vocabulary for highlighting text. Keys are match keys.
+public struct VocabularySnapshot: Codable, Equatable, Sendable {
+    /// Changes whenever any vocabulary state may have changed. Compare for equality only.
+    public let version: String
+    public let language: String
+    /// Combined state of each spelling, by `VocabularyTerm.matchKey`.
+    public let expressions: [String: VocabularyReadingState]
+    /// Combined state of each dictionary form, by `VocabularyTerm.lemmaKey`.
+    public let lemmas: [String: VocabularyReadingState]
+
+    /// The version is a digest of the language and its states, so it changes only when something a
+    /// reader would see changes, and never matches another language's snapshot.
+    public init(language: String, statuses: [VocabularyStatus]) {
+        self.language = language
+        let rows = statuses.filter { $0.term.language == language }
+        expressions = Dictionary(grouping: rows, by: \.term.matchKey).mapValues(VocabularyStatus.combinedState(of:))
+        lemmas = Dictionary(grouping: rows, by: \.term.lemmaKey).mapValues(VocabularyStatus.lemmaState(of:))
+        var digest = SHA256()
+        digest.update(data: Data("v1\u{1F}\(language)".utf8))
+        for (name, map) in [("e", expressions), ("l", lemmas)] {
+            for key in map.keys.sorted() {
+                digest.update(data: Data("\u{1E}\(name)\u{1F}\(key)\u{1F}\(map[key]!.rawValue)".utf8))
+            }
+        }
+        version = digest.finalize().prefix(16).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The state of a word in text, given the dictionary forms a pack resolves it to.
+    public func state(of text: String, lemmas candidates: [String] = []) -> VocabularyReadingState {
+        let key = VocabularyTerm.matchKey(text, language: language)
+        if let state = expressions[key] { return state }
+        let states = Set(candidates.map { VocabularyTerm.matchKey($0, language: language) }
+            .map { lemmas[$0] ?? expressions[$0] ?? .unassessed })
+        if !states.isEmpty, states.allSatisfy({ $0 == .known || $0 == .ignored }) {
+            return states.contains(.known) ? .known : .ignored
+        }
+        if states.contains(.learning) { return .learning }
+        return .unassessed
+    }
+}
+
+/// One requested change in a bulk judgment.
+public struct VocabularyJudgmentEntry: Codable, Equatable, Sendable {
+    public var term: VocabularyTerm
+    public var judgment: VocabularyJudgment
+
+    public init(term: VocabularyTerm, judgment: VocabularyJudgment) {
+        self.term = term
+        self.judgment = judgment
+    }
+}
+
+public struct VocabularyBatchReceipt: Codable, Equatable, Sendable {
+    public let batchID: UUID
+    /// Judgments written by this batch.
+    public let recorded: Int
+    /// Requested judgments that already applied and were skipped.
+    public let unchanged: Int
+    /// The changes the batch wrote, so callers can update local state without a reload.
+    public let changes: [VocabularyJudgmentChange]
 }
 
 public struct VocabularySetDraft: Codable, Equatable, Sendable {
@@ -99,6 +383,7 @@ public struct VocabularySetDraft: Codable, Equatable, Sendable {
 
 public enum VocabularySetError: LocalizedError {
     case invalidTerm, missingMeaning, invalidOccurrence, exposedAnswer, changedPreset, idConflict
+    case invalidJudgment, batchTooLarge, batchNotFound
     public var errorDescription: String? {
         switch self {
         case .invalidTerm: "Choose a language and enter a word or phrase."
@@ -107,6 +392,9 @@ public enum VocabularySetError: LocalizedError {
         case .exposedAnswer: "Choose a sentence that shows the missing form only once."
         case .changedPreset: "The Vocabulary Set card setup was edited. Restore it before adding another set."
         case .idConflict: "This request already created a different vocabulary set."
+        case .invalidJudgment: "Choose Known, Not known, Ignored, or Use review history."
+        case .batchTooLarge: "Import at most 20,000 words at a time."
+        case .batchNotFound: "That bulk change is no longer available to undo."
         }
     }
 }

@@ -1,7 +1,13 @@
+/* Dotted: not assessed yet. Dashed: marked not known, or seen before. Solid: studying with cards. */
 ::highlight(neoanki-unassessed) {
   text-decoration-line: underline;
   text-decoration-style: dotted;
   text-decoration-color: color-mix(in srgb, currentColor 57%, transparent);
+}
+::highlight(neoanki-unfamiliar) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: color-mix(in srgb, currentColor 75%, transparent);
 }
 ::highlight(neoanki-learning) {
   text-decoration-line: underline;

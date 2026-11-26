@@ -35,7 +35,7 @@ button.secondary { color: inherit; background: transparent; border-color: var(--
 .answer-label label { margin-top: 14px; }
 #dictionary-name { max-width: 175px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding-top: 8px; }
 #status { margin: 14px 0 2px; }
-#status.error { color: light-dark(#a51c22, #ffb4ab); }
+#status.error, #placement-status.error { color: light-dark(#a51c22, #ffb4ab); }
 #lookup-status { margin: 6px 0; }
 .source { overflow-wrap: anywhere; margin: 10px 0 0; }
 #suggestions { display: grid; gap: 4px; max-height: 105px; overflow-y: auto; }
@@ -45,5 +45,10 @@ footer { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line);
 .settings h1 { font-size: 24px; }
 .settings #port { width: 140px; }
 .settings .actions { justify-content: flex-start; margin-top: 16px; }
+.band { margin: 16px 0 0; padding: 0; border: 0; }
+.band legend { font-weight: 600; padding: 0; }
+.band .words { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
+.band label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
+.band input[type="checkbox"] { width: auto; margin: 0; }
 .privacy { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 32px; }
 [hidden] { display: none !important; }

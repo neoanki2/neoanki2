@@ -69,9 +69,10 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
     case listStudyResponses, getStudyResponse, deleteStudyResponse
     case downloadStudyResponse, headStudyResponse
     case uploadMedia, headMedia, downloadMedia, mediaMetadata
-    case listKnownWords, recordVocabularyJudgment, createVocabularySet
+    case listKnownWords, getKnownWordsSnapshot, recordVocabularyJudgment, createVocabularySet
+    case recordVocabularyJudgmentBatch, undoVocabularyJudgmentBatch
     case listVocabularyPacks, getVocabularyPack, deleteVocabularyPack
-    case searchVocabularyEntries, getVocabularyEntry
+    case searchVocabularyEntries, getVocabularyEntry, resolveDictionaryForms, getVocabularyFrequencyBand
     case downloadVocabularyMedia, headVocabularyMedia
     case createVocabularyPackImport, getVocabularyPackImport, deleteVocabularyPackImport
     case uploadVocabularyPackFile, validateVocabularyPackImport, commitVocabularyPackImport
@@ -93,6 +94,20 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
             "Optional order atomically reconciles one generated deck against complete expected item snapshots. Both dry runs and commits reject stale snapshots; only New-card introduction times are reordered."
         case .uploadMedia:
             "Media bytes must match the declared kind. An M4A or M4B major brand identifies M4A audio even when generic MP4 brands are listed for compatibility."
+        case .listKnownWords:
+            "Rows include state, the state of this exact term, and expressionState, the combined state of the spelling across all its meanings, which is the state to show for the word in text. Filter by expression to read one spelling; expression requires language and matches as a reader would, ignoring case, spacing, and, for Ukrainian, Russian, and Belarusian, stress marks and apostrophe variants. origin archivedReviews marks a word kept as known after the cards that proved it were deleted."
+        case .getKnownWordsSnapshot:
+            "Returns the combined reading state of every spelling (expressions) and dictionary form (lemmas) in one language, keyed by match key. Pass the version of a snapshot you hold as since; while it is still current the response contains only version, language, and unchanged true. To find the state of a word in text, use expressions for its match key; otherwise resolve its dictionary forms with a vocabulary pack and look each up in lemmas, then expressions. The word is known if every form is known or ignored and at least one is known, ignored if all are ignored, learning if any is learning, and unassessed otherwise."
+        case .recordVocabularyJudgment:
+            "Judgments are known, unfamiliar, ignored, or reviewHistory. Ignored hides a word, such as a name or brand, from reading highlights and word counts. term.lemma optionally records the dictionary form the spelling belongs to. Other judgment values are rejected."
+        case .recordVocabularyJudgmentBatch:
+            "Records 1 to 20,000 judgments in one change. The Idempotency-Key identifies the batch: retrying it returns the first receipt. Judgments that already apply are counted as unchanged and not written again. Use batchId to undo the whole change."
+        case .undoVocabularyJudgmentBatch:
+            "Restores the judgment each word had before the batch, except for words changed again since, which are counted as unchanged. The receipt describes the undo, whose batchId is new; retrying with the same Idempotency-Key returns the same receipt."
+        case .resolveDictionaryForms:
+            "Maps up to 2,000 words from text to the dictionary forms the pack lists for them, at most eight each. Matching ignores case and, where dictionaries mark stress, the stress marks that ordinary text omits. Words the pack does not contain are omitted from data."
+        case .getVocabularyFrequencyBand:
+            "Lists the pack's dictionary forms for a language from most to least frequent. offset and limit (1 to 20,000, default 1,000) select a band; sample instead returns that many evenly spaced words from the band, for placement checks. total counts every ranked form in the language."
         default:
             nil
         }

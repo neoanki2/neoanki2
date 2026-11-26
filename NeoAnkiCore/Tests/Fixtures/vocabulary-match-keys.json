@@ -1,0 +1,25 @@
+{
+  "description": "Shared vectors for VocabularyTerm.matchKey (NeoAnkiCore), VocabularyMatchKey (NeoAnkiVocabularyKit), and matchKey (Chrome companion). All three must produce the same key.",
+  "vectors": [
+    { "language": "en", "input": "  Serendipity ", "key": "serendipity" },
+    { "language": "en", "input": "in  spite\tof", "key": "in spite of" },
+    { "language": "es", "input": "Sí", "key": "sí" },
+    { "language": "es", "input": "sí", "key": "sí" },
+    { "language": "es", "input": "si", "key": "si" },
+    { "language": "uk", "input": "Кни́ги", "key": "книги" },
+    { "language": "uk", "input": "книги", "key": "книги" },
+    { "language": "uk", "input": "м’ясо", "key": "м'ясо" },
+    { "language": "uk", "input": "мʼясо", "key": "м'ясо" },
+    { "language": "uk", "input": "їжак", "key": "їжак" },
+    { "language": "uk", "input": "й", "key": "й" },
+    { "language": "uk-UA", "input": "Сло̀во", "key": "слово" },
+    { "language": "ru", "input": "Молоко́", "key": "молоко" },
+    { "language": "ru", "input": "ёж", "key": "ёж" },
+    { "language": "be", "input": "сло́ва", "key": "слова" },
+    { "language": "de", "input": "Straße", "key": "straße" },
+    { "language": "fr", "input": "Cáfé", "key": "cáfé" },
+    { "language": "ja", "input": "食べる", "key": "食べる" },
+    {"language":"el","input":"ΟΔΟΣ","key":"οδοσ"},
+    {"language":"el","input":"οδός","key":"οδόσ"}
+  ]
+}

@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5
+contract_digest: sha256:1734a8fd9f22c9af754508c692a653af17965ac85fa6e2118be23fdefda00c85
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -360,6 +360,23 @@ Type: **object**.
 - `impact` — DeckResetImpact; required
 - `revision` — integer; required
 
+## DictionaryForms {#schema-dictionaryforms}
+
+Type: **object**.
+
+### Properties
+
+- `data` — object; required
+
+## DictionaryFormsInput {#schema-dictionaryformsinput}
+
+Type: **object**.
+
+### Properties
+
+- `language` — string; required
+- `words` — array of string; required
+
 ## DuplicateCandidate {#schema-duplicatecandidate}
 
 Type: **object**.
@@ -636,9 +653,13 @@ Type: **object**.
 ### Properties
 
 - `clozeMature` — boolean; required
+- `expressionState` — VocabularyReadingState; required
 - `hasCards` — boolean; required
+- `judgedAt` — string; optional
 - `judgment` — VocabularyJudgment; optional
+- `origin` — VocabularyJudgmentOrigin; optional
 - `readingMature` — boolean; required
+- `state` — VocabularyReadingState; required
 - `term` — VocabularyTerm; required
 
 ## KnownWordCollection {#schema-knownwordcollection}
@@ -649,6 +670,18 @@ Type: **object**.
 
 - `data` — array of KnownWord; required
 - `page` — PageInfo; required
+
+## KnownWordsSnapshot {#schema-knownwordssnapshot}
+
+Type: **object**.
+
+### Properties
+
+- `expressions` — object; optional
+- `language` — string; required
+- `lemmas` — object; optional
+- `unchanged` — boolean; optional
+- `version` — string; required
 
 ## LexicalEntry {#schema-lexicalentry}
 
@@ -1191,9 +1224,37 @@ Type: **object**.
 - `code` — string; required
 - `pointer` — string; required
 
+## VocabularyFrequencyBand {#schema-vocabularyfrequencyband}
+
+Type: **object**.
+
+### Properties
+
+- `total` — integer; required
+- `words` — array of string; required
+
 ## VocabularyJudgment {#schema-vocabularyjudgment}
 
 Type: **string**.
+
+## VocabularyJudgmentBatchInput {#schema-vocabularyjudgmentbatchinput}
+
+Type: **object**.
+
+### Properties
+
+- `entries` — array of VocabularyJudgmentInput; required
+
+## VocabularyJudgmentBatchReceipt {#schema-vocabularyjudgmentbatchreceipt}
+
+Type: **object**.
+
+### Properties
+
+- `batchId` — string; required
+- `changes` — array of VocabularyJudgmentChange; required
+- `recorded` — integer; required
+- `unchanged` — integer; required
 
 ## VocabularyJudgmentChange {#schema-vocabularyjudgmentchange}
 
@@ -1201,9 +1262,11 @@ Type: **object**.
 
 ### Properties
 
+- `batchId` — string; optional
 - `changedAt` — string; required
 - `id` — string; required
 - `judgment` — VocabularyJudgment; required
+- `origin` — VocabularyJudgmentOrigin; optional
 - `term` — VocabularyTerm; required
 
 ## VocabularyJudgmentInput {#schema-vocabularyjudgmentinput}
@@ -1214,6 +1277,10 @@ Type: **object**.
 
 - `judgment` — VocabularyJudgment; required
 - `term` — VocabularyTerm; required
+
+## VocabularyJudgmentOrigin {#schema-vocabularyjudgmentorigin}
+
+Type: **string**.
 
 ## VocabularyPack {#schema-vocabularypack}
 
@@ -1291,6 +1358,10 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
+## VocabularyReadingState {#schema-vocabularyreadingstate}
+
+Type: **string**.
+
 ## VocabularySetInput {#schema-vocabularysetinput}
 
 Type: **object**.
@@ -1326,8 +1397,9 @@ Type: **object**.
 
 - `expression` — string; required
 - `language` — string; required
+- `lemma` — string or null; optional
 - `sense` — string or null; optional
 
-Contract digest: `sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5`.
+Contract digest: `sha256:1734a8fd9f22c9af754508c692a653af17965ac85fa6e2118be23fdefda00c85`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

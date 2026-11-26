@@ -2,7 +2,7 @@
 title: Import and export
 description: Generated NeoAnki local API operations for import and export.
 audience: api
-contract_digest: sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5
+contract_digest: sha256:1734a8fd9f22c9af754508c692a653af17965ac85fa6e2118be23fdefda00c85
 parent: Local API reference
 permalink: /api/import-and-export/
 ---
@@ -250,6 +250,6 @@ curl --request POST \
   --header 'Authorization: Bearer <token>'
 ```
 
-Contract digest: `sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5`.
+Contract digest: `sha256:1734a8fd9f22c9af754508c692a653af17965ac85fa6e2118be23fdefda00c85`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._
