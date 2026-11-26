@@ -2,7 +2,7 @@
 title: Vocabulary
 description: Generated NeoAnki local API operations for vocabulary.
 audience: api
-contract_digest: sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5
+contract_digest: sha256:1734a8fd9f22c9af754508c692a653af17965ac85fa6e2118be23fdefda00c85
 parent: Local API reference
 permalink: /api/vocabulary/
 ---
@@ -13,7 +13,7 @@ permalink: /api/vocabulary/
 
 ## `GET /v1/known-words`
 
-List known words through the loopback-only NeoAnki API.
+List known words through the loopback-only NeoAnki API. Rows include state, the state of this exact term, and expressionState, the combined state of the spelling across all its meanings, which is the state to show for the word in text. Filter by expression to read one spelling; expression requires language and matches as a reader would, ignoring case, spacing, and, for Ukrainian, Russian, and Belarusian, stress marks and apostrophe variants. origin archivedReviews marks a word kept as known after the cards that proved it were deleted.
 
 - **Operation ID:** `listKnownWords`
 - **Authorization:** Bearer token with `known-words.read`
@@ -25,6 +25,7 @@ List known words through the loopback-only NeoAnki API.
 ### Parameters
 
 - `language` — query; optional. The language query parameter.
+- `expression` — query; optional. Spelling to match as a reader would. Requires language.
 - `limit` — query; optional. Maximum number of results to return.
 - `cursor` — query; optional. Opaque cursor returned by the preceding page.
 
@@ -35,9 +36,56 @@ curl --request GET \
   'http://127.0.0.1:8766/v1/known-words' \
   --header 'Authorization: Bearer <token>'
 ```
+## `POST /v1/known-words/judgment-batches`
+
+Record vocabulary judgment batch through the loopback-only NeoAnki API. Records 1 to 20,000 judgments in one change. The Idempotency-Key identifies the batch: retrying it returns the first receipt. Judgments that already apply are counted as unchanged and not written again. Use batchId to undo the whole change.
+
+- **Operation ID:** `recordVocabularyJudgmentBatch`
+- **Authorization:** Bearer token with `known-words.write`
+- **Success:** `201` with [VocabularyJudgmentBatchReceipt]({{ '/api/schemas/#schema-vocabularyjudgmentbatchreceipt' | relative_url }})
+- **Request body:** [VocabularyJudgmentBatchInput]({{ '/api/schemas/#schema-vocabularyjudgmentbatchinput' | relative_url }})
+- **Success headers:** `X-NeoAnki-Change-Cursor`
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `Idempotency-Key` — header; required. Caller-generated key used to replay a mutation safely.
+
+### Example request
+
+```bash
+curl --request POST \
+  'http://127.0.0.1:8766/v1/known-words/judgment-batches' \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '<request-json>'
+```
+## `POST /v1/known-words/judgment-batches/{id}/undo`
+
+Undo vocabulary judgment batch through the loopback-only NeoAnki API. Restores the judgment each word had before the batch, except for words changed again since, which are counted as unchanged. The receipt describes the undo, whose batchId is new; retrying with the same Idempotency-Key returns the same receipt.
+
+- **Operation ID:** `undoVocabularyJudgmentBatch`
+- **Authorization:** Bearer token with `known-words.write`
+- **Success:** `200` with [VocabularyJudgmentBatchReceipt]({{ '/api/schemas/#schema-vocabularyjudgmentbatchreceipt' | relative_url }})
+- **Request body:** None
+- **Success headers:** `X-NeoAnki-Change-Cursor`
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `id` — path; required. Resource identifier.
+- `Idempotency-Key` — header; required. Caller-generated key used to replay a mutation safely.
+
+### Example request
+
+```bash
+curl --request POST \
+  'http://127.0.0.1:8766/v1/known-words/judgment-batches/{id}/undo' \
+  --header 'Authorization: Bearer <token>'
+```
 ## `POST /v1/known-words/judgments`
 
-Record vocabulary judgment through the loopback-only NeoAnki API.
+Record vocabulary judgment through the loopback-only NeoAnki API. Judgments are known, unfamiliar, ignored, or reviewHistory. Ignored hides a word, such as a name or brand, from reading highlights and word counts. term.lemma optionally records the dictionary form the spelling belongs to. Other judgment values are rejected.
 
 - **Operation ID:** `recordVocabularyJudgment`
 - **Authorization:** Bearer token with `known-words.write`
@@ -58,6 +106,29 @@ curl --request POST \
   --header 'Authorization: Bearer <token>' \
   --header 'Content-Type: application/json' \
   --data '<request-json>'
+```
+## `GET /v1/known-words/snapshot`
+
+Get known words snapshot through the loopback-only NeoAnki API. Returns the combined reading state of every spelling (expressions) and dictionary form (lemmas) in one language, keyed by match key. Pass the version of a snapshot you hold as since; while it is still current the response contains only version, language, and unchanged true. To find the state of a word in text, use expressions for its match key; otherwise resolve its dictionary forms with a vocabulary pack and look each up in lemmas, then expressions. The word is known if every form is known or ignored and at least one is known, ignored if all are ignored, learning if any is learning, and unassessed otherwise.
+
+- **Operation ID:** `getKnownWordsSnapshot`
+- **Authorization:** Bearer token with `known-words.read`
+- **Success:** `200` with [KnownWordsSnapshot]({{ '/api/schemas/#schema-knownwordssnapshot' | relative_url }})
+- **Request body:** None
+- **Success headers:** None
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `language` — query; required. The language query parameter.
+- `since` — query; optional. Version of a snapshot the caller already holds.
+
+### Example request
+
+```bash
+curl --request GET \
+  'http://127.0.0.1:8766/v1/known-words/snapshot' \
+  --header 'Authorization: Bearer <token>'
 ```
 ## `POST /v1/vocabulary-pack-imports`
 
@@ -267,6 +338,31 @@ curl --request GET \
   'http://127.0.0.1:8766/v1/vocabulary-packs/{id}' \
   --header 'Authorization: Bearer <token>'
 ```
+## `POST /v1/vocabulary-packs/{id}/dictionary-forms`
+
+Resolve dictionary forms through the loopback-only NeoAnki API. Maps up to 2,000 words from text to the dictionary forms the pack lists for them, at most eight each. Matching ignores case and, where dictionaries mark stress, the stress marks that ordinary text omits. Words the pack does not contain are omitted from data.
+
+- **Operation ID:** `resolveDictionaryForms`
+- **Authorization:** Bearer token with `vocabulary.read`
+- **Success:** `200` with [DictionaryForms]({{ '/api/schemas/#schema-dictionaryforms' | relative_url }})
+- **Request body:** [DictionaryFormsInput]({{ '/api/schemas/#schema-dictionaryformsinput' | relative_url }})
+- **Success headers:** `X-NeoAnki-Change-Cursor`
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `id` — path; required. Resource identifier.
+- `Idempotency-Key` — header; optional. Caller-generated key used to replay a mutation safely.
+
+### Example request
+
+```bash
+curl --request POST \
+  'http://127.0.0.1:8766/v1/vocabulary-packs/{id}/dictionary-forms' \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '<request-json>'
+```
 ## `GET /v1/vocabulary-packs/{id}/entries`
 
 Search vocabulary entries through the loopback-only NeoAnki API.
@@ -314,6 +410,32 @@ Get vocabulary entry through the loopback-only NeoAnki API.
 ```bash
 curl --request GET \
   'http://127.0.0.1:8766/v1/vocabulary-packs/{id}/entries/{entryId}' \
+  --header 'Authorization: Bearer <token>'
+```
+## `GET /v1/vocabulary-packs/{id}/frequency-band`
+
+Get vocabulary frequency band through the loopback-only NeoAnki API. Lists the pack's dictionary forms for a language from most to least frequent. offset and limit (1 to 20,000, default 1,000) select a band; sample instead returns that many evenly spaced words from the band, for placement checks. total counts every ranked form in the language.
+
+- **Operation ID:** `getVocabularyFrequencyBand`
+- **Authorization:** Bearer token with `vocabulary.read`
+- **Success:** `200` with [VocabularyFrequencyBand]({{ '/api/schemas/#schema-vocabularyfrequencyband' | relative_url }})
+- **Request body:** None
+- **Success headers:** None
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `id` — path; required. Resource identifier.
+- `language` — query; required. The language query parameter.
+- `offset` — query; optional. Number of most frequent words to skip.
+- `limit` — query; optional. Maximum number of results to return.
+- `sample` — query; optional. Number of evenly spaced words to return from the band.
+
+### Example request
+
+```bash
+curl --request GET \
+  'http://127.0.0.1:8766/v1/vocabulary-packs/{id}/frequency-band' \
   --header 'Authorization: Bearer <token>'
 ```
 ## `GET /v1/vocabulary-packs/{id}/media`
@@ -387,6 +509,6 @@ curl --request POST \
   --data '<request-json>'
 ```
 
-Contract digest: `sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5`.
+Contract digest: `sha256:1734a8fd9f22c9af754508c692a653af17965ac85fa6e2118be23fdefda00c85`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

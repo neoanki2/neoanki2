@@ -319,6 +319,10 @@ before revealing it. The production card hides the exact form in the sentence
 with a native Cloze blank and uses the saved meaning as a cue. Type the
 missing word to compare your answer with the original form before grading.
 
+Successful meaning reviews count toward [Known Words](../authoring-items/#known-words-and-vocabulary-card-sets).
+Suspending a vocabulary card keeps the evidence it has earned. A word that is
+known from mature reviews stays known after you delete its card set.
+
 ## Feedback and grading
 
 After reveal, NeoAnki2 may show:
