@@ -26,28 +26,42 @@ jobs:
     name: Documentation content validation
     runs-on: macos-26-intel
     timeout-minutes: 10
+    outputs:
+      site_changed: ${{ steps.site.outputs.changed }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Validate feature coverage and links
-        run: swift Scripts/validate-docs.swift --require-screenshots
-      - name: Check direct main changes have documentation updates
-        if: github.event_name == 'push'
+      - name: Validate documentation and required updates
         env:
-          BASE_REF: ${{ github.event.before }}
-        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "$BASE_REF"
-      - name: Check dispatched pull-request revision
-        if: github.event_name == 'workflow_dispatch' && inputs.base_ref != ''
+          BASE_REF: ${{ github.event_name == 'push' && github.event.before || inputs.base_ref }}
+        run: |
+          arguments=(--require-screenshots)
+          if [[ -n "$BASE_REF" ]]; then
+            arguments+=(--base-ref "$BASE_REF")
+          fi
+          swift Scripts/validate-docs.swift "${arguments[@]}"
+      - name: Check whether the rendered site needs rebuilding
+        id: site
         env:
-          BASE_REF: ${{ inputs.base_ref }}
-        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "$BASE_REF"
+          PREVIOUS_SHA: ${{ github.event.before }}
+        run: |
+          changed=true
+          if [[ "$GITHUB_EVENT_NAME" == push ]] &&
+            git diff --quiet "$PREVIOUS_SHA" HEAD -- docs .github/workflows/docs-pages.yml \
+              Scripts/validate-built-docs.py Scripts/check-docs-responsive.mjs \
+              Scripts/build-docs-redirect.py Scripts/validate-docs-redirect.py \
+              Scripts/check-published-docs.py; then
+            changed=false
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build documentation site
     needs: validate-content
+    if: needs.validate-content.outputs.site_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

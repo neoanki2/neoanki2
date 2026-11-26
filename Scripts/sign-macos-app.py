@@ -222,7 +222,6 @@ def sign(app, material, require_notarization=True):
         entitlements.write_bytes(plistlib.dumps(entitlements_for(material.team)))
         run(["codesign", "--force", "--sign", material.identity, "--keychain", str(keychain),
              "--options", "runtime", "--timestamp", "--entitlements", str(entitlements), str(app)], timeout=120)
-    run(["codesign", "--verify", "--deep", "--strict", str(app)])
     if not require_notarization:
         verify(app, require_notarization=False)
         return

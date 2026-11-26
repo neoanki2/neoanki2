@@ -49,7 +49,8 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   before invoking publication; a queued auto-merge is insufficient. The command
   requires a clean checkout matching remote `main`, records that main revision,
   and rejects old branch-built candidates on resume. It captures an immutable
-  worktree, runs only relevant headless checks once, builds affected artifacts in
+  worktree, reuses passing unit CI for the exact tree or runs the affected
+  headless checks when that evidence is missing, builds affected artifacts in
   parallel, uploads/submits Store builds with automatic release, and updates the
   official Homebrew cask. Apple processing/review and public availability are
   reported separately. Actual simultaneous Store availability cannot be promised.
