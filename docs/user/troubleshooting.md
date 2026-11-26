@@ -177,10 +177,11 @@ update as the status changes; reopening Settings or toggling sync is not
 required. See [iCloud recovery](../sync-reminders-widgets/#troubleshoot-icloud)
 if an account or transfer problem remains visible.
 
-Incoming reviews now refresh Home counts and loaded Browse schedules when they
-arrive. If devices still disagree, compare the same scope on both and confirm
-the sending device has uploaded its latest reviews. **Current** on the receiving
-Mac alone cannot confirm that an offline phone has sent its latest changes.
+Incoming reviews refresh Home counts, loaded Browse schedules, and the Dock
+badge when they arrive. An open Mac app checks periodically even when another
+app has focus. To check immediately, choose **NeoAnki2 → Settings → iCloud →
+Sync Now**. If the devices still disagree, compare the same deck scope and
+check the sending device’s sync status.
 
 If **Vocabulary Packs** reports a catalog refresh problem, retry its iCloud
 refresh after sync becomes available. Packs already installed on the device

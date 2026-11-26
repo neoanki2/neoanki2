@@ -12,7 +12,9 @@ private func contractRequire(_ condition: Bool, _ marker: String, _ detail: Stri
 }
 
 struct ContractStep: Codable, Sendable {
-    enum Mode: String, Codable, Sendable { case push, lostPush, foreground, beforeSend, partialAcknowledgement, failedFetch, incomingMove, outgoingMove }
+    enum Mode: String, Codable, Sendable {
+        case push, lostPush, inactiveMac, foreground, beforeSend, partialAcknowledgement, failedFetch, incomingMove, outgoingMove
+    }
     let mode: Mode
     let cardIndex: Int
     var reviewCount = 1
@@ -126,6 +128,7 @@ private final class ContractReplica {
         self.transport = transport
         let service = OfflineFirstSyncService(repository: repository,
             adapter: SQLiteLibrarySyncAdapter(repository: repository), transport: transport, metadataStore: metadata,
+            inactiveRecoveryPollInterval: name == "mac" ? .seconds(10) : nil,
             timing: clock.timing(for: name), backupURL: { directory.appendingPathComponent("backup.sqlite") })
         self.service = service
         let model = LibraryFeatureModel(library: repository, syncService: service,
@@ -259,7 +262,7 @@ private final class ContractFixture {
         if step.mode == .partialAcknowledgement { await phone.transport.inject(.afterPartialSend) }
         let cards = ledger.cards.values.sorted { $0.id.uuidString < $1.id.uuidString }
         let inactiveFetches = await mac.transport.fetchCount()
-        if step.mode == .foreground { await mac.service.setForeground(false) }
+        if step.mode == .foreground || step.mode == .inactiveMac { await mac.service.setForeground(false) }
         if step.mode == .incomingMove {
             // The receiver is suspended while this mixed batch reaches cloud.
             // A lifecycle start below stages it before reconstructing the app.
@@ -314,7 +317,7 @@ private final class ContractFixture {
             try contractRequire(!metadata.stagedInbound.isEmpty, "SYNC_CONTRACT_ASSET_RELOCATION", "No durable inbox staged before moving receiver")
             try contractRequire(try await cloud.activeLeaseCount() == 0, "SYNC_CONTRACT_ASSET_RELOCATION", "Transient downloads must already be expired")
             mac = try await move(mac, legacy: step.legacyMetadata)
-        } else if step.mode == .lostPush || step.mode == .failedFetch {
+        } else if step.mode == .lostPush || step.mode == .failedFetch || step.mode == .inactiveMac {
             if step.mode == .failedFetch {
                 await mac.transport.inject(.fetch)
                 let beforeFetch = clock.completed("mac")
@@ -322,15 +325,15 @@ private final class ContractFixture {
                 try await clock.waitForCompletion(deviceID: "mac", after: beforeFetch)
             }
             let poll = try await clock.pollRequest(deviceID: "mac")
-            try contractRequire(poll.duration == .seconds(3), "SYNC_CONTRACT_POLL_DEADLINE", "Recovery poll interval changed")
+            let expectedInterval: Duration = step.mode == .inactiveMac ? .seconds(10) : .seconds(3)
+            try contractRequire(poll.duration == expectedInterval, "SYNC_CONTRACT_POLL_DEADLINE", "Recovery poll interval changed")
             let beforeFetch = await mac.transport.fetchCount()
             clock.advance(to: poll.deadline - .milliseconds(1))
             try contractRequire(await mac.transport.fetchCount() == beforeFetch, "SYNC_CONTRACT_POLL_DEADLINE", "Receiver fetched before its recovery timer")
             clock.advance(by: .milliseconds(1))
         } else if step.mode == .foreground {
             clock.advance(by: .seconds(3))
-            try contractRequire(!clock.hasPoll(deviceID: "mac"), "SYNC_CONTRACT_FOREGROUND", "Inactive receiver retained a recovery timer")
-            try contractRequire(await mac.transport.fetchCount() == inactiveFetches, "SYNC_CONTRACT_FOREGROUND", "Inactive receiver fetched without a push")
+            try contractRequire(await mac.transport.fetchCount() == inactiveFetches, "SYNC_CONTRACT_FOREGROUND", "Inactive receiver fetched before its slower poll")
             await mac.service.setForeground(true)
         } else if controlledPush {
             await cloud.deliverPush(to: "mac")
@@ -348,6 +351,7 @@ private final class ContractFixture {
             }
         }
         try await verifyLedger()
+        if step.mode == .inactiveMac { await mac.service.setForeground(true) }
         await cloud.setPushesEnabled(true, for: "mac")
         completedSteps += 1
     }
@@ -473,6 +477,10 @@ struct SyncConvergenceContractTests {
     @Test func lostPushRecoversAtNextPollDeadline() async throws {
         try await runContract(.init(scenario: "lost-push", seed: 7,
             steps: [.init(mode: .lostPush, cardIndex: 0)]))
+    }
+    @Test func inactiveMacRecoversMissedPushAndRefreshesVisibleDueCount() async throws {
+        try await runContract(.init(scenario: "inactive-mac", seed: 87,
+            steps: [.init(mode: .inactiveMac, cardIndex: 0, reviewCount: 3)]))
     }
     @Test func foregroundCatchesUpWithoutWaitingForTheNextPoll() async throws {
         try await runContract(.init(scenario: "foreground", seed: 2,

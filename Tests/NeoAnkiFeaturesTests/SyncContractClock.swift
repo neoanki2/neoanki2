@@ -142,9 +142,6 @@ final class SyncContractClock: @unchecked Sendable {
             throw CancellationError()
         }
     }
-    func hasPoll(deviceID: String) -> Bool {
-        !pending(deviceID, reason: .recoveryPoll).isEmpty
-    }
     func waitForCompletion(deviceID: String, after count: Int) async throws {
         try await syncContractWatch("SYNC_CONTRACT_CYCLE_COMPLETION") {
             let changes = await self.events.stream()

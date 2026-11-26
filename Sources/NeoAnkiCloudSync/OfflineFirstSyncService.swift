@@ -33,6 +33,7 @@ public actor OfflineFirstSyncService: SyncService {
     private let learningTime: LearningTimeSyncService?
     private let backupURL: @Sendable () -> URL
     private let recoveryPollInterval: Duration
+    private let inactiveRecoveryPollInterval: Duration?
     private let timing: SyncTiming
     private let timingUsesSystemNetwork: Bool
     private var currentStatus: SyncStatus = .offline
@@ -83,6 +84,7 @@ public actor OfflineFirstSyncService: SyncService {
         statistics: StatisticsSyncService? = nil,
         knownWords: VocabularyJudgmentSyncService? = nil,
         recoveryPollInterval: Duration = .seconds(3),
+        inactiveRecoveryPollInterval: Duration? = nil,
         backupURL: @escaping @Sendable () -> URL
     ) {
         self.repository = repository
@@ -94,6 +96,7 @@ public actor OfflineFirstSyncService: SyncService {
         self.knownWords = knownWords
         self.backupURL = backupURL
         self.recoveryPollInterval = recoveryPollInterval
+        self.inactiveRecoveryPollInterval = inactiveRecoveryPollInterval
         self.timing = .continuous
         self.timingUsesSystemNetwork = true
     }
@@ -105,6 +108,7 @@ public actor OfflineFirstSyncService: SyncService {
         transport: any CloudSyncTransport,
         metadataStore: SyncMetadataStore,
         recoveryPollInterval: Duration = .seconds(3),
+        inactiveRecoveryPollInterval: Duration? = nil,
         timing: SyncTiming,
         backupURL: @escaping @Sendable () -> URL
     ) {
@@ -117,6 +121,7 @@ public actor OfflineFirstSyncService: SyncService {
         self.knownWords = nil
         self.backupURL = backupURL
         self.recoveryPollInterval = recoveryPollInterval
+        self.inactiveRecoveryPollInterval = inactiveRecoveryPollInterval
         self.timing = timing
         self.timingUsesSystemNetwork = false
     }
@@ -161,14 +166,14 @@ public actor OfflineFirstSyncService: SyncService {
                 }
             }
             if timingUsesSystemNetwork { monitorConnectivity() }
-            configureForegroundTimers()
+            configurePollTimers()
         }
     }
 
     public func setForeground(_ foreground: Bool) async {
         guard self.foreground != foreground else { return }
         self.foreground = foreground
-        configureForegroundTimers()
+        configurePollTimers()
         if foreground, isStarted { request(.download, .upload, .media, .statistics, .learningTime, .knownWords) }
     }
 
@@ -223,23 +228,23 @@ public actor OfflineFirstSyncService: SyncService {
         for id in completed.keys { cancelWaiter(id) }
     }
 
-    private func configureForegroundTimers() {
+    private func configurePollTimers() {
         automaticSyncTask?.cancel()
         activityPollTask?.cancel()
         automaticSyncTask = nil
         activityPollTask = nil
-        guard isStarted, foreground else { return }
+        guard isStarted else { return }
         let scheduler = timing
-        let interval = recoveryPollInterval
-        automaticSyncTask = Task { [weak self] in
-            while !Task.isCancelled {
-                do { try await scheduler.sleep(interval, .recoveryPoll) }
-                catch { return }
-                guard !Task.isCancelled else { return }
-                await self?.pollLibrary()
+        if let interval = foreground ? recoveryPollInterval : inactiveRecoveryPollInterval {
+            automaticSyncTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    do { try await scheduler.sleep(interval, .recoveryPoll) }
+                    catch { return }
+                    await self?.pollLibrary()
+                }
             }
         }
-        if statistics != nil || learningTime != nil || knownWords != nil {
+        if foreground, statistics != nil || learningTime != nil || knownWords != nil {
             activityPollTask = Task { [weak self] in
                 while !Task.isCancelled {
                     do { try await scheduler.sleep(.seconds(30), .activityPoll) }
@@ -252,7 +257,7 @@ public actor OfflineFirstSyncService: SyncService {
     }
 
     private func pollLibrary() {
-        guard foreground, workers[.download] == nil else { return }
+        guard !Task.isCancelled, workers[.download] == nil else { return }
         request(.download)
     }
 

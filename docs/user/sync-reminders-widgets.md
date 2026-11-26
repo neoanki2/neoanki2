@@ -120,11 +120,12 @@ library is silently replaced wholesale. Local SQLite remains authoritative, so
 authoring and study continue when the network or iCloud is unavailable.
 
 Use **Sync Now** for an immediate attempt. NeoAnki2 also synchronizes when it
-becomes active, about 600 milliseconds after committed local changes, and when
+becomes active, about 250 milliseconds after committed local changes, and when
 iCloud sends a silent change notification. Incoming changes refresh Home,
 Browse schedules, and due counts as soon as they commit, rather than waiting
-for the ordinary count timer. A 10-second recovery poll catches missed change
-notifications while the app is running.
+for the ordinary count timer. The library checks for missed notifications about
+every three seconds while active. On Mac it continues checking about every ten
+seconds while another app has focus, so the Dock badge can catch up.
 
 Pending changes, including downloaded images, remain recoverable after an app
 update. The updated app resumes its saved queue when it next runs, preserving

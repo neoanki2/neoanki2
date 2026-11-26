@@ -44,7 +44,6 @@ struct NeoAnki2App: App {
     @State private var syncService: OfflineFirstSyncService?
     @State private var syncStatusModel = MacCloudSyncStatusModel()
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppPreferences.cloudSyncEnabled) private var cloudSyncEnabled = false
 #if DEBUG
     @State private var testConfiguration: UITestRuntimeConfiguration?
@@ -152,9 +151,6 @@ struct NeoAnki2App: App {
                 // startup on the stable root so that it cannot cancel sync.
                 await bootstrap()
                 installUITestControlIfNeeded()
-            }
-            .onChange(of: scenePhase) { _, phase in
-                Task { await syncService?.setForeground(phase == .active) }
             }
             .onChange(of: decksModel?.selectedDeckID) { _, deckID in
                 Task { await syncService?.prioritizeMedia(in: deckID.map { .deck($0) }) }
@@ -318,6 +314,7 @@ struct NeoAnki2App: App {
     private func updateCloudSync(enabled: Bool, library: SQLiteLibraryRepository) async {
         guard enabled else {
             appDelegate.synchronizeCloudChanges = nil
+            appDelegate.cloudSyncActivationChanged = nil
             vocabularyLibraryModel?.sync.setEnabled(false)
             syncStatusModel.stop()
             await syncService?.stop()
@@ -345,9 +342,14 @@ struct NeoAnki2App: App {
                     directory: root.appendingPathComponent("Statistics Sync", isDirectory: true)),
                 knownWords: try await VocabularyJudgmentSyncService.make(repository: library,
                     directory: root.appendingPathComponent("Known Words Sync", isDirectory: true)),
+                // The Dock badge needs incoming reviews while another app has focus.
+                inactiveRecoveryPollInterval: .seconds(10),
                 backupURL: { root.appendingPathComponent("pre-cloud-merge.sqlite") }
             )
             syncService = service
+            appDelegate.cloudSyncActivationChanged = { [weak service] in
+                Task { await service?.setForeground(NSApp.isActive) }
+            }
             await service.setForeground(NSApp.isActive)
             await service.prioritizeMedia(in: decksModel?.selectedDeckID.map { .deck($0) })
             appDelegate.synchronizeCloudChanges = { [weak service] scope in _ = await service?.receiveRemoteChanges(scope) }
