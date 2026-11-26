@@ -121,7 +121,9 @@ fi
 
 echo "Building NeoAnki2 ($CONFIG)..."
 cd "$ROOT"
-BUILD_ARGUMENTS=(-c "$CONFIG")
+# This bundle copies only the Mac app executable. Keep unrelated package
+# products out of both local installs and universal release builds.
+BUILD_ARGUMENTS=(-c "$CONFIG" --product NeoAnki2)
 if [ -n "${NEOANKI_INSTALL_SCRATCH_PATH:-}" ]; then
   BUILD_ARGUMENTS+=(--scratch-path "$NEOANKI_INSTALL_SCRATCH_PATH")
 fi
