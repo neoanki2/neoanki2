@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowPresentations: [ObjectIdentifier: WindowFramePolicy.Presentation] = [:]
     let authoredDeckOpenRequests = AuthoredDeckOpenRequests()
     var synchronizeCloudChanges: (@MainActor (SyncRemoteScope) async -> Void)?
+    var cloudSyncActivationChanged: (@MainActor () -> Void)?
     private static let cloudPushLogger = Logger(subsystem: "com.neoanki2.app", category: "CloudSyncPush")
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -27,7 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
         guard let scope = CKSyncEngineTransport.notificationScope(userInfo) else { return }
-        Self.cloudPushLogger.notice("Received library change notification")
+        Self.cloudPushLogger.notice("Received iCloud change notification for \(String(describing: scope), privacy: .public)")
         Task { await synchronizeCloudChanges?(scope) }
     }
 
@@ -84,6 +85,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         // Returning from notification settings must restore an unchanged count.
         Self.dockBadge.reapply()
+        cloudSyncActivationChanged?()
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        cloudSyncActivationChanged?()
     }
 
     @objc private func windowGeometryDidChange(_ notification: Notification) {

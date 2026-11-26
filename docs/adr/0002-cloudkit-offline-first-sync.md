@@ -34,10 +34,11 @@ newer explicit delivery. Dictionary assets remain in their separate zone.
 A silent `CKRecordZoneSubscription` wakes the corresponding library,
 statistics, or learning-time worker. The foreground library reader checks its
 delta token every three seconds and wakes immediately on activation or network
-recovery. It coalesces pushes during a read into one follow-up and leaves the
-durable checkpoint alone on empty checks. Server retry deadlines take priority
-over wake events. Background activity depends on system execution and push
-delivery.
+recovery. macOS keeps a ten-second library poll while the app is inactive so
+missed pushes can still update the Dock badge. The reader coalesces pushes
+during a read into one follow-up and leaves the durable checkpoint alone on
+empty checks. Server retry deadlines take priority over wake events. Mobile
+background activity depends on system execution and push delivery.
 
 The first committed SQLite journal change opens a 250-millisecond upload window.
 Later commits join that window without moving its deadline. A separate receiver

@@ -158,7 +158,9 @@ that its signature cannot access.
 
 With iCloud enabled, the local library opens while sync catches up. Opening or
 returning to the app starts an immediate check, and incoming changes update
-counts as they arrive. iPhone and iPad can also receive a silent
+counts as they arrive. On Mac, the library also checks periodically while
+another app has focus so the Dock badge can reflect reviews from other devices.
+iPhone and iPad can also receive a silent
 sync notification before their first screen appears; startup and the screen
 share the same library initialization.
 
