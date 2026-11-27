@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fail() {
+  printf 'Pre-push: %s\n' "$*" >&2
+  exit 1
+}
+
+head=$(git rev-parse HEAD)
+branch_update=false
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ "$remote_ref" == refs/heads/* && "$local_ref" != '(delete)' ]] || continue
+  [[ "$local_sha" == "$head" ]] || fail "Check out the commit being pushed to $remote_ref."
+  branch_update=true
+done
+[[ "$branch_update" == true ]] || exit 0
+
+require_clean_head() {
+  local current_head status
+  current_head=$(git rev-parse HEAD)
+  status=$(git status --porcelain=v1 --untracked-files=all)
+  [[ "$current_head" == "$head" && -z "$status" ]] \
+    || fail "Validation requires the checked-out commit to stay clean. Commit or stash pending changes."
+}
+
+remote_main() {
+  gh api repos/neoanki2/neoanki2/git/ref/heads/main --jq .object.sha
+}
+
+require_clean_head
+base=$(remote_main)
+git merge-base --is-ancestor "$base" "$head" \
+  || fail "Integrate GitHub main ($base) into the branch before validating. The PR merge would test a different tree."
+
+cd "$(git rev-parse --show-toplevel)"
+export DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
+unset TOOLCHAINS
+expected_build=$(cat Config/app-unit-xcode-build.txt)
+actual_build=$(plutil -extract ProductBuildVersion raw "$DEVELOPER_DIR/../version.plist" 2>/dev/null) \
+  || fail "Select the full Xcode installation for CI build $expected_build using DEVELOPER_DIR."
+[[ "$(uname -m)" == arm64 && "$actual_build" == "$expected_build" ]] \
+  || fail "App CI requires Apple Silicon and Xcode build $expected_build. Found $(uname -m) and $actual_build."
+export SDKROOT
+SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+
+printf 'Pre-push: validating %s against main %s.\n' "$head" "$base"
+git diff --check "$base...$head"
+xcrun swift Scripts/validate-docs.swift --require-screenshots --base-ref "$base"
+./Scripts/test-unit.sh
+api_changes=$(git diff --name-only "$base...$head" -- Sources/NeoAnkiAPI Tools/NeoAnkiAPIReferenceGenerator docs/api)
+if [[ -n "$api_changes" ]]; then
+  xcrun swift run --scratch-path "${NEOANKI_UNIT_BUILD_ROOT:-$PWD/.build}/ci-unit-app" neoanki-api-reference check
+fi
+require_clean_head
+[[ "$(remote_main)" == "$base" ]] || fail "GitHub main advanced during validation. Integrate it and run the checks again."
+printf 'Pre-push: all checks passed for %s.\n' "$head"

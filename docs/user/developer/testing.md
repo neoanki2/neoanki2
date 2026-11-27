@@ -35,9 +35,25 @@ Use `./Scripts/test-fast.sh` for the broader local headless run, including
 Core flows, the sync campaigns, generated API freshness, and documentation
 validation. Performance benchmarks and native XCTest UI journeys are opt-in.
 
-Strict documentation checks run before release pushes. The controller checks
-generated API reference freshness for API source changes. Documentation
-publishing runs separately for changes to site inputs.
+## Pre-push validation
+
+Enable the tracked Git hook in this checkout:
+
+```bash
+git config --local core.hooksPath Scripts/githooks
+```
+
+Commit your changes, integrate current GitHub main, and push from a clean
+checkout of the commit you want to send. The hook verifies the current base,
+runs all four unit lanes, and checks the diff and strict documentation.
+Changes to the local API, its generator, or generated reference also run the
+API freshness check. A failure stops the push.
+
+The hook uses Apple Silicon and the exact Xcode build pinned for the app CI
+job in `Config/app-unit-xcode-build.txt`. Set `DEVELOPER_DIR` to that Xcode
+installation's `Contents/Developer` directory if another Xcode is selected.
+The hosted Intel Core and Linux Chrome jobs verify their platforms separately.
+Documentation publishing runs after integration.
 
 ## Focused suites
 
@@ -355,13 +371,11 @@ energy on the same reference device.
 
 ## CI reliability and optional UI investigations
 
-Required Swift unit-test jobs use `macos-26-intel` with Xcode 26.6. Hosted ARM
-jobs previously failed before runner acquisition during capacity shortages.
-Native Mac unit tests therefore execute on Intel; local Apple Silicon
-verification remains separate. Manual platform validation and release archives
-retain the iOS ARM64 and universal Mac build checks.
-The [official image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md)
-lists the pinned Xcode installation.
+The app unit job uses the Apple Silicon `xcode-27` image with Xcode 27.2.
+Core runs on `macos-26-intel` with Xcode 26.6. Manual platform validation and
+release archives retain iOS ARM64 and universal Mac build checks.
+The [official image inventory](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)
+lists the pinned app CI installation.
 
 Resource contracts check each checksum read's autorelease lifetime and pairing
 approval cancellation/completion directly. The former process-wide RSS growth
