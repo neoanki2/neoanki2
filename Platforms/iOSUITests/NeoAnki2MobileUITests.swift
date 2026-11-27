@@ -435,6 +435,10 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         }
     }
 
+    func back(_ app: XCUIApplication) {
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+    }
+
     func open(_ title: String, in app: XCUIApplication) {
         XCTAssertTrue(app.navigationBars.firstMatch.waitUntilExists(timeout: 5), "App navigation unavailable")
         let tabDestination = app.tabBars.buttons[title]
@@ -809,7 +813,7 @@ final class MobileAuthoringSurfaceUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.buttons["Install Pack…"].waitUntilExists(timeout: 5))
         XCTAssertFalse(app.navigationBars["Vocabulary Packs"].buttons["Install Pack"].exists)
 
-        app.navigationBars["Vocabulary Packs"].buttons.firstMatch.tap()
+        back(app)
         let enableSync = app.buttons["Enable iCloud Sync…"]
         XCTAssertTrue(enableSync.waitUntilExists(timeout: 3))
         enableSync.tap()
@@ -1292,9 +1296,6 @@ final class MobileVisualRedesignUITests: NeoAnki2MobileUITestCase {
         tree.name = name + "-tree"
         tree.lifetime = .keepAlways
         add(tree)
-    }
-    func back(_ app: XCUIApplication) {
-        app.navigationBars.buttons.element(boundBy: 0).tap()
     }
     func testManagementScreenInventory() throws {
         let app = launchApp()
