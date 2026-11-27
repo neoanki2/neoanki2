@@ -417,6 +417,9 @@ struct AddItemView: View {
     private func fieldEditor(_ field: FieldDef) -> some View {
         let photoTitle = mediaValues[field.id] == nil ? "Photos" : "Replace from Photos"
         switch field.type {
+        case .studyExercise:
+            StudyExerciseFieldEditor(label: field.name, text: valueBinding(for: field.id),
+                                     defaultMode: selectedType?.preferredStudyExerciseMode ?? .target)
         case .number:
             TextField("Enter \(field.name.lowercased())", text: valueBinding(for: field.id))
                 .keyboardType(.decimalPad)
@@ -604,6 +607,7 @@ struct AddItemView: View {
                         guard raw.isEmpty || formatter.number(from: raw) != nil else { throw ItemDraftError.invalidNumber(field.name) }
                         content[field.id] = raw.isEmpty ? .empty : .number(formatter.number(from: raw)!.doubleValue)
                     case .imageOcclusion: content[field.id] = occlusions[field.id].map(ContentValue.imageOcclusion) ?? .empty
+                    case .studyExercise: content[field.id] = try .studyExercise(StudyExercise(editorText: values[field.id] ?? ""))
                     case .cloze: content[field.id] = .cloze(values[field.id] ?? "", blanks: clozeBlanks[field.id] ?? [])
                     case .text: content[field.id] = .text(values[field.id] ?? "")
                     }
@@ -936,7 +940,7 @@ struct ItemEditMobileView: View {
                         }
                     }
                 }
-                ContextAuthoringEntry(features: model.features, deckID: draft.deckID, fields: ContextExamplePreset.authoringFields(in: itemType),
+                VocabularyAuthoringEntry(features: model.features, deckID: draft.deckID, fields: ContextExamplePreset.authoringFields(in: itemType),
                     text: { id in
                         switch draft.value(for: id) {
                         case let .text(value, _), let .cloze(value, _): value
@@ -1063,6 +1067,11 @@ struct ItemEditMobileView: View {
                         .disabled(processingAttachments > 0)
                 }
             }
+        case .studyExercise:
+            StudyExerciseFieldEditor(label: field.name, text: Binding(
+                get: { textFor(field.id) ?? "" },
+                set: { draft.setText($0, for: field.id); saveOperation.beginEditing() }
+            ), defaultMode: draft.itemType.preferredStudyExerciseMode)
         case .number:
             TextField("Number", value: Binding(get: { numberFor(field.id) }, set: { set($0.map(ContentValue.number) ?? .empty, field.id) }), format: .number)
                 .keyboardType(.decimalPad)

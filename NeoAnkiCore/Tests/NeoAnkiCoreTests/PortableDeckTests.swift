@@ -619,3 +619,23 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     #expect(result.createdItemTypeCount == 1)
     #expect(try await destination.listItemTypes().filter { $0.name == "Shared Name" }.count == 2)
 }
+
+@Test func portableExerciseKeepsDependentAnswersAndAuthoredChoices() throws {
+    let target = StudyExercise(
+        mode: .target, parts: ["", " dogs need ", "."],
+        targets: [.init(allowsOmission: true), .init(choices: ["exercise", "water"])],
+        answers: [["", "exercise"], ["Some", "water"]]
+    )
+    #expect(target.stimulus == "[1] dogs need [2].")
+    #expect(target.accepts(["", "exercise"]))
+    #expect(target.accepts(["some", "water"]))
+    #expect(!target.accepts(["", "water"]))
+    let choice = StudyExercise(mode: .choose, prompt: "A. Version A\nB. Version B",
+        options: [.init(id: "a", label: "Only A"), .init(id: "both", label: "Both")], correctOptionID: "both")
+    for exercise in [target, choice] {
+        try exercise.validate()
+        let value = ContentValue.studyExercise(exercise)
+        let encoded = try PortableJSON.encodeContent(value)
+        #expect(try PortableJSON.decodeContent(encoded, formatVersion: PortableDeck.version) == value)
+    }
+}

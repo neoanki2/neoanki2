@@ -43,7 +43,7 @@
       "workers": 1,
       "tests": [
         "NeoAnki2MobileUITests/MobileNavigationUITests/testTopLevelProductNavigation",
-        "NeoAnki2MobileUITests/MobileNavigationUITests/testLearnInContextOnlyRequiresDeckAndPhraseAndExplainsUnavailableGeneration",
+        "NeoAnki2MobileUITests/MobileNavigationUITests/testVocabularySetShortcutExplainsUnavailableGeneration",
         "NeoAnki2MobileUITests/MobileDeckUITests/testDeckCreateRenameAndDeleteJourney",
         "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsNavigationAndHomeConsolidation",
         "NeoAnki2MobileUITests/MobileStatisticsUITests/testCalendarPresentationAndStableSelection"
@@ -217,7 +217,8 @@
       "device": "iPhone 17 Pro Max",
       "workers": 1,
       "tests": [
-        "NeoAnki2MobileUITests/MobileFitStudyAreaUITests/testPromptFitsPortraitAndLandscapeAndKeepsAnswerReadable"
+        "NeoAnki2MobileUITests/MobileFitStudyAreaUITests/testPromptFitsPortraitAndLandscapeAndKeepsAnswerReadable",
+        "NeoAnki2MobileUITests/MobileGrammarExerciseUITests/testResponseControlsIdentifyAndCheckAllThreeModes"
       ]
     },
     {

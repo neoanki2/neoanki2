@@ -54,6 +54,8 @@ enum ContentRenderingPolicy {
             "Image occlusion"
         case .cloze:
             "Cloze"
+        case .studyExercise:
+            "Study exercise"
         case let .media(ref):
             switch ref.kind {
             case .audio: "Audio"

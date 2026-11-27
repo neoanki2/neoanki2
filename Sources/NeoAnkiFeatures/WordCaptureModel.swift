@@ -79,18 +79,25 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
         let definition = sense?.definitions.first?.text
         let language = selectedEntry?.language ?? (selectedPack?.languages.count == 1 ? selectedPack?.languages.first : nil) ?? ""
         let examples = sense?.examples ?? []
-        let sentence = examples.first {
+        let reading = examples.first {
             VocabularySet.occurrences(of: query, in: $0.text.value, language: language).count == 1
-        }?.text.value ?? ""
+        }
+        let sentence = reading?.text.value ?? ""
         let production = examples.first { example in
             guard example.text.value != sentence, !sentence.isEmpty, let form = example.target?.exactText else { return false }
             return VocabularySet.occurrences(of: form, in: example.text.value, language: language).count == 1
         }
         let discriminator = selectedEntry?.senses.count == 1 && results.count == 1 ? nil : definition?.value
-        return .init(term: .init(language: language, expression: query, sense: discriminator),
+        let key = VocabularyTerm.matchKey(query, language: language)
+        let lemma = selectedEntry.flatMap { entry in
+            ([entry.canonicalForm] + entry.forms).contains { VocabularyTerm.matchKey($0.text.value, language: language) == key }
+                ? entry.canonicalForm.text.value : nil
+        }
+        return .init(term: .init(language: language, expression: query, sense: discriminator, lemma: lemma),
                      meaning: definition?.value ?? "", meaningLanguage: definition?.language ?? "",
                      sentence: sentence, productionSentence: production?.text.value,
-                     productionForm: production?.target?.exactText, deckID: deckID)
+                     productionForm: production?.target?.exactText,
+                     source: VocabularyExampleLookup.citation(for: reading?.provenance), deckID: deckID)
     }
 
     public func makeTypeChooser() -> ItemTypeChooserFeatureModel {

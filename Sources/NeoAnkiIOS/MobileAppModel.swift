@@ -77,6 +77,7 @@ extension LibraryFeatureModel {
                 }
                 content[field.id] = .number(number)
             case .imageOcclusion: content[field.id] = .empty
+            case .studyExercise: content[field.id] = try .studyExercise(StudyExercise(editorText: input))
             case .cloze: content[field.id] = .cloze(input, blanks: [])
             case .audio, .image, .gif, .video: throw ItemDraftError.unsupportedValue(field.name)
             }

@@ -36,19 +36,23 @@ current search text and sort order.
 ## Known Words and vocabulary card sets
 
 Open **Library → Known Words** and choose the language you’re learning. Known
-Words tracks each language separately. On Mac, open the filter menu to switch
-between **Known**, **Learning**, **Not known**, and **Ignored**. The menu shows
-how many words are in each group for the selected language.
+Words tracks each language separately and lists each dictionary headword once.
+A saved dictionary form or an unambiguous match in an installed pack can group
+forms such as *пагорків* and *пагорок*. You can find the row by searching either
+its headword or a saved form. On Mac, open the filter menu to switch between
+**Known**, **Learning**, **Not known**, and **Ignored**. The menu counts headwords
+for the selected language.
 
 Use **Add Word** and choose **Mark Known** to record a word or phrase you already
-understand. You can also mark words from **Learn in Context** or
+understand. You can also mark words from
 [Chrome Reading Mode](../chrome-companion/#use-reading-mode).
 
 Choose **Create Cards** in **Add Word** to practice a term in context. Give it a short
 meaning and a sentence containing the term. **Understand in context** asks
 what the highlighted term means. **Complete the sentence** hides the exact
-occurrence with a native Cloze blank. Recall the missing form aloud or type it
-to compare, then choose your grade. Both cards have their own review schedules.
+occurrence from the sentence with a native Cloze blank. Recall the missing form
+aloud or type it to compare, then choose your grade. Both cards have their own
+review schedules.
 
 Words can become **Known · From reviews** after spaced, successful meaning
 recall. **Cloze recall** reflects production separately. Known words from
@@ -98,50 +102,24 @@ new item and delete the old one after checking the result.
 
 ## Learn a word or phrase in context
 
-Choose **Learn in Context** in Create on iPhone/iPad, or from the Mac
-File menu. This is a separate authoring flow; the standard Add Item form stays
-focused on the selected item type's fields.
+Open **Known Words → Add Word → Create Cards**, **Create → Create Vocabulary Set**
+on iPhone or iPad, or **File → Create Vocabulary Set…** on Mac. These open the
+same card composer.
 
-1. Choose a deck and enter a word or phrase.
-2. Choose **Find Examples**. The app detects the language and finds local dictionary
-   examples, then uses Apple Intelligence to fill the set with up to three examples.
-   Each sentence gets its own contextual meaning and automatic phrase highlighting.
-3. Preview the sentences and play their audio, then choose **Add Cards**.
+1. Enter a word or phrase and choose its learning and meaning languages.
+2. Choose **Find Examples** to search installed packs. Choose a dictionary
+   meaning and example if more than one matches. For Ukrainian, the updated
+   СУМ-11 pack provides literary quotations and their citations.
+3. Check the meaning, the exact form to blank, and the Cloze preview. Choose a
+   deck or **Unassigned**, then choose **Create Card Set**.
 
-Each example becomes an ordinary Context Example item with its own review schedule.
-Speech is added automatically when an installed voice for the example’s language
-is available. An interrupted add preserves the draft for retry. **Undo** removes
-the last added batch while its items remain unchanged and unstudied. Rewriting a
-saved sentence detaches its old recording unless you replace it with matching media.
-To change the expression, type in the same input; the preview updates after you
-choose **Find Examples** again. Saved items can be edited in the ordinary item editor.
+You can enter a sentence and meaning yourself. When the dictionary has no usable
+sentence, **Generate Example** uses Apple Intelligence on supported devices and
+languages. Generated examples are labeled in the preview. The selected source
+is saved with the item.
 
-This capture flow has no language or meaning fields, target-marking controls,
-source import setup, or extra practice options. It uses Apple capabilities and
-installed dictionary examples on this device, without online video search or cloud
-generation. When no suitable local examples or supported Apple model are available,
-the app explains that instead of silently stopping. Text cards can still be saved
-when no voice is installed.
-
-Initial dictionary, voice, and system-model installation is separate from offline
-authoring. Accepted items and media follow existing sync and export settings.
-Unfinished drafts remain device-local and are restored when you reopen the flow.
-The Study queue updates when the receiving library saves the example and its cards.
-
-An example that includes video opens playback controls below the preview.
-
-All accepted examples and enabled Card setups are saved, but only one new
-related card is introduced per study day. Language and expression identify
-related context examples across separate batches and decks; adding the same
-expression again does not start another daily allowance. A learned relative
-that is due takes precedence. These eligibility rules do not combine grades or
-change another card's memory. The library rebuilds this grouping for existing,
-imported, and synced content automatically; undoing a grade restores eligibility.
-Choosing a deck limits which new example can be introduced, but reviewing a
-related example in another deck still defers its new relatives for that day,
-including during an extra study session.
-When the study queue runs out, the session checks these rules again before
-adding newly due examples.
+Existing **Context Example** items remain editable and studyable, with their
+audio and review history. They follow the [related-card scheduling rules](../studying/#study-queue-order).
 
 ## Create image occlusion items
 
@@ -236,8 +214,7 @@ the capture sheet if needed, or use **Enter Manually** when no suitable entry is
 available. On Mac, arrow keys navigate matches, Return chooses a highlighted
 match, **Command-Return** adds a valid word, and Escape requests closing the sheet.
 
-Use **New Item** for general authoring or **Learn in Context** for sentence-based
-cards.
+Use **New Item** for general authoring or **Create Vocabulary Set** for contextual vocabulary pairs.
 
 ## Fill fields from a dictionary
 

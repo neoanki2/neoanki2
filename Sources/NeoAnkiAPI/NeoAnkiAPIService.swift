@@ -2001,6 +2001,7 @@ public actor NeoAnkiAPIService {
                     "mediaId", "kind", "sha256", "fileExtension", "durationMs",
                     "altText", "reservationId",
                 ])
+            case "studyExercise": allowedContent = common.union(["exercise"])
             case "cloze": allowedContent = common.union(["text", "blanks"])
             case "number": allowedContent = common.union(["number"])
             default: allowedContent = common

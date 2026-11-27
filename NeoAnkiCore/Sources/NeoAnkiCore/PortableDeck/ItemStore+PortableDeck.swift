@@ -479,7 +479,7 @@ private func validatePortableFields(_ fields: [FieldValue], against itemType: It
 private func portableValue(_ value: ContentValue, matches type: FieldType) -> Bool {
     if case .empty = value { return true }
     switch (type, value) {
-    case (.imageOcclusion, .imageOcclusion), (.text, .text), (.richText, .rich), (.number, .number), (.cloze, .cloze):
+    case (.studyExercise, .studyExercise), (.imageOcclusion, .imageOcclusion), (.text, .text), (.richText, .rich), (.number, .number), (.cloze, .cloze):
         return true
     case let (.audio, .media(ref)): return ref.kind == .audio
     case let (.image, .media(ref)): return ref.kind == .image

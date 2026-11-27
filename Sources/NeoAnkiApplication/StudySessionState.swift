@@ -117,8 +117,10 @@ public struct StudySessionState: Sendable {
         let persisted = liveCards.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.id, $0) }) }
         func remainsValid(_ card: Card) -> Bool {
             guard card.itemID == itemID else { return true }
-            guard let item, let template = templates[card.templateID], CardGenerator.shouldGenerate(template, for: item) else { return false }
-            if let persisted { return persisted[card.id].map { !$0.isSuspended } ?? false }
+            let effective = persisted == nil ? card : persisted?[card.id]
+            guard let effective, !effective.isSuspended, let item, let template = templates[effective.templateID],
+                  CardGenerator.shouldGenerate(template, for: item) else { return false }
+            if persisted != nil { return true }
             // Compatibility adapters without the atomic snapshot capability can
             // still prune retired generation coordinates from canonical content.
             if template.interaction == .cloze {
@@ -133,11 +135,19 @@ public struct StudySessionState: Sendable {
         }
         func refreshed(_ due: DueCard, updateCard: Bool) -> DueCard {
             guard due.item.id == itemID, let item, let itemType else { return due }
+            var card = persisted?[due.id] ?? due.card
+            guard let template = templates[card.templateID] else { return due }
+            if !updateCard {
+                card.memory = due.card.memory
+                card.memoryModelVersion = due.card.memoryModelVersion
+                card.memoryParameterSetID = due.card.memoryParameterSetID
+                card.schedulingHistoryOrigin = due.card.schedulingHistoryOrigin
+            }
             var result = due
             result.item = item
             result.itemType = itemType
-            if let template = templates[due.template.id] { result.template = template }
-            if updateCard, let card = persisted?[due.id] { result.card = card }
+            result.template = template
+            result.card = card
             StudyQueueOrdering.refreshRelation(in: &result)
             return result
         }

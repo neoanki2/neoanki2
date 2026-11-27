@@ -47,14 +47,15 @@ decks, or dictionaries are created by the extension.
 
 ## Privacy and access
 
-Permissions are `activeTab`, `scripting`, `storage`, and HTTP access to
-`127.0.0.1` only. The extension reads the active page's selection after you invoke
+The companion uses `activeTab`, `scripting`, `storage`, and HTTP access to
+`127.0.0.1`. The extension reads the active page's selection after you invoke
 it; it does not scan browsing history or run continuously on every page. Pairing
 requests only `library.read`, `items.write`, and `vocabulary.read`.
 
 Drafts and the API token are saved locally in Chrome, outside Chrome sync, with
-storage restricted to trusted extension contexts. Dictionary queries and card
-saves use NeoAnki2's loopback API. Saved cards follow NeoAnki2's sync settings.
+storage restricted to trusted extension contexts. Card saves and local dictionary
+queries use NeoAnki2's loopback API. Select the СУМ-11 examples pack in Settings
+to use its quotations in Ukrainian Reading Mode. Saved cards follow NeoAnki2's sync settings.
 Disconnect in extension Settings or revoke the client in NeoAnki2's Local API
 settings. Disconnect needs NeoAnki2 to be reachable so access can be revoked.
 
@@ -77,6 +78,9 @@ expose that popup as a controllable page, form interactions use the same product
 popup document in a constrained 380 × 600 headless tab. The tests use a
 temporary profile, SQLite library, vocabulary pack, and loopback ports. They
 never open the installed NeoAnki2 app or the user's Chrome profile.
+
+The integration check covers local citations, dictionary-only contexts, and
+reading sentences paired with a separate dictionary Cloze.
 
 The fixture's automatic approval is test-only and requires `--test-fixture` and
 an empty `neoanki-chrome-*` directory. It exits when its parent's stdin closes.

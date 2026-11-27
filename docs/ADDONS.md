@@ -60,7 +60,7 @@ On iPhone and iPad they open directly from Create.
 The former vocabulary builder and generator have been removed. Their separate
 paradigm editor duplicated vocabulary authoring and required unnecessary setup.
 **Add Word** now fills a chosen deck's item type from an installed dictionary;
-**Learn in Context** creates sentence-based cards. Offline `.neovocab` package
+**Create Vocabulary Set** creates meaning-recall and Cloze pairs. Offline `.neovocab` package
 storage, lookup, and sync remain independent of deck builders. Existing generated
 vocabulary items remain ordinary library data and can still be studied and edited.
 

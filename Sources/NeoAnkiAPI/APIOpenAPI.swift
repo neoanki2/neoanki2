@@ -555,6 +555,7 @@ package enum APIOpenAPI {
         let timestamp: [String: Any] = ["type": "string", "format": "date-time"]
         let nonnegative: [String: Any] = ["type": "integer", "minimum": 0]
         let revision: [String: Any] = ["type": "integer", "minimum": 1]
+        let string = ["type": "string"]
         let sha256: [String: Any] = ["type": "string", "pattern": "^[0-9a-f]{64}$"]
         func object(_ required: [String], _ properties: [String: Any]) -> [String: Any] {
             [
@@ -614,6 +615,10 @@ package enum APIOpenAPI {
                 object(["type", "text", "blanks"], [
                     "type": ["type": "string", "const": "cloze"],
                     "text": ["type": "string"], "blanks": array(reference("ClozeSpan"), min: 1),
+                ]),
+                object(["type", "exercise"], [
+                    "type": ["type": "string", "const": "studyExercise"],
+                    "exercise": reference("StudyExercise"),
                 ]),
                 object(["type", "number"], [
                     "type": ["type": "string", "const": "number"],
@@ -937,6 +942,16 @@ package enum APIOpenAPI {
                     "width": ["type": "number", "exclusiveMinimum": 0, "maximum": 1],
                     "height": ["type": "number", "exclusiveMinimum": 0, "maximum": 1],
                 ]),
+            ]),
+            "StudyExerciseChoice": object(["id", "label"], ["id": string, "label": string]),
+            "StudyExerciseTarget": object(["choices", "allowsOmission"], [
+                "original": string, "choices": array(string), "allowsOmission": ["type": "boolean"],
+            ]),
+            "StudyExercise": object(["mode", "prompt", "parts", "targets", "options", "answers"], [
+                "mode": ["type": "string", "enum": ["target", "rewrite", "choose"]],
+                "prompt": string, "parts": array(string), "targets": array(reference("StudyExerciseTarget"), max: 16),
+                "options": array(reference("StudyExerciseChoice"), max: 8), "answers": array(array(string)),
+                "correctOptionID": string,
             ]),
             "ContentValue": contentValue,
             "FieldValue": object(["fieldId", "value"], [

@@ -43,7 +43,9 @@ import Testing
             case .number: value = .number(42.5)
             case .cloze: value = .cloze("Alpha Beta", blanks: [.init(group: 4, start: 6, length: 4, hint: "Answer")])
             case .imageOcclusion: value = .imageOcclusion(.init(image: imageRef, masks: [.init(group: 1, rect: .init(x: 0.1, y: 0.1, width: 0.2, height: 0.2), answerText: "Bridge")], nextGroup: 2))
-            default:
+            case .studyExercise:
+                value = .studyExercise(.init(mode: .rewrite, prompt: "Write in the past tense.", answers: [["I walked."]]))
+            case .image, .audio, .gif, .video:
                 let kind = try #require(field.type.mediaKind)
                 value = .media(try #require(references[kind]))
             }
@@ -83,7 +85,11 @@ import Testing
                 content.masks[0].answerText = "Corrected"
                 snapshot.fieldOcclusions[field.id] = content
                 expected.fields[index].value = .imageOcclusion(content)
-            default:
+            case .studyExercise:
+                let exercise = StudyExercise(mode: .rewrite, prompt: "Write in the future tense.", answers: [["I will walk."]])
+                snapshot.fieldText[field.id] = exercise.editorText
+                expected.fields[index].value = .studyExercise(exercise)
+            case .image, .audio, .gif, .video:
                 snapshot.fieldMediaAltText[field.id] = "Corrected description"
                 var ref = try #require(snapshot.fieldMedia[field.id])
                 ref.altText = "Corrected description"

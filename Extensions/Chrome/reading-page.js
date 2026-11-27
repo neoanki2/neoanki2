@@ -9,7 +9,6 @@
   const underlined = ['unassessed', 'unfamiliar', 'learning'];
   // Words segmented per pass; larger pages continue in later tasks so the page stays responsive.
   const passLimit = 20000;
-  const sampleSize = 12;
   const send = async (action, data) => {
     const reply = await chrome.runtime.sendMessage({ type: `neoankiReading${action}`, ...data });
     if (reply?.error) throw Object.assign(new Error(reply.error), { status: reply.status });
@@ -18,7 +17,7 @@
 
   let mode, host, panel, live, summary, restButton, observer, timer, refreshTimer, statusTimer, selection;
   let wordSegmenter, sentenceSegmenter, languageName, snapshot, root, stale;
-  let lastDeck = '', offline = false, dictionary = false, formsRequest = null;
+  let offline = false, dictionary = false, formsRequest = null;
   // After a dictionary-forms failure, lookups pause until `formsRetryAt`, doubling up to 5 minutes.
   let formsRetryAt = 0, formsBackoff = 0;
   // `session` changes on every stop, so replies for an earlier session are dropped.
@@ -424,7 +423,6 @@
     try {
       const result = await send('Snapshot', { since: snapshot?.version });
       if (!mode || generation !== refreshGeneration) return;
-      lastDeck = result.lastDeck;
       offline = result.offline;
       dictionary = result.dictionary;
       if (!result.unchanged) {
@@ -471,16 +469,28 @@
     shown = true;
     panel.hidden = false;
     renderPanel();
-    const [options, rows] = await Promise.allSettled([
-      send('Options', { expression: picked.expression }), send('Details', { expression: picked.expression }),
-    ]);
-    if (selection !== picked) return;
-    picked.options = options.status === 'fulfilled' ? options.value : { decks: [], meanings: [] };
-    picked.rows = rows.status === 'fulfilled' ? rows.value : [];
-    if (rows.status === 'fulfilled') applyRows(picked);
-    if (!picked.composing) renderPanel();
-    const failure = [options, rows].find(result => result.status === 'rejected');
-    if (failure) errorText(failure.reason);
+    void loadDetails(picked);
+    try {
+      picked.options = await send('Options', { expression: picked.expression });
+    } catch (error) {
+      picked.options = { decks: [], meanings: [] };
+      if (selection === picked) errorText(error);
+    }
+    if (selection === picked && !picked.pending && !picked.composing) renderPanel();
+  }
+
+  async function loadDetails(picked) {
+    const request = send('Details', { expression: picked.expression });
+    picked.detailsRequest = request;
+    try {
+      const rows = await request;
+      if (selection !== picked || picked.detailsRequest !== request) return;
+      picked.rows = rows;
+      applyRows(picked);
+      if (!picked.pending && !picked.composing) renderPanel();
+    } catch (error) {
+      if (selection === picked && picked.detailsRequest === request) errorText(error);
+    }
   }
 
   // The rows' combined state is the truth for this spelling; correct the page if it differs.
@@ -492,7 +502,7 @@
 
   function positionPanel() {
     if (!selection) return;
-    const { rect } = selection;
+    const rect = selection.kind === 'rest' ? restButton.getBoundingClientRect() : selection.rect;
     const width = panel.offsetWidth;
     const height = panel.offsetHeight;
     const top = rect.bottom + height + 8 <= innerHeight ? rect.bottom + 8 : rect.top - height - 8;
@@ -503,43 +513,65 @@
   function renderPanel({ focus = false } = {}) {
     const picked = selection;
     if (!picked) return;
+    panel.classList.toggle('bulk-panel', picked.kind === 'rest');
     if (picked.kind === 'rest') { renderRest(focus); return; }
-    panel.replaceChildren();
-    const termLine = node('div', '', panel, { class: 'top' });
-    node('strong', picked.expression, termLine, { id: 'word', lang: mode.language });
-    button(termLine, 'Close', () => close(true));
-    const meanings = picked.options?.meanings || [];
-    if (meanings.length > 1) {
+    // Keep action buttons mounted while background results arrive so a click or keyboard focus isn't lost.
+    if (!picked.controls?.mark.isConnected) {
+      panel.replaceChildren();
+      const termLine = node('div', '', panel, { class: 'top' });
+      node('strong', picked.expression, termLine, { id: 'word', lang: mode.language });
+      button(termLine, 'Close', () => close(true));
       const label = node('label', 'Meaning', panel);
       const choices = node('select', '', label);
-      choices.add(new Option('Choose the meaning', ''));
-      for (const [index, gloss] of meanings.entries()) choices.add(new Option(gloss.meaning, String(index)));
-      if (picked.choice !== undefined) choices.value = String(picked.choice);
       choices.addEventListener('change', () => {
         picked.choice = choices.value === '' ? undefined : Number(choices.value);
-        renderPanel({ focus: true });
-        panel.querySelector('select')?.focus();
+        renderPanel();
       });
+      const definition = node('p', '', panel, { class: 'definition' });
+      const status = node('div', '', panel, { class: 'status' });
+      const cloze = node('div', 'Cloze recall', panel);
+      const actions = node('div', '', panel, { class: 'actions' });
+      // Reading judgments apply to the word as a whole; only a card set needs a meaning.
+      const mark = button(actions, '', () => {
+        void judge(picked.controls.known ? 'unfamiliar' : 'known');
+      });
+      const ignore = button(actions, 'Ignore', () => { void judge('ignored'); });
+      const undo = button(actions, 'Undo', () => { void judge(); });
+      const history = button(actions, 'Use review history', () => { void judge('reviewHistory'); });
+      const create = button(actions, 'Create card set', () => { void showComposer(); });
+      const hint = node('p', 'Choose a meaning to create a card set.', panel, { class: 'hint' });
+      picked.controls = { label, choices, definition, status, cloze, mark, ignore, undo, history, create, hint };
     }
+    const controls = picked.controls;
+    const meanings = picked.options?.meanings || [];
+    controls.label.hidden = meanings.length < 2;
+    if (meanings.length > 1 && !controls.choices.options.length) {
+      controls.choices.add(new Option('Choose the meaning', ''));
+      for (const [index, gloss] of meanings.entries()) controls.choices.add(new Option(gloss.meaning, String(index)));
+      if (picked.choice !== undefined) controls.choices.value = String(picked.choice);
+    }
+    const gloss = meanings[picked.choice ?? 0];
+    controls.definition.hidden = !picked.options;
+    controls.definition.textContent = gloss?.meaning || 'No definition found. You can enter one in the card set.';
+    controls.definition.lang = gloss?.language || '';
+
     const info = model.describe(picked.rows || [], stateOf(picked.match));
-    node('div', [info.label, picked.rows && info.detail].filter(Boolean).join(' — '), panel, { class: 'status' });
-    if (info.clozeMature) node('div', 'Cloze recall', panel);
-    const actions = node('div', '', panel, { class: 'actions' });
-    const ready = Boolean(picked.options && picked.rows) && !picked.pending;
-    const known = info.state === 'known';
-    // Reading judgments apply to the word as a whole; a meaning is needed only for a card set.
-    const mark = button(actions, known ? 'Remove from Known' : 'I know this', () => {
-      void judge(known ? 'unfamiliar' : 'known', info.previous);
-    });
-    mark.disabled = !ready;
-    if (info.state !== 'ignored') button(actions, 'Ignore', () => { void judge('ignored', info.previous); }).disabled = !ready;
-    if (picked.undo) button(actions, 'Undo', () => { void judge(picked.undo); }).disabled = picked.pending;
-    if (info.explicit) button(actions, 'Use review history', () => { void judge('reviewHistory', info.previous); }).disabled = !ready;
+    controls.status.textContent = [info.label, picked.rows && info.detail].filter(Boolean).join(' — ');
+    controls.cloze.hidden = !info.clozeMature;
+    controls.known = info.state === 'known';
+    controls.mark.textContent = controls.known ? 'Remove from Known' : 'I know this';
+    controls.mark.disabled = picked.pending;
+    controls.ignore.hidden = info.state === 'ignored';
+    controls.ignore.disabled = picked.pending;
+    controls.undo.hidden = !picked.undo;
+    controls.undo.disabled = picked.pending;
+    controls.history.hidden = !info.explicit;
+    controls.history.disabled = picked.pending;
     const unresolved = meanings.length > 1 && picked.choice === undefined;
-    button(actions, 'Create card set', () => { void showComposer(); }).disabled = !ready || unresolved;
-    if (unresolved) node('p', 'Choose a meaning to create a card set.', panel, { class: 'hint' });
+    controls.create.disabled = picked.pending || !picked.options || unresolved;
+    controls.hint.hidden = !unresolved;
     positionPanel();
-    if (focus) mark.focus();
+    if (focus) controls.mark.focus();
   }
 
   function termOf(picked, sense) {
@@ -554,35 +586,56 @@
     reviewHistory: expression => `${expression} now follows your reviews.`,
   };
 
-  async function judge(judgment, previous) {
+  async function judge(judgment) {
     const picked = selection;
     if (!picked || picked.pending) return;
-    const key = picked.retryJudgment?.judgment === judgment ? picked.retryJudgment.key : crypto.randomUUID();
-    picked.retryJudgment = { judgment, key };
     picked.pending = true;
+    renderPanel();
     try {
-      await send('Judge', { term: termOf(picked), judgment, key });
-      picked.retryJudgment = undefined;
-      picked.undo = previous;
-      announce(judged[judgment](picked.expression));
-      try {
-        picked.rows = await send('Details', { expression: picked.expression });
-        applyRows(picked);
-      } catch {
-        if (current(picked)) setLocal(picked.match, judgment === 'reviewHistory' ? undefined : judgment);
+      if (judgment) {
+        // A one-word batch gives Undo the server's previous judgment even if panel details are still loading.
+        const previousState = model.lookup(snapshot.expressions, picked.match);
+        if (picked.retryJudgment?.entry.judgment !== judgment) {
+          const term = termOf(picked);
+          term.lemma ??= picked.rows?.find(row => !row.term.sense && row.term.lemma)?.term.lemma;
+          picked.retryJudgment = { entry: { term, judgment }, key: crypto.randomUUID() };
+        }
+        const { entry, key } = picked.retryJudgment;
+        const receipt = await send('Batch', { entries: [entry], keys: [key] });
+        if (selection !== picked) return;
+        picked.retryJudgment = undefined;
+        picked.undo = receipt.recorded ? { batchIds: receipt.batchIds, keys: [crypto.randomUUID()], previousState } : undefined;
+        const learning = judgment === 'unfamiliar' && picked.rows?.some(row => row.hasCards);
+        setLocal(picked.match, judgment === 'reviewHistory' ? undefined : learning ? 'learning' : judgment);
+        announce(judged[judgment](picked.expression));
+      } else {
+        const { batchIds, keys, previousState } = picked.undo;
+        const result = await send('UndoBatches', { batchIds, keys });
+        if (selection !== picked) return;
+        picked.undo = undefined;
+        if (result.recorded) setLocal(picked.match, previousState);
+        announce(result.recorded ? 'Undone.' : 'The word changed after you marked it.');
       }
+      picked.rows = null;
+      refreshGeneration++;
+      void loadDetails(picked);
       refreshSoon();
-    } catch (error) { errorText(error); }
+    } catch (error) {
+      if (selection === picked) errorText(error);
+    }
     finally {
       picked.pending = false;
-      if (selection === picked) renderPanel({ focus: true });
+      if (selection === picked) {
+        updateBadge();
+        renderPanel({ focus: true });
+      }
     }
   }
 
   // "Mark the rest as known": every unassessed word on the page that you didn't open.
   async function offerRest() {
     if (selection?.pending || !snapshot) return;
-    const picked = { kind: 'rest', rect: restButton.getBoundingClientRect(), focus: document.activeElement, pending: true, session };
+    const picked = { kind: 'rest', focus: document.activeElement, pending: true, session };
     selection = picked;
     shown = true;
     panel.hidden = false;
@@ -619,22 +672,55 @@
     if (!picked.entries) {
       node('p', 'Collecting the words on this page…', panel, { class: 'status' });
     } else if (picked.receipt) {
-      const count = picked.receipt.recorded;
-      node('p', `Marked ${count.toLocaleString()} ${count === 1 ? 'word' : 'words'} as known.`, panel, { class: 'status' });
-      primary = button(actions(), 'Undo', () => { void undoRest(); });
-      primary.disabled = picked.pending;
+      node('p', picked.resultMessage, panel, { class: 'status' });
+      if (picked.receipt.recorded) {
+        primary = button(actions(), 'Undo', () => { void undoRest(); });
+        primary.disabled = picked.pending;
+      }
     } else if (!picked.entries.length) {
       node('p', 'Every word on this page already has a status, or you opened it.', panel, { class: 'status' });
     } else {
       const count = picked.entries.length;
-      node('p', `Mark ${count.toLocaleString()} ${count === 1 ? 'word' : 'words'} on this page as known?`, panel, { class: 'status' });
-      const sample = picked.entries.slice(0, sampleSize).map(entry => entry.term.expression).join(', ');
-      node('p', sample + (count > sampleSize ? ', …' : ''), panel, { class: 'sample', lang: mode.language });
+      let ignoredCount = picked.entries.filter(entry => entry.judgment === 'ignored').length;
+      const status = node('p', '', panel, { class: 'status', 'aria-live': 'polite' });
+      const words = node('div', '', panel, { class: 'word-preview', tabindex: '0',
+        role: 'region', 'aria-label': 'Words in this batch' });
+      for (const entry of picked.entries) {
+        const { expression } = entry.term;
+        const word = node('div', '', words, { class: 'word-entry' });
+        node('span', expression, word, { lang: mode.language });
+        const toggle = button(word, '', () => {
+          const ignore = entry.judgment === 'known';
+          entry.judgment = ignore ? 'ignored' : 'known';
+          ignoredCount += ignore ? 1 : -1;
+          updateToggle();
+          updateSummary();
+        });
+        function updateToggle() {
+          const ignored = entry.judgment === 'ignored';
+          const action = ignored ? 'Keep' : 'Ignore';
+          toggle.textContent = ignored ? '↶' : '×';
+          toggle.title = action;
+          toggle.setAttribute('aria-label', `${action} ${expression}`);
+          word.classList.toggle('word-ignored', ignored);
+        }
+        // Keep the submitted choices and keys together if the response is lost and the user retries.
+        toggle.disabled = Boolean(picked.previous);
+        updateToggle();
+      }
       node('p', 'Words you opened here, words you’re learning, and words marked not known or ignored are left out.', panel, { class: 'hint' });
       const row = actions();
-      primary = button(row, 'Mark as known', () => { void markRest(); });
+      primary = button(row, '', () => { void markRest(); });
       primary.disabled = picked.pending;
       button(row, 'Cancel', () => close(true)).disabled = picked.pending;
+      function updateSummary() {
+        const knownCount = count - ignoredCount;
+        status.textContent = ignoredCount
+          ? `Mark as known: ${knownCount.toLocaleString()}. Ignore: ${ignoredCount.toLocaleString()}.`
+          : `Mark ${count.toLocaleString()} ${count === 1 ? 'word' : 'words'} on this page as known?`;
+        primary.textContent = picked.pending ? 'Saving…' : picked.previous ? 'Retry save' : ignoredCount ? 'Apply changes' : 'Mark as known';
+      }
+      updateSummary();
     }
     positionPanel();
     if (focus) primary?.focus();
@@ -644,19 +730,22 @@
     const picked = selection;
     if (picked?.kind !== 'rest' || picked.pending) return;
     picked.pending = true;
-    renderPanel();
     // The states to restore on Undo, read before the batch can change them (a retry keeps the first).
     picked.previous ||= new Map(picked.entries.map(entry => [entry.key, model.lookup(snapshot.expressions, entry.key)]));
+    renderPanel();
     try {
       const receipt = await send('Batch', { entries: picked.entries.map(({ term, judgment }) => ({ term, judgment })), keys: picked.keys });
       picked.receipt = receipt;
       picked.undoKeys = receipt.batchIds.map(() => crypto.randomUUID());
       if (!current(picked)) return;
-      for (const entry of picked.entries) snapshot.expressions[entry.key] = 'known';
+      for (const entry of picked.entries) snapshot.expressions[entry.key] = entry.judgment;
+      const changed = `${receipt.recorded.toLocaleString()} ${receipt.recorded === 1 ? 'word' : 'words'}`;
+      picked.resultMessage = picked.entries.some(entry => entry.judgment === 'ignored')
+        ? `Updated ${changed}.` : `Marked ${changed} as known.`;
       restate();
       refreshSoon();
-      announce(`Marked ${receipt.recorded.toLocaleString()} words as known.`);
-    } catch (error) { errorText(error); }
+      announce(picked.resultMessage);
+    } catch (error) { if (current(picked)) errorText(error); }
     finally {
       picked.pending = false;
       if (selection === picked) renderPanel({ focus: true });
@@ -701,32 +790,63 @@
     const meaningLanguage = node('input', '', node('label', 'Meaning language', form), { required: '' });
     const sentence = node('textarea', '', node('label', 'Example sentence', form), { rows: '3', required: '', maxlength: '2000' });
     const deck = node('select', '', node('label', 'Deck', form));
+    const decks = picked.options?.decks || [];
     deck.add(new Option('Unassigned', ''));
-    for (const value of picked.options?.decks || []) deck.add(new Option(value.name, value.id));
-    deck.value = lastDeck;
+    for (const value of decks) deck.add(new Option(value.name, value.id));
+    if (decks.some(value => value.id === picked.options.lastDeck)) deck.value = picked.options.lastDeck;
+    deck.addEventListener('change', () => {
+      picked.options.lastDeck = deck.value;
+      void send('RememberDeck', { deckID: deck.value }).catch(errorText);
+    });
     meaning.value = gloss?.meaning || '';
     meaningLanguage.value = gloss?.language || mode.meaningLanguage;
-    sentence.value = picked.sentence || gloss?.example || '';
+    const examples = (gloss?.examples || []).filter(example =>
+      example.sentence.toLocaleLowerCase(mode.language).split(example.form.toLocaleLowerCase(mode.language)).length === 2 &&
+      /\p{L}/u.test(example.sentence.replace(example.form, '')) &&
+      keyOf(example.sentence) !== keyOf(picked.sentence));
+    const pageSentence = /\p{L}/u.test(picked.sentence.replace(picked.expression, '')) ? picked.sentence : '';
+    let readingExample = pageSentence ? null : examples[0];
+    sentence.value = pageSentence || readingExample?.sentence || picked.sentence || '';
     const preview = node('p', '', form, { class: 'status', 'aria-live': 'polite' });
+    const hint = node('p', '', form, { class: 'hint' });
     node('button', 'Create card set', form, { type: 'submit', class: 'primary' });
-    let useDictionaryExample;
-    if (gloss?.form && gloss.example && keyOf(gloss.example) !== keyOf(picked.sentence)) {
-      const alternate = node('label', '', form, { class: 'alternate' });
-      useDictionaryExample = node('input', '', alternate, { type: 'checkbox' });
-      useDictionaryExample.checked = true;
-      alternate.append('Use dictionary example for Cloze');
+    let dictionaryChoice;
+    if (examples.length) {
+      const label = pageSentence ? 'Dictionary example for Cloze' : 'Dictionary example';
+      dictionaryChoice = node('select', '', node('label', label, form));
+      dictionaryChoice.add(new Option(pageSentence ? 'Use the reading sentence' : 'Enter a sentence', ''));
+      for (const [index, example] of examples.entries()) {
+        dictionaryChoice.add(new Option([example.sentence, example.source].filter(Boolean).join(' — '), String(index)));
+      }
+      if (readingExample) dictionaryChoice.value = '0';
+      dictionaryChoice.addEventListener('change', () => {
+        if (!pageSentence) {
+          readingExample = chosenExample();
+          sentence.value = readingExample?.sentence || '';
+        }
+        picked.key = crypto.randomUUID();
+        previewText();
+      });
     }
-    const secondExample = () => useDictionaryExample?.checked ? gloss : null;
+    const chosenExample = () => dictionaryChoice?.value ? examples[Number(dictionaryChoice.value)] : null;
+    const secondExample = () => pageSentence ? chosenExample() : null;
     const previewText = () => {
       const second = secondExample();
-      const text = second?.example || sentence.value;
-      const target = second?.form || picked.expression;
+      const text = second?.sentence || sentence.value;
+      const target = second?.form || readingExample?.form || picked.expression;
       const index = text.toLowerCase().indexOf(target.toLowerCase());
       preview.textContent = index < 0 ? 'Use an example containing the selected word or phrase.'
         : `Cloze preview: ${text.slice(0, index)}[…]${text.slice(index + target.length)}`;
+      const definition = meaning.value.trim();
+      hint.hidden = !definition;
+      hint.textContent = `Cloze hint · ${definition}`;
     };
     previewText();
-    for (const field of [meaning, meaningLanguage, sentence, deck, useDictionaryExample].filter(Boolean)) field.addEventListener('input', () => {
+    for (const field of [meaning, meaningLanguage, sentence, deck]) field.addEventListener('input', () => {
+      if (field === sentence && readingExample?.sentence !== sentence.value) {
+        readingExample = null;
+        if (!pageSentence && dictionaryChoice) dictionaryChoice.value = '';
+      }
       picked.key = crypto.randomUUID();
       previewText();
     });
@@ -736,14 +856,20 @@
       picked.pending = true;
       const second = secondExample();
       const sense = picked.choice === undefined ? undefined : picked.options.meanings[picked.choice].meaning;
-      const draft = { term: termOf(picked, sense), meaning: meaning.value, meaningLanguage: meaningLanguage.value,
+      const term = termOf(picked, sense);
+      if (readingExample) {
+        term.lemma ??= picked.expression;
+        term.expression = readingExample.form;
+      }
+      const draft = { term, meaning: meaning.value, meaningLanguage: meaningLanguage.value,
         sentence: sentence.value, occurrence: sentence.value === picked.sentence ? picked.occurrence : 0,
-        deckID: deck.value, productionSentence: second?.example, productionForm: second?.form };
+        deckID: deck.value, productionSentence: second?.sentence, productionForm: second?.form,
+        usePageSource: Boolean(pageSentence && sentence.value === pageSentence),
+        dictionarySources: [...new Set([readingExample?.source, second?.source].filter(Boolean))] };
       back.disabled = true;
       for (const field of form.elements) field.disabled = true;
       try {
         await send('Create', { draft, key: picked.key });
-        lastDeck = draft.deckID;
         await refresh();
         announce('Vocabulary card set added.');
         picked.pending = false;
@@ -773,18 +899,28 @@
       #badge, section, output { position: fixed; z-index: 2147483647; font: 14px system-ui; color: CanvasText; background: Canvas; }
       #badge { right: 12px; top: 12px; max-width: min(460px, calc(100vw - 24px)); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 7px 9px; border: 1px solid GrayText; border-radius: 7px; }
       section { width: min(340px, calc(100vw - 16px)); max-height: min(72vh, 460px); overflow: auto; padding: 14px; border: 1px solid GrayText; border-radius: 10px; box-shadow: 0 6px 24px #0003; }
-      section[hidden], output:empty { display: none; }
+      section.bulk-panel { width: min(640px, calc(100vw - 16px)); max-height: min(84vh, 620px); }
+      section.bulk-panel:not([hidden]) { display: flex; flex-direction: column; }
+      .bulk-panel > :not(.word-preview) { flex: none; }
+      [hidden], output:empty { display: none; }
       .top, .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
       .top { justify-content: space-between; overflow-wrap: anywhere; }
       .status { margin-block: 8px; line-height: 1.4; white-space: pre-wrap; }
-      .sample { line-height: 1.4; overflow-wrap: anywhere; }
+      .definition { margin-block: 8px; line-height: 1.4; overflow-wrap: anywhere; }
+      .word-preview { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px 8px;
+        min-height: 0; max-height: min(52vh, 26rem); overflow: auto; overflow-wrap: anywhere;
+        margin-block: 8px; padding: 8px; border: 1px solid GrayText; border-radius: 6px; }
+      .word-entry { display: inline-flex; align-items: center; gap: 2px; max-inline-size: 100%; }
+      .word-entry > span { min-inline-size: 0; }
+      .word-entry button { display: grid; place-items: center; flex: none; inline-size: 1.5rem; min-height: 1.5rem;
+        padding: 0; border: 0; border-radius: 4px; background: transparent; font-size: 1.2em; line-height: 1; }
+      .word-entry button:not(:disabled):hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+      .word-ignored > span { text-decoration: line-through; }
       .hint { color: GrayText; font-size: 12px; line-height: 1.4; }
       button, input, select, textarea { font: inherit; color: inherit; }
       button { padding: 4px 8px; min-height: 30px; cursor: pointer; }
       button:disabled { cursor: default; }
       label { display: block; margin-block: 9px; }
-      .alternate { display: flex; align-items: center; gap: 6px; }
-      .alternate input { margin: 0; width: auto; }
       input, select, textarea { display: block; width: 100%; margin-top: 3px; }
       output { right: 12px; bottom: 12px; padding: 8px 12px; border: 1px solid GrayText; border-radius: 7px; max-width: min(360px, calc(100vw - 24px)); }
     `);
@@ -805,6 +941,7 @@
     document.addEventListener('pointerup', findSelection);
     document.addEventListener('keyup', keyboard);
     window.addEventListener('focus', refresh);
+    window.addEventListener('resize', positionPanel);
     observer = new MutationObserver(changed);
     observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true,
       attributeOldValue: true, attributeFilter: ['hidden', 'class', 'style', 'open', 'aria-hidden'] });
@@ -835,6 +972,7 @@
     document.removeEventListener('pointerup', findSelection);
     document.removeEventListener('keyup', keyboard);
     window.removeEventListener('focus', refresh);
+    window.removeEventListener('resize', positionPanel);
     for (const state of underlined) CSS.highlights?.delete(`neoanki-${state}`);
     highlights = {};
     blockData.clear();
@@ -849,7 +987,6 @@
     phraseLimit = 1;
     layout = 0;
     restyled = false;
-    lastDeck = '';
     offline = dictionary = false;
     formsRequest = null;
     formsRetryAt = formsBackoff = 0;

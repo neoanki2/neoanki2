@@ -1516,6 +1516,9 @@ enum PortableJSON {
             value = try dictionary(JSONSerialization.jsonObject(with: JSONEncoder().encode(content)))
             value["image"] = try object(encodeContent(.media(content.image)))
             value["type"] = "imageOcclusion"
+        case let .studyExercise(exercise):
+            try exercise.validate()
+            value = ["type": "studyExercise", "exercise": try JSONSerialization.jsonObject(with: JSONEncoder().encode(exercise))]
         case let .number(number):
             guard number.isFinite else { throw invalid() }
             value = ["type": "number", "value": number]
@@ -1637,6 +1640,11 @@ enum PortableJSON {
                   let number = value["value"] as? NSNumber,
                   number.doubleValue.isFinite else { throw invalid() }
             return .number(number.doubleValue)
+        case "studyExercise":
+            guard Set(value.keys) == ["type", "exercise"], let payload = value["exercise"] else { throw invalid() }
+            let exercise = try JSONDecoder().decode(StudyExercise.self, from: JSONSerialization.data(withJSONObject: payload))
+            try exercise.validate()
+            return .studyExercise(exercise)
         case "cloze":
             guard Set(value.keys) == ["type", "text", "blanks"],
                   let text = value["text"] as? String, let raw = value["blanks"] as? [Any],

@@ -19,7 +19,19 @@ for command_name in jq python3 shasum swift; do
   }
 done
 
-for source_file in "$ARCHIVE" "$STRESS" "$HETERONYMS" "$FREQUENCY"; do
+source_files=("$ARCHIVE" "$STRESS" "$HETERONYMS" "$FREQUENCY")
+if [[ "${1:-}" == "--sum11-examples" && $# -eq 1 ]]; then
+  FORMS="$SOURCE_ROOT/github/unimorph-ukr/ukr.xz"
+  if [[ ! -f "$FORMS" ]]; then
+    FORMS="$SOURCE_ROOT/morphology/unimorph-ukr.xz"
+  fi
+  source_files=("$ARCHIVE" "$FORMS")
+elif [[ $# -ne 0 ]]; then
+  echo "Usage: $0 [--sum11-examples]" >&2
+  exit 2
+fi
+
+for source_file in "${source_files[@]}"; do
   [[ -f "$source_file" ]] || {
     echo "Locked Ukrainian source is missing: $source_file" >&2
     exit 1
@@ -37,6 +49,34 @@ actual_archive_sha="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
 }
 
 mkdir -p "$PACK_ROOT"
+
+if [[ "${1:-}" == "--sum11-examples" ]]; then
+  output="$PACK_ROOT/SUM11-Ukrainian-Examples.neovocab"
+  if [[ -e "$output" ]]; then
+    echo "Move the previous output aside before rebuilding: $output" >&2
+    exit 1
+  fi
+  staging="$(mktemp -d "$PACK_ROOT/.sum11-examples.XXXXXX")"
+  trap 'rm -rf "$staging"' EXIT
+  python3 "$NORMALIZER" --input "$ARCHIVE" --output "$staging/base.jsonl" --dictionary sum11
+  swift run --package-path "$REPO_ROOT" neoanki-vocab compile \
+    --input "$staging/base.jsonl" --output "$staging/base.neovocab" \
+    --id stardict.sum11.uk.staging --title "SUM-11" --language uk --capability lexicon
+  python3 "$REPO_ROOT/Tools/VocabularySources/enrich_ukrainian_inflections.py" \
+    --base-pack "$staging/base.neovocab" --forms "$FORMS" \
+    --supplement "$REPO_ROOT/Tools/VocabularySources/ukrainian-supplement.jsonl" --output "$staging/examples.jsonl"
+  swift run --package-path "$REPO_ROOT" neoanki-vocab compile \
+    --input "$staging/examples.jsonl" --output "$staging/examples.neovocab" \
+    --id stardict.sum11.uk.v5 --title "СУМ-11 — Ukrainian with examples (v5)" \
+    --language uk --capability lexicon --capability pronunciation --capability morphology --capability corpus \
+    --source-id stardict-sum11 --source-name "СУМ-11 from StarDict and ВЕСУМ forms via UniMorph" \
+    --license "Mixed СУМ-11 terms and ВЕСУМ CC BY-NC-SA 4.0; personal local use only" \
+    --source-url "https://github.com/bakustarver/ukr-dictionaries-list-opensource/releases/download/0.1/Stardict.Ukr.zip"
+  swift run --package-path "$REPO_ROOT" neoanki-vocab validate --pack "$staging/examples.neovocab"
+  mv "$staging/examples.neovocab" "$output"
+  echo "Ukrainian examples pack ready: $output"
+  exit 0
+fi
 
 SUM_JSONL="$PACK_ROOT/sum11-uk.jsonl"
 RUUK_JSONL="$PACK_ROOT/ruuk-aligned.jsonl"

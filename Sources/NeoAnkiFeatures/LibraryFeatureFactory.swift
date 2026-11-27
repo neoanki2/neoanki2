@@ -54,7 +54,4 @@ public struct LibraryFeatureFactory {
     public func makeWordCapture(rootURL: URL, onSaved: @escaping @MainActor () async -> Void = {}) -> WordCaptureModel {
         .init(library: library, rootURL: rootURL, onSaved: onSaved)
     }
-    public func makeLearnInContext(rootURL: URL, onSaved: @escaping @MainActor () async -> Void = {}) -> LearnInContextModel {
-        .init(library: library, rootURL: rootURL, onSaved: onSaved)
-    }
 }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { allPages, apiBase, APIError, applyAutofill, BASIC_ID, BATCH_LIMIT, batchKeys, basicFields, capabilities, DictionaryLookup, emptyDraft, hasCapabilities, makeAPI, PLACEMENT_CAPABILITIES, postJudgmentBatches, READING_CAPABILITIES, readSelection, renderEntry, requireCapabilities, revokeClient, safeSource, saveDraft, undoJudgmentBatches } from '../core.js';
+import { allPages, apiBase, APIError, applyAutofill, BASIC_ID, BATCH_LIMIT, batchKeys, basicFields, capabilities, DictionaryLookup, emptyDraft, hasCapabilities, isUkrainianDefinition, makeAPI, PLACEMENT_CAPABILITIES, postJudgmentBatches, READING_CAPABILITIES, readSelection, renderEntry, requireCapabilities, revokeClient, safeSource, saveDraft, undoJudgmentBatches } from '../core.js';
 
 // reading-model.js is a classic script for content scripts; load it the way Chrome does.
 const readingModel = () => {
@@ -32,6 +32,15 @@ test('port configuration stays on IPv4 loopback', () => {
   assert.equal(apiBase(), 'http://127.0.0.1:8766');
   assert.equal(apiBase('12345'), 'http://127.0.0.1:12345');
   for (const port of [80, 0, 65536, '8766/path', 'localhost', '1e4', 'NaN', '']) assert.throws(() => apiBase(port));
+});
+
+test('Ukrainian grammar fragments cannot be suggested as meanings', () => {
+  for (const header of ['а, е.', 'а́, е́.', 'а. е.', 'я, є.', '-о́ва, -о́ве:', 'и, ж.', 'ч. і ж.', ').', 'па́ра² 1).']) {
+    assert.equal(isUkrainianDefinition(header), false, header);
+  }
+  for (const gloss of ['Сажа.', 'Так.', 'Який коптить.', 'ж., розм. Молода людина.', 'Див. застрява́ти.']) {
+    assert.equal(isUkrainianDefinition(gloss), true, gloss);
+  }
 });
 
 test('library reads follow pagination without exceeding the API limit', async () => {

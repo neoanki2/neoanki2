@@ -37,6 +37,8 @@ public enum ItemDraftValidation {
         itemType: ItemType
     ) -> [ItemDraftValidationIssue] {
         itemType.fields.compactMap { field in
+            if field.type == .studyExercise, let value = draft.text[field.id], !value.isEmpty,
+               (try? StudyExercise(editorText: value)) == nil { return .invalidValue(field.id) }
             if field.type == .number {
                 let input = draft.text[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
                 if !input.isEmpty, Double(input)?.isFinite != true { return .invalidValue(field.id) }
@@ -62,7 +64,7 @@ public enum ItemDraftValidation {
             guard field.isRequired else { return nil }
             let hasValue: Bool
             switch field.type {
-            case .text, .richText, .number, .cloze:
+            case .text, .richText, .number, .cloze, .studyExercise:
                 hasValue = !draft.text[field.id, default: ""]
                     .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             case .imageOcclusion:

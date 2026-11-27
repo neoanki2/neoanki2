@@ -28,7 +28,7 @@ Validation checks the complete bundle without importing it, including:
   generation conditions;
 - version-3 root and descendant item-type policies, including ordered
   references and valid defaults;
-- item values, tags, required fields, rich text, and cloze markers;
+- item values, tags, required fields, rich text, cloze markers, and study exercises;
 - media paths, confinement, signatures, kinds, sizes, and aggregate limits; and
 - source-file, record, part, deck, type, field, template, item, and media
   limits.
@@ -37,6 +37,9 @@ Rich-text values may use the version 2 span format to preserve supported
 styles, semantic text colors, relative text sizes, and safe HTTP, HTTPS, or
 mailto links. The validator also accepts legacy version 1 rich text; conflicting
 legacy style pairs are normalized during import.
+
+For a Study Exercise field, provide a `studyExercise` object. The validator
+checks that the exercise has valid prompts, answers, and options for its kind.
 
 For new bundles, use manifest version 6. The root deck must provide a
 non-empty `itemTypes` array; add `defaultType` when one choice should be

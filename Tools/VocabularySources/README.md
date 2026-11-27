@@ -26,6 +26,56 @@ with exact logical byte counts, Git commits, SHA-256 content digests, and source
 URLs. An interrupted `.part` download can resume; a completed mismatch stops
 with an error instead of being silently blessed.
 
+## English and Japanese packs with English meanings
+
+Use Open English WordNet for English definitions, usage examples, attested
+forms, and IPA. Use the JMdict example edition for Japanese spellings,
+readings, English glosses, and Japanese examples linked to a dictionary sense.
+The Japanese Tatoeba exports supply sentence-owner attribution and CC0
+information. Examples retain their source links and use their exact surface
+form when it occurs once.
+
+| Local input | Source | SHA-256 of the verified snapshot |
+| --- | --- | --- |
+| `english/english-wordnet-2025.xml.gz` | [Open English WordNet 2025](https://en-word.net/static/english-wordnet-2025.xml.gz) | `9ca6d1dcb75f822fdd66617f7d9da48142ace38dd544d6ad5e2feca1674ad3fe` |
+| `japanese/JMdict_e_examp.gz` | [JMdict example edition](https://www.edrdg.org/pub/Nihongo/JMdict_e_examp.gz), November 27, 2026 | `bbb29cd085e090f93aeafdcfa5a9d7a35dd0b2d9bdd47151da861cf3860f9672` |
+| `japanese/jpn_sentences_detailed.tsv.bz2` | [Tatoeba sentence details](https://downloads.tatoeba.org/exports/per_language/jpn/jpn_sentences_detailed.tsv.bz2) | `7725f5e04795db081c20d615a66a79780e77df1577c088074bfe72a477dab543` |
+| `japanese/jpn_sentences_CC0.tsv.bz2` | [Tatoeba CC0 sentences](https://downloads.tatoeba.org/exports/per_language/jpn/jpn_sentences_CC0.tsv.bz2) | `39e6768de61f901a0904d9e74e554772d4e12286121ec3e2c6bd5307ce543465` |
+
+Place the inputs under `.local/vocab-sources/` and normalize them locally.
+
+```sh
+python3 Tools/VocabularySources/normalize_learning_dictionaries.py wordnet \
+  --input .local/vocab-sources/english/english-wordnet-2025.xml.gz \
+  --output .local/vocab-packs/english-wordnet.jsonl
+python3 Tools/VocabularySources/normalize_learning_dictionaries.py jmdict \
+  --input .local/vocab-sources/japanese/JMdict_e_examp.gz \
+  --tatoeba-details .local/vocab-sources/japanese/jpn_sentences_detailed.tsv.bz2 \
+  --tatoeba-cc0 .local/vocab-sources/japanese/jpn_sentences_CC0.tsv.bz2 \
+  --output .local/vocab-packs/japanese-jmdict.jsonl
+
+swift run neoanki-vocab compile --input .local/vocab-packs/english-wordnet.jsonl \
+  --output .local/vocab-packs/English-WordNet-2025.neovocab \
+  --id oewn.en.2025 --title 'English → English — Open English WordNet 2025' \
+  --language en --capability lexicon --capability corpus --capability morphology --capability pronunciation \
+  --source-id open-english-wordnet --source-name 'Open English WordNet' \
+  --attribution 'Open English WordNet Community, derived from Princeton WordNet' \
+  --license 'CC BY 4.0' --source-url https://en-word.net/downloads
+swift run neoanki-vocab compile --input .local/vocab-packs/japanese-jmdict.jsonl \
+  --output .local/vocab-packs/Japanese-English-JMdict.neovocab \
+  --id edrdg.jmdict.ja-en --title 'Japanese → English — JMdict with examples' \
+  --language ja --capability lexicon --capability corpus --capability morphology \
+  --source-id edrdg-jmdict --source-name 'JMdict and Tatoeba' \
+  --attribution 'Electronic Dictionary Research and Development Group (EDRDG), with Tatoeba contributors' \
+  --license 'JMdict CC BY-SA 4.0; Tatoeba per-sentence terms' \
+  --source-url https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project
+```
+
+Use **English** for the meaning language with either pack. In Chrome, choose
+the study language when starting Reading Mode. Its pack setting can select
+the matching pack, and Reading Mode can also find definitions in other
+installed packs for the chosen study language.
+
 ## Build an offline pack from the local Kaikki artifact
 
 The repository now includes a language-neutral Kaikki normalizer and the
@@ -74,15 +124,54 @@ UberText frequency data:
 Tools/VocabularySources/build-ukrainian-offline-packs.sh
 ```
 
-The StarDict adapter deliberately keeps short source spans instead of copying
-whole articles into every pack entry. Entry provenance stores the exact
-StarDict byte offset and length; the pack manifest stores the locked source URL,
-terms, and database digest. Russian lookup results are candidates, not automatic
-sense decisions: a consumer must defer multiple plausible headwords.
+The StarDict adapter keeps definition paragraphs and separates inflection
+endings from meanings. It preserves numbered senses individually. Entry
+provenance stores the exact StarDict byte offset and length. The pack manifest
+stores the locked source URL, terms, and database digest. Russian lookup results
+are candidates. When multiple headwords are plausible, the caller must let the
+learner choose.
 
 The stress/frequency cache is not a NeoAnki library database and must never be
 placed inside NeoAnki's managed pack directory. It is a reproducible local index
 of the locked source snapshot.
+
+### Build the СУМ-11 pack with literary examples
+
+Run the local build with the locked StarDict archive and UniMorph data in place.
+
+```sh
+Tools/VocabularySources/build-ukrainian-offline-packs.sh --sum11-examples
+```
+
+Import `.local/vocab-packs/SUM11-Ukrainian-Examples.neovocab` in NeoAnki2.
+For Chrome Reading Mode, select **СУМ-11 — Ukrainian with examples (v5)** in the
+companion's settings. The pack retains sense-linked quotations, source
+citations as printed in the dictionary, and exact Cloze targets that can be
+resolved through the Ukrainian forms index. Keep the source data and the pack
+for personal local use.
+
+### Add Ukrainian inflections to a definition pack
+
+Use the locked UniMorph `ukr.xz` file to add VESUM forms to a local SUM‑11
+pack. The adapter joins attested forms to existing headwords and preserves
+the original meanings, examples, and pronunciation data. For example,
+the resulting pack can look up `пагорків` under `пагорок` offline. The optional
+supplement adds sourced headwords missing from SUM‑11, such as `млость`, and
+the same adapter adds their attested inflections.
+
+```sh
+python3 Tools/VocabularySources/enrich_ukrainian_inflections.py \
+  --base-pack .local/vocab-packs/SUM11-Ukrainian.neovocab \
+  --forms .local/vocab-sources/ukrainian/github/unimorph-ukr/ukr.xz \
+  --supplement Tools/VocabularySources/ukrainian-supplement.jsonl \
+  --output .local/vocab-packs/sum11-with-vesum.jsonl
+```
+
+Compile the resulting JSONL with `neoanki-vocab compile` using a distinct pack
+ID, language `uk`, and the `lexicon`, `pronunciation`, and `morphology`
+capabilities. Each added form retains its UniMorph record reference. Include
+the VESUM attribution and CC BY-NC-SA 4.0 terms alongside the SUM‑11 source
+terms in the pack metadata. Keep this combined pack for personal local use.
 
 Kaikki's Ukrainian extract comes from English Wiktionary, so its glosses are
 English. The normalizer preserves this as definition language `en`; it does not

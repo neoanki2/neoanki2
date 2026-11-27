@@ -244,7 +244,7 @@ public enum TemplateBuilder {
 
     private static func modality(for fieldType: FieldType) -> Modality {
         switch fieldType {
-        case .text, .richText, .number, .cloze:
+        case .text, .richText, .number, .cloze, .studyExercise:
             return .text
         case .audio:
             return .audio

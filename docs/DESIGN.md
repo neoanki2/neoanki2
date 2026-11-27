@@ -368,7 +368,7 @@ iPad keeps the same workflows with a sidebar and a centered reading column.
 - Study has one reading column, one horizontal inset, and a fixed keyboard-safe action footer. Mobile content scrolls at its natural type size, including response controls; Read Full Card also opens a dedicated reader. Prompt and revealed answer remain adjacent. Grade labels fill their controls and reflow at accessibility sizes. Full content remains concealed until reveal.
 - Authoring uses Item terminology, labeled fields, contextual deck selection, inline feedback, native media pickers, and unsaved-change protection.
 - Item Type Studio uses reorderable summaries and focused field editors. Card Setup starts with its preview and concise Layout/Answer Method controls; content, availability, and learning route open focused screens. Draft/reducer validation and atomic save remain shared with Mac.
-- Poem and prose builders open directly in Create and progress from source to preview to import. The obsolete vocabulary builder is removed; Add Word and Learn in Context cover vocabulary authoring. Transfer and missing-pack states provide a useful next action. Settings and local recordings use native grouped sections. The study-day time lives inline in Settings and saves automatically.
+- Poem and prose builders open directly in Create and progress from source to preview to import. The obsolete vocabulary builder is removed; Add Word and Create Vocabulary Set cover vocabulary authoring. Transfer and missing-pack states provide a useful next action. Settings and local recordings use native grouped sections. The study-day time lives inline in Settings and saves automatically.
 
 Verification uses disposable headless Simulators only. Cover actual destinations, answer concealment, compact/large phones, iPad, light/dark, largest Dynamic Type, contrast, reduced motion, rotation, keyboards, and long content. Physical-device media and signed CloudKit acceptance remain separate. Persisted formats and HTTP interfaces remain unchanged.
 
@@ -390,7 +390,7 @@ touch targets preserve the app’s quiet native identity.
 ## Navigation simplification
 
 Keep the Mac scope toolbar focused on Browse and Add Item. Vocabulary capture
-and Learn in Context use the File menu with the selected deck as their context.
+and Create Vocabulary Set use the File menu with the selected deck as their context.
 Delete All Unassigned belongs in the Unassigned sidebar menu, alongside library
 management, rather than next to the study actions. Keep its impact confirmation.
 These cuts remove duplicate entry points without changing stored items or schedules.

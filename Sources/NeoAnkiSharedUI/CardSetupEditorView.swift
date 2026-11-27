@@ -264,6 +264,7 @@ public enum SharedStudyContentVisibilityPolicy {
         switch value {
         case .text, .rich: "Text"
         case .number: "Number"
+        case .studyExercise: "Study exercise"
         case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         case let .media(reference):
@@ -3114,6 +3115,7 @@ private extension ContentValue {
         case let .imageOcclusion(content): content.image.altText ?? "Image Occlusion"
         case let .cloze(text, _): text
         case let .number(value): value.formatted()
+        case let .studyExercise(exercise): exercise.stimulus
         case .empty: "Choose content"
         }
     }
@@ -3129,6 +3131,7 @@ private extension FieldType {
         case .gif: "GIF"
         case .video: "Video"
         case .number: "Number"
+        case .studyExercise: "Study exercise"
         case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         }

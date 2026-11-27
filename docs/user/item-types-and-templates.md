@@ -27,11 +27,8 @@ static layouts presents them, and how the learner answers. The saved data model
 calls a Card setup a `Template`; the friendlier name is only a change in the
 app's interface.
 
-**Learn in Context** creates ordinary **Context Example** items and a comprehension
-card for each sentence. Capture prepares the fields automatically; it does not
-require choosing a type, mapping fields, or configuring extra Card setups. Saved
-items remain editable through the normal item editor.
-
+**Create Vocabulary Set** makes one Vocabulary Set item with a meaning-recall
+card and a Cloze card. Existing Context Example items are editable in the item editor.
 
 Open **Item Types** on Mac, or **Create → Item Types & Card Setups** on iPhone
 and iPad. The Item Type Studio edits fields and Card setups together and saves

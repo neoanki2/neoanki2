@@ -197,6 +197,22 @@ export async function saveDraft(draft, fields, config, persist, api) {
   }
 }
 
+const ukrainianGrammar = new Set([
+  'а', 'е', 'я', 'є', 'и', 'і', 'ї', 'у', 'ю', 'о', 'ого', 'ього', 'ова', 'ове', 'ому',
+  'ч', 'ж', 'с', 'сер', 'р', 'мн', 'одн', 'род', 'знах', 'дав', 'оруд', 'місц', 'клич', 'відм',
+  'невідм', 'незм', 'збірн', 'док', 'недок', 'безос', 'присл', 'прикм', 'дієприкм', 'дієпр',
+  'розм', 'діал', 'заст', 'перен', 'спец', 'пестл', 'зменш', 'і', 'та',
+]);
+
+// Older Ukrainian packs sometimes store a StarDict heading fragment as a definition.
+export function isUkrainianDefinition(text) {
+  const plain = text.trim().normalize('NFD').replace(/[\u0300\u0301]/gu, '').normalize('NFC');
+  if (!/\p{L}/u.test(plain)) return false;
+  if (/^[\p{Script=Cyrillic}’ʼ'-]+[¹²³⁴⁵⁶⁷⁸⁹⁰]*\s+\d+\)\.?$/u.test(plain)) return false;
+  const words = plain.toLowerCase().match(/\p{L}+/gu) || [];
+  return !(/[.,;:]|^[-–]/u.test(plain) && words.every(word => ukrainianGrammar.has(word)));
+}
+
 export function renderEntry(entry) {
   const seen = new Set();
   const unique = values => values.filter(value => {

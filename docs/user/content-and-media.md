@@ -22,13 +22,17 @@ images, GIFs, and image occlusion; descriptions you enter are saved with the ima
 Leaving the description empty still lets you save and reopen an attached image.
 A description helps identify the image when using VoiceOver.
 
-An item type can define Text, Rich Text, Number, Cloze, Image Occlusion, Image, GIF, Audio, and
-Video fields. The field type controls authoring, validation, storage, and
-native rendering. Creating the definition inside a deck makes those fields
+An item type can define Text, Rich Text, Number, Cloze, Image Occlusion, Study
+Exercise, Image, GIF, Audio, and Video fields. The field type controls
+authoring, validation, storage, and native rendering. Creating the definition inside a deck makes those fields
 available when adding items there. Reusing the same type in another deck links
 its fields and Card setups; choose an independent copy when the decks need to
 change separately. Detaching a type does not convert or remove stored numbers,
 text, cloze blanks, or media from existing items.
+
+Use a Study Exercise field to ask learners to type one or more targets, type a
+rewrite, or choose an answer. The field stores the prompt and accepted answers
+or the correct option.
 
 ## Text
 

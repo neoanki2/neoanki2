@@ -301,7 +301,7 @@ public struct CardSetupRecommendation: Equatable, Sendable {
 
     private static func modality(for type: FieldType) -> Modality {
         switch type {
-        case .text, .richText, .number, .cloze: .text
+        case .text, .richText, .number, .cloze, .studyExercise: .text
         case .audio: .audio
         case .image, .imageOcclusion, .gif: .image
         case .video: .video

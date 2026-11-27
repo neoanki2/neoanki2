@@ -116,7 +116,8 @@ private struct ContextAuthoringPreferences: Codable {
             }
         }
         return .init(term: .init(language: target.language, expression: expression,
-                                sense: target.senseID == nil ? nil : target.meaning),
+                                sense: target.senseID == nil ? nil : target.meaning,
+                                lemma: target.senseID == nil ? nil : target.expression),
                      meaning: first?.meaning ?? target.meaning, meaningLanguage: "", sentence: sentence,
                      productionSentence: productionForm == nil ? nil : production?.sentence,
                      productionForm: productionForm, deckID: draft.deckID)

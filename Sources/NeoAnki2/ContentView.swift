@@ -33,11 +33,11 @@ struct ContentView: View {
     @Bindable var schedulingModel: SchedulingModel
     @Bindable var vocabularyLibraryModel: VocabularyLibraryModel
     @State private var appSession = AppSession()
-    private var showsLearnInContext: Bool {
-        get { if case .learnInContext = appSession.presentation { return true }; return false }
+    private var showsVocabularySet: Bool {
+        get { if case .vocabularySet = appSession.presentation { return true }; return false }
         nonmutating set {
-            if newValue { appSession.show(.learnInContext(deckID: decksModel.selectedDeckID)) }
-            else if case .learnInContext = appSession.presentation { appSession.dismissPresentation() }
+            if newValue { appSession.show(.vocabularySet(deckID: decksModel.selectedDeckID)) }
+            else if case .vocabularySet = appSession.presentation { appSession.dismissPresentation() }
         }
     }
     /// Persisted per user, not per browse session: whether you want to see
@@ -347,11 +347,14 @@ struct ContentView: View {
                 await reloadScope()
             }, deckID: decksModel.selectedDeckID)
         }
-        .sheet(isPresented: Binding(get: { showsLearnInContext }, set: { showsLearnInContext = $0 })) {
-            LearnInContextView(model: features.makeLearnInContext(rootURL: vocabularyLibraryModel.rootURL) {
-                await decksModel.load(asOf: .now)
-                await reloadScope()
-            }, deckID: decksModel.selectedDeckID)
+        .sheet(isPresented: Binding(get: { showsVocabularySet }, set: { showsVocabularySet = $0 })) {
+            if let vocabulary = features.personalVocabulary {
+                VocabularyComposerView(vocabulary: vocabulary, decks: features.vocabularyDecks, startsCreating: true,
+                                       deckID: decksModel.selectedDeckID, packRoot: vocabularyLibraryModel.rootURL) {
+                    await decksModel.load(asOf: .now)
+                    await reloadScope()
+                }
+            }
         }
         .sheet(isPresented: $schedulingModel.isShowingSettings) {
             SchedulingSettingsView(model: schedulingModel) {
@@ -534,7 +537,7 @@ struct ContentView: View {
             openVocabularyPackImport: openVocabularyPackImport,
             openVocabularyPacks: { isShowingVocabularyPacks = true },
             openAddFromVocabulary: { isAddingFromVocabulary = true },
-            openLearnInContext: { showsLearnInContext = true },
+            openVocabularySet: { showsVocabularySet = true },
             openDeckBuilder: { isShowingDeckBuilder = true },
             openTemplates: { openTemplates() },
             openBrowse: { openBrowse() },

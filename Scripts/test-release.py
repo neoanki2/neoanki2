@@ -144,7 +144,10 @@ class PlanningTests(unittest.TestCase):
     def test_phone_blocker_keeps_release_pending_without_repeating_publication(self):
         self.one_command_release(block_phone=True)
 
-    def one_command_release(self, block_phone=False):
+    def test_deferred_phone_skips_preparation_and_installs_only_on_explicit_resume(self):
+        self.one_command_release(defer_phone=True)
+
+    def one_command_release(self, block_phone=False, defer_phone=False):
         self.write('Sources/NeoAnkiIOS/Home.swift','after')
         calls=[];owner=self
         class Hub:
@@ -195,12 +198,19 @@ class PlanningTests(unittest.TestCase):
              patch.object(controller,'status',return_value={}):
             self.write('.gitignore','.build/\n')
             self.git('add','.');self.git('commit','-qm','merged release input')
-            self.assertEqual(controller.main([]),1 if block_phone else 0)
+            args = ['--defer-iphone'] if defer_phone else []
+            self.assertEqual(controller.main(args),1 if block_phone else 0)
             if block_phone:
                 self.assertEqual(controller.main([]),0)
             before=copy.deepcopy(calls)
             self.assertEqual(controller.main([]),0)
             self.assertEqual(calls,before)
+            if defer_phone:
+                self.assertFalse(any(c[0] in ('prepare-iphone','iphone') for c in calls))
+                path = self.root / '.build/releases/1.0.320/release.json'
+                self.assertTrue(json.loads(path.read_text())['local_iphone']['deferred'])
+                self.assertEqual(controller.main(['--resume','1.0.320']),0)
+                self.assertEqual(json.loads(path.read_text())['local_iphone'], {'status':'installed'})
         self.assertLess(next(i for i,c in enumerate(calls) if c[0]=='main-provenance'),next(i for i,c in enumerate(calls) if c[0]=='reserve'))
         self.assertIn(('reserve','1.0.320','320'),calls)
         self.assertIn(('build','ios','1.0.320','320'),calls)
@@ -208,8 +218,10 @@ class PlanningTests(unittest.TestCase):
         self.assertEqual([c for c in calls if c[0]=='publish'],[('publish',['ios'])])
         self.assertEqual([c for c in calls if c[0]=='iphone'],[('iphone','1.0.320')] * (2 if block_phone else 1))
         # The phone update is prepared once, after exports and before publication completes.
-        self.assertEqual([c for c in calls if c[0]=='prepare-iphone'],[('prepare-iphone',False)])
-        self.assertLess(calls.index(('export','ios')),calls.index(('prepare-iphone',False)))
+        preparations = [c for c in calls if c[0]=='prepare-iphone']
+        self.assertEqual(preparations, [] if defer_phone else [('prepare-iphone',False)])
+        if preparations:
+            self.assertLess(calls.index(('export','ios')),calls.index(preparations[0]))
 
 
     def test_clean_synchronized_main_is_the_release_source(self):

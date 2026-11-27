@@ -555,33 +555,23 @@ class NeoAnki2MobileUITestCase: XCTestCase {
 
 @MainActor
 final class MobileNavigationUITests: NeoAnki2MobileUITestCase {
-    func testLearnInContextOnlyRequiresDeckAndPhraseAndExplainsUnavailableGeneration() throws {
-        let app = launchApp()
+    func testVocabularySetShortcutExplainsUnavailableGeneration() throws {
+        let app = launchApp(additionalArguments: ["-vocabularyLearningLanguage", "en",
+                                                   "-vocabularyMeaningLanguage", "en"])
         open("Create", in: app)
-        app.buttons["New Deck"].tap()
-        let deckName = app.textFields["e.g. Spanish vocabulary"]
-        XCTAssertTrue(deckName.waitUntilExists(timeout: 10))
-        deckName.tap(); deckName.typeText("Expressions")
-        app.buttons["new-deck-create"].tap()
-        let entry = app.buttons["create-learn-in-context"]
+        let entry = app.buttons["create-vocabulary-set"]
         XCTAssertTrue(entry.waitUntilExists(timeout: 10)); entry.tap()
-        let expression = app.textFields["context-expression"]
+        let expression = app.textFields["vocabulary-set-word"]
         XCTAssertTrue(expression.waitUntilExists(timeout: 10))
         expression.tap(); expression.typeText("take into account")
-        XCTAssertFalse(app.descendants(matching: .any)["context-meaning"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["context-language"].exists)
-        XCTAssertFalse(app.buttons["Options"].exists)
-        let find = app.buttons["context-find-examples"]
+        let find = app.buttons["vocabulary-find-examples"]
         XCTAssertTrue(find.isEnabled && find.isHittable)
         find.tap()
-        // Simulator has no Apple Intelligence model. A completed request must explain the missing resource.
-        let error = app.descendants(matching: .any)["context-error"].firstMatch
-        XCTAssertTrue(error.waitUntilExists(timeout: 15))
-        XCTAssertTrue(error.label.contains("Apple Intelligence"))
-        XCTAssertFalse(error.label.contains("GenerationError"))
+        let explanation = app.staticTexts["vocabulary-generation-unavailable"]
+        XCTAssertTrue(explanation.waitUntilExists(timeout: 15))
+        XCTAssertTrue(explanation.label.contains("Apple Intelligence"))
+        XCTAssertTrue(app.descendants(matching: .any)["vocabulary-set-sentence"].firstMatch.exists)
         XCTAssertTrue(find.isEnabled)
-        let preview = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        preview.name = "Learn in Context minimal inputs"; preview.lifetime = .keepAlways; self.add(preview)
     }
 
     func testKnownWordsAndContextualVocabularyCapture() throws {
@@ -2514,5 +2504,69 @@ final class MobileFitStudyAreaUITests: NeoAnki2MobileUITestCase {
         }
         XCTAssertFalse(reveal.exists)
         capture("landscape-answer", in: app)
+    }
+}
+
+@MainActor
+final class MobileGrammarExerciseUITests: NeoAnki2MobileUITestCase {
+    func testResponseControlsIdentifyAndCheckAllThreeModes() throws {
+        for (mode, title) in [("target", "Type the target"), ("replacement", "Type the target"),
+                              ("rewrite", "Type a rewrite"), ("choose", "Choose")] {
+            let app = launchApp(environment: [
+                "NEOANKI_TEST_SCENARIO": "grammar-exercise", "NEOANKI_TEST_GRAMMAR_MODE": mode,
+            ])
+            let heading = app.staticTexts["studyExerciseMode"]
+            XCTAssertTrue(heading.waitUntilExists(timeout: 15), app.debugDescription)
+            XCTAssertEqual(heading.label, title)
+            XCTAssertFalse(app.buttons["Good"].exists)
+            XCTAssertFalse(app.staticTexts["Answer concealed"].exists)
+            let before = XCTAttachment(screenshot: app.screenshot())
+            before.name = mode + "-prompt"
+            before.lifetime = .keepAlways
+            add(before)
+            switch mode {
+            case "target":
+                let prompt = app.staticTexts["studyExerciseStimulus"]
+                let field = app.textFields["studyTarget0"]
+                XCTAssertTrue(field.exists)
+                XCTAssertLessThan(field.frame.minY - prompt.frame.maxY, 115)
+                XCTAssertTrue(app.descendants(matching: .any)["No word"].exists)
+                field.tap()
+                field.typeText("the")
+                app.buttons["Check Answer"].tap()
+                XCTAssertTrue(app.staticTexts["studyExerciseResult"].waitUntilExists(timeout: 5))
+                XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Expected")).firstMatch.exists)
+                XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Then I opened a file from another folder.")).firstMatch.exists)
+            case "replacement":
+                XCTAssertEqual(app.staticTexts["studyExerciseStimulus"].label, "We ‹need call› the service.")
+                XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Copy the whole sentence")).firstMatch.exists)
+                XCTAssertFalse(app.textFields["studyRewrite"].exists)
+                let replacement = app.textFields["studyTarget0"]
+                XCTAssertEqual(replacement.placeholderValue, "Replacement")
+                replacement.tap()
+                replacement.typeText("need to call")
+                app.buttons["Check Answer"].tap()
+                let result = app.staticTexts["studyExerciseResult"]
+                XCTAssertTrue(result.waitUntilExists(timeout: 5))
+                XCTAssertEqual(result.label, "Correct")
+            case "rewrite":
+                let rewrite = app.textFields["studyRewrite"]
+                XCTAssertTrue(rewrite.exists)
+                rewrite.tap()
+                rewrite.typeText("Does it work?")
+                app.buttons["Check Answer"].tap()
+            default:
+                XCTAssertFalse(app.buttons["Check Choice"].exists)
+                XCTAssertFalse(app.textFields["studyRewrite"].exists)
+                app.buttons["studyExerciseChoice-right"].tap()
+            }
+            XCTAssertTrue(app.buttons["Good"].waitUntilExists(timeout: 8))
+            XCTAssertFalse(app.staticTexts["Answer concealed"].exists)
+            let after = XCTAttachment(screenshot: app.screenshot())
+            after.name = mode + "-checked"
+            after.lifetime = .keepAlways
+            add(after)
+            app.terminate()
+        }
     }
 }
