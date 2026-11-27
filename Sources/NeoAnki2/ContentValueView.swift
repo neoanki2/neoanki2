@@ -58,6 +58,8 @@ struct ContentValueView: View {
                 }
             case let .imageOcclusion(content):
                 ImageOcclusionStudyView(content: content, mediaStore: mediaStore, group: content.displayGroup(cardGroup: occlusionGroup, allowsPreview: !isStudyContent && isAnswerRevealed), revealed: isAnswerRevealed)
+            case let .studyExercise(exercise):
+                Text(exercise.stimulus).multilineTextAlignment(textAlignment)
             case let .cloze(text, blanks):
                 ClozeContentView(
                     text: text,

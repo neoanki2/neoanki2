@@ -174,7 +174,7 @@ alternatives exist; a small deck can still finish every due review.
 Large queues use the same spacing rules without searching every remaining card
 when the next card is already unrelated to the recent cards.
 
-Ordinary siblings share an item. **Learn in Context** examples share their
+Ordinary siblings share an item. Saved **Context Example** items share their
 language and expression, including examples added in separate batches or decks.
 At most **one new related card per study day** is introduced. A learned relative
 that is due takes precedence, and reviewing a relative today defers new relatives

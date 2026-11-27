@@ -110,7 +110,7 @@ private extension FieldType {
         switch self {
         case .audio, .image, .gif, .video, .cloze, .imageOcclusion:
             true
-        case .text, .richText, .number:
+        case .text, .richText, .number, .studyExercise:
             false
         }
     }
@@ -1757,6 +1757,8 @@ public actor ItemStore {
             switch fieldValue.value {
             case let .imageOcclusion(content):
                 try ImageOcclusionValidation.validate(content)
+            case let .studyExercise(exercise):
+                try exercise.validate()
             case let .cloze(text, blanks):
                 try ClozeValidation.validate(text: text, blanks: blanks)
             case let .media(ref):
@@ -1796,7 +1798,8 @@ public actor ItemStore {
         case (.text, .text), (.text, .rich), (.richText, .text), (.richText, .rich),
              (.audio, .media),
              (.image, .media), (.gif, .media), (.video, .media),
-             (.number, .number), (.cloze, .cloze), (.imageOcclusion, .imageOcclusion):
+             (.number, .number), (.cloze, .cloze), (.imageOcclusion, .imageOcclusion),
+             (.studyExercise, .studyExercise):
             true
         default:
             false

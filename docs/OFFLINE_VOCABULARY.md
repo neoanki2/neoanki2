@@ -73,6 +73,17 @@ swift run neoanki-vocab search \
 `compile`, `validate`, and `search` reject URL-shaped input paths. None performs
 network access. Compilation refuses to overwrite an existing pack.
 
+## Install a local pack from the terminal
+
+```sh
+swift run neoanki-vocab install --pack /path/to/Pack.neovocab \
+  --root "$HOME/Library/Application Support/neoanki2/Vocabulary Packs"
+```
+
+The command validates and copies the pack into the local Mac library. A pack
+with the same identifier must be managed through the existing Vocabulary Packs
+tools before importing a replacement.
+
 ## Kaikki/Wiktextract adapter
 
 `Tools/VocabularySources/normalize_kaikki.py` reads a local Kaikki JSONL or

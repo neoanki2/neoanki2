@@ -49,7 +49,23 @@ class NormalizeStarDictTests(unittest.TestCase):
             entry["senses"][0]["definitions"][0]["text"]["value"],
             "Дашок для захисту очей від світла.",
         )
-        self.assertEqual(entry["senses"][0]["examples"], [])
+        self.assertEqual(entry["senses"][0]["examples"][0]["text"]["value"], "Під абажуром блимала лампа.")
+
+    def test_sum_examples_follow_their_subsense_and_homonym(self) -> None:
+        article = (
+            '<div style="margin-left:1em"><font color="maroon"><b>ЧЕРЕДА́¹</b></font>, и, <i>ж.</i> Гурт тварин.</div>'
+            '<div style="margin-left:3em"><i>Там паслася череда.</i><font color="dodgerblue">(Автор, 12)</font>;</div>'
+            '<div style="margin-left:1em">// Ряд предметів. <span class="ex"><i>Виднілася череда хат.</i></span></div>'
+            '<div style="margin-left:1em"><font color="maroon"><b>ЧЕРЕДА́²</b></font>, и, <i>ж.</i> Лікарська рослина.</div>'
+            '<div style="margin-left:2em"><i>Череда, а за нею інша череда, росли тут.</i></div>'
+        )
+        entry = MODULE.normalize_sum_entry("череда", article, 3, 10, "a" * 64)
+        self.assertEqual(len(entry["senses"]), 3)
+        first, second, third = (sense["examples"][0] for sense in entry["senses"])
+        self.assertEqual(first["provenance"]["attribution"], "(Автор, 12)")
+        self.assertEqual(first["target"]["exactText"], "череда")
+        self.assertEqual(second["text"]["value"], "Виднілася череда хат.")
+        self.assertNotIn("target", third)
 
     def test_ruuk_entry_indexes_exact_ukrainian_translation(self) -> None:
         article = (
@@ -78,6 +94,32 @@ class NormalizeStarDictTests(unittest.TestCase):
             entry["senses"][0]["definitions"][0]["text"]["value"],
             "Укріплене житло феодала доби середньовіччя.",
         )
+
+    def test_sum_adjective_endings_are_metadata_and_keep_numbered_senses(self) -> None:
+        article = (
+            '<div style="margin-left:1em"><font color="maroon"><b>КІ́ПТЯ́ВИЙ</b></font>, а, е.</div>'
+            '<div style="margin-left:1em">1. Який коптить.</div>'
+            '<div style="margin-left:3em"><i>Кіптявий каганець.</i></div>'
+            '<div style="margin-left:1em">2. Покритий кіптем; закопчений.</div>'
+        )
+        entry = MODULE.normalize_sum_entry("кіптявий", article, 7, 11, "c" * 64)
+        self.assertEqual(entry["canonicalForm"]["grammaticalFeatures"],
+                         [{"name": "dictionaryHeader", "value": "КІ́ПТЯ́ВИЙ, а, е."}])
+        meanings = [definition["text"]["value"] for sense in entry["senses"] for definition in sense["definitions"]]
+        self.assertEqual(meanings, ["Який коптить.", "Покритий кіптем; закопчений."])
+
+    def test_sum_inline_meaning_keeps_an_embedded_italic_reference(self) -> None:
+        article = ('<div style="margin-left:1em"><font color="maroon"><b>ПАРОМІ́Р</b></font>, а, <i>ч.</i> '
+                   'Прилад для вимірювання витрати пари (<i>див.</i> <b>па́ра²</b> 1).</div>')
+        entry = MODULE.normalize_sum_entry("паромір", article, 7, 11, "c" * 64)
+        self.assertEqual(entry["senses"][0]["definitions"][0]["text"]["value"],
+                         "Прилад для вимірювання витрати пари (див. па́ра² 1).")
+
+    def test_sum_missing_definition_keeps_the_headword_without_a_sense(self) -> None:
+        article = '<div style="margin-left:1em"><font color="maroon"><b>ЛІПОТА́</b></font>, <i>и́, ж., заст</i>.</div>'
+        entry = MODULE.normalize_sum_entry("ліпота", article, 7, 11, "c" * 64)
+        self.assertEqual(entry["canonicalForm"]["text"]["value"], "ліпота")
+        self.assertEqual(entry["senses"], [])
 
     def test_archive_member_resolution_and_normalization(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

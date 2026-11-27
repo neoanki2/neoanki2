@@ -157,17 +157,16 @@ moves to the newly revealed answer without changing that semantic order.
 
 Independent cards use the same ±15% interval variation and related-card spacing
 as Mac. Only one new relative is introduced per study day, including examples
-added for the same expression in separate Learn in Context batches. Poetry and
+saved for the same expression as separate Context Example items. Poetry and
 prose keep their schedules: only eligible parts enter a session, in source order.
 Skip and failed recalls return on later passes. See
 [Study queue order](../studying/#study-queue-order).
 
 ## Author and organize
 
-**Create → Learn in Context** needs only a deck and a word or phrase. Choose
-**Find Examples**, preview the sentences and audio, then **Add Cards**. The app
-handles language, meanings, and phrase highlighting without extra setup.
-
+Open **Create → Create Vocabulary Set** to find a sentence from an installed
+dictionary and save a meaning-recall and Cloze pair. The same composer is
+available from **Known Words → Add Word → Create Cards**.
 
 Use **Create → New Item** or the add action in a scope. Choose the deck and item
 type, then fill its typed fields. The primary picker shows this deck's types;

@@ -69,6 +69,7 @@ public final class StudyFeatureModel: Identifiable {
     public private(set) var dueCheckError: UserFacingError?
     public var pendingGradeUndo: StudyGradeUndo? { sessionState.pendingGradeUndo }
     public private(set) var typedAnswer = ""
+    public private(set) var exerciseTargets: [Int: String] = [:]
     public private(set) var answerEvaluation: AnswerEvaluation?
     public private(set) var choiceOptions: [String] = []
     public private(set) var selectedChoice: String?
@@ -79,6 +80,9 @@ public final class StudyFeatureModel: Identifiable {
     /// Retain the learner's actual response when the input controls disappear.
     public var reviewResponse: String? {
         guard isAnswerRevealed else { return nil }
+        if currentCard?.studyExercise?.mode == .target, !exerciseTargets.isEmpty {
+            return exerciseTargets.sorted { $0.key < $1.key }.map { $0.value.isEmpty ? "No word" : $0.value }.joined(separator: " / ")
+        }
         switch currentCard?.template.interaction {
         case .type, .cloze:
             return typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : typedAnswer
@@ -116,6 +120,7 @@ public final class StudyFeatureModel: Identifiable {
     private var expectedQueueCount = 0
     private var startGeneration: UInt64 = 0
     private var itemReloadGeneration: UInt64 = 0
+    private var attemptRevision: UInt64 = 0
     package var remainingQueueLoadGate: (@Sendable () async -> Void)?
 
     public init(
@@ -438,7 +443,48 @@ public final class StudyFeatureModel: Identifiable {
         interactionMessage = nil
     }
 
+    public func updateExerciseTarget(_ index: Int, value: String?) {
+        guard !isAnswerRevealed, let exercise = currentCard?.studyExercise,
+              exercise.mode == .target, exercise.targets.indices.contains(index) else { return }
+        if value == "", !exercise.targets[index].allowsOmission { return }
+        learningTime.interaction()
+        exerciseTargets[index] = value
+        interactionMessage = nil
+    }
+
+    public func submitExerciseChoice(_ id: String) {
+        guard !isAnswerRevealed, let exercise = currentCard?.studyExercise,
+              exercise.mode == .choose, let option = exercise.options.first(where: { $0.id == id }) else { return }
+        learningTime.interaction()
+        selectedChoice = option.label
+        interactionMessage = nil
+        answerEvaluation = id == exercise.correctOptionID ? .correct : .incorrect
+        isAnswerRevealed = true
+    }
+
     public func submitTypedAnswer() {
+        if !isAnswerRevealed, let exercise = currentCard?.studyExercise, exercise.mode != .choose {
+            let response: [String]
+            if exercise.mode == .target {
+                response = exercise.targets.indices.compactMap { exerciseTargets[$0] }
+                guard response.count == exercise.targets.count,
+                      response.allSatisfy({ $0.isEmpty || !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+                else {
+                    interactionMessage = "Answer each target."
+                    return
+                }
+            } else {
+                guard !typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    interactionMessage = "Enter the rewritten sentence."
+                    return
+                }
+                response = [typedAnswer]
+            }
+            answerEvaluation = exercise.accepts(response) ? .correct : .incorrect
+            interactionMessage = nil
+            isAnswerRevealed = true
+            return
+        }
         guard let card = currentCard, !isAnswerRevealed,
               card.template.interaction == .type || VocabularySet.supportsTypedResponse(card) else { return }
         let evaluation = VocabularySet.supportsTypedResponse(card)
@@ -570,6 +616,7 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     private func resetAttemptTiming() {
+        attemptRevision &+= 1
         reviewTiming.reset()
         attemptActiveStart = learningTime.sessionMilliseconds
         answerActiveStart = nil
@@ -655,18 +702,49 @@ public final class StudyFeatureModel: Identifiable {
     public func pauseReviewTiming() { reviewTiming.pause(); learningTime.setActive(false) }
     public func resumeReviewTiming() { reviewTiming.resume(); learningTime.setActive(true) }
 
+    public var promptRefreshRevision: UInt64? {
+        guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission, !isAnswerRevealed,
+              let interaction = currentCard?.template.interaction else { return nil }
+        switch interaction {
+        case .record, .audioSubmission, .arrange: return nil
+        default: return attemptRevision
+        }
+    }
+
+    /// Recheck the displayed copy when its turn begins or after a sync or API commit.
+    /// Subscribing before the first read also covers changes while the queue was opening.
+    public func observeCurrentPromptChanges() async {
+        guard let revision = promptRefreshRevision, itemSnapshotReader != nil,
+              let journal = library as? any LibraryChangePersisting else { return }
+        let changes = await journal.changeNotifications()
+        await reloadCurrentItem(whileUnanswered: revision)
+        for await _ in changes {
+            guard !Task.isCancelled, promptRefreshRevision == revision else { return }
+            await reloadCurrentItem(whileUnanswered: revision)
+        }
+    }
+
     /// Re-reads the item behind the current card after it was edited mid-session,
     /// so the rest of the session shows the correction rather than the copy the
     /// queue was built from. Every queued card drawn from that item is refreshed,
     /// because one item can own several cards in the same session.
     public func reloadCurrentItem() async {
+        await reloadCurrentItem(whileUnanswered: nil)
+    }
+
+    private func reloadCurrentItem(whileUnanswered revision: UInt64?) async {
+        func canReplacePrompt() -> Bool {
+            guard let revision else { return true }
+            return promptRefreshRevision == revision && typedAnswer.isEmpty && exerciseTargets.isEmpty && selectedChoice == nil
+        }
+
         guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission,
-              let current = currentCard else { return }
+              !Task.isCancelled, canReplacePrompt(), let current = currentCard else { return }
         let itemID = current.item.id
         let cardID = current.id
         let position = index
         let generation = startGeneration
-        itemReloadGeneration &+= 1
+        if revision == nil { itemReloadGeneration &+= 1 }
         let reloadGeneration = itemReloadGeneration
 
         do {
@@ -679,6 +757,16 @@ public final class StudyFeatureModel: Identifiable {
                 compatibilityItem = try await library.item(id: itemID)
                 snapshot = nil
             }
+            if revision != nil, let snapshot, let live = snapshot.cards.first(where: { $0.id == cardID }), !live.isSuspended {
+                // An item can arrive before its updated card in a separate sync batch.
+                // Wait for a usable template instead of dropping a still-live card.
+                guard snapshot.itemType.templates.contains(where: { $0.id == live.templateID }) else { return }
+                if snapshot.item == current.item, snapshot.itemType == current.itemType,
+                   live.templateID == current.template.id, live.clozeGroup == current.card.clozeGroup,
+                   live.occlusionGroup == current.card.occlusionGroup {
+                    return
+                }
+            }
             let stillEligible: Bool
             if isExtraIntroduction(current), let extraLibrary {
                 stillEligible = try await extraLibrary.isExtraStudyCardEligible(cardID: cardID, scope: sessionScope, asOf: clock())
@@ -687,7 +775,7 @@ public final class StudyFeatureModel: Identifiable {
             }
             guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission,
                   startIsCurrent(generation), itemReloadGeneration == reloadGeneration,
-                  currentCard?.id == cardID, index == position else { return }
+                  canReplacePrompt(), currentCard?.id == cardID, index == position else { return }
             guard stillEligible else {
                 await discardMissingCurrentCard(cardID)
                 return
@@ -711,7 +799,7 @@ public final class StudyFeatureModel: Identifiable {
                 prepareCurrentInteraction()
             }
         } catch {
-            guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission,
+            guard revision == nil, !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission,
                   startIsCurrent(generation), itemReloadGeneration == reloadGeneration,
                   currentCard?.id == cardID, index == position else { return }
             self.error = errorMapper.map(error)
@@ -733,6 +821,7 @@ public final class StudyFeatureModel: Identifiable {
         // skipping through a queue and returning to the same card ID/index.
         itemReloadGeneration &+= 1
         typedAnswer = ""
+        exerciseTargets = [:]
         answerEvaluation = nil
         selectedChoice = nil
         selectedArrangementIndex = nil
@@ -742,13 +831,13 @@ public final class StudyFeatureModel: Identifiable {
             arrangedItems = []
             return
         }
-        choiceOptions = card.template.interaction == .choose
+        choiceOptions = card.template.interaction == .choose && card.studyExercise == nil
             ? StudyResponseEvaluator.choiceOptions(for: card)
             : []
         arrangedItems = card.template.interaction == .arrange
             ? StudyResponseEvaluator.arrangement(for: card)?.initial ?? []
             : []
-        if card.template.interaction == .choose, choiceOptions.isEmpty {
+        if card.template.interaction == .choose, card.studyExercise == nil, choiceOptions.isEmpty {
             interactionMessage = "This card has no usable answer options. Reveal it to self-grade."
         } else if card.template.interaction == .arrange, arrangedItems.isEmpty {
             interactionMessage = "This card has nothing to arrange. Reveal it to self-grade."

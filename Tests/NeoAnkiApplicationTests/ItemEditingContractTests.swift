@@ -16,6 +16,7 @@ import Testing
         var snapshot = ItemEditorState.empty(for: nil)
         switch kind {
         case .text, .richText: snapshot.fieldSpans[field] = [Span("A 🧠 e\u{301}", styles: [.bold])]
+        case .studyExercise: snapshot.fieldText[field] = StudyExercise(mode: .rewrite, prompt: "It works.", answers: [["Does it work?"]]).editorText
         case .number: snapshot.fieldText[field] = "-42.5"
         case .cloze:
             snapshot.fieldText[field] = "A 🧠 e\u{301}"
@@ -69,6 +70,7 @@ import Testing
         switch kind {
         case .text: value = .text("A 🧠 e\u{301}", lang: "en")
         case .richText: value = .rich(try #require(expected.fieldSpans[field.id]))
+        case .studyExercise: value = .studyExercise(try StudyExercise(editorText: #require(expected.fieldText[field.id])))
         case .number: value = .number(-42.5)
         case .cloze: value = .cloze(try #require(expected.fieldText[field.id]), blanks: try #require(expected.fieldClozeBlanks[field.id]))
         case .image, .audio, .gif, .video: value = .media(try #require(expected.fieldMedia[field.id]))
@@ -80,7 +82,7 @@ import Testing
         switch kind {
         case .text: #expect(hydrated.fieldSpans[field.id] == [Span("A 🧠 e\u{301}")])
         case .richText: #expect(hydrated.fieldSpans == expected.fieldSpans)
-        case .number: #expect(hydrated.fieldText == expected.fieldText)
+        case .number, .studyExercise: #expect(hydrated.fieldText == expected.fieldText)
         case .cloze:
             #expect(hydrated.fieldText == expected.fieldText)
             #expect(hydrated.fieldClozeBlanks == expected.fieldClozeBlanks)

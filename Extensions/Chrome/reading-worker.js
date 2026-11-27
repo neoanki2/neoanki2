@@ -1,5 +1,5 @@
 import './reading-model.js';
-import { allPages, APIError, hasCapabilities, makeAPI, postJudgmentBatches, READING_CAPABILITIES, requireCapabilities, safeSource,
+import { allPages, APIError, hasCapabilities, isUkrainianDefinition, makeAPI, postJudgmentBatches, READING_CAPABILITIES, requireCapabilities, safeSource,
   undoJudgmentBatches } from './core.js';
 import { readState, storageReady, writeState } from './storage.js';
 
@@ -8,6 +8,7 @@ const recordable = ['known', 'unfamiliar', 'ignored', 'reviewHistory'];
 const snapshots = new Map();
 const resolvedForms = new Map();
 const keyFor = tabId => `reading-mode:${tabId}`;
+const deckKeyFor = language => `card-set-deck:${language}`;
 const languageCode = value => String(value || '').trim().toLowerCase().replaceAll('_', '-');
 function originOf(url) {
   try {
@@ -56,7 +57,7 @@ async function snapshotFor(mode, since) {
     offline = true;
   }
   snapshots.set(key, snapshot);
-  const result = { version: snapshot.version, offline, dictionary: Boolean(state.config.packId), lastDeck: state.lastDeck || '' };
+  const result = { version: snapshot.version, offline, dictionary: Boolean(state.config.packId) };
   return since && since === snapshot.version ? { ...result, unchanged: true } : { ...result, snapshot };
 }
 
@@ -88,31 +89,81 @@ async function dictionaryForms(message, mode) {
 const termFor = (term, mode) => ({ language: mode.language, expression: String(term?.expression || ''),
   ...(term?.lemma ? { lemma: String(term.lemma) } : {}) });
 
-async function captureOptions(message, mode) {
-  const state = await readState();
-  const api = makeAPI(state.config);
-  const decks = await allPages(api, '/v1/decks');
-  if (!state.config.packId) return { decks, meanings: [] };
-  const query = new URLSearchParams({ query: message.expression, mode: 'exact', language: mode.language, limit: '20' });
-  try {
-    const pack = encodeURIComponent(state.config.packId);
-    const { data } = await api(`/v1/vocabulary-packs/${pack}/entries?${query}`);
-    const meanings = [];
-    const seen = new Set();
-    for (const entry of data) {
-      for (const sense of entry.senses || []) {
-        const gloss = sense.definitions?.find(definition => languageCode(definition.text.language) === mode.meaningLanguage)
-          || sense.definitions?.[0];
-        const meaning = gloss?.text?.value?.trim();
-        if (!meaning || seen.has(meaning)) continue;
-        seen.add(meaning);
-        const example = sense.examples?.find(value => !value.text.language || languageCode(value.text.language) === mode.language);
-        meanings.push({ meaning, language: languageCode(gloss.text.language) || mode.meaningLanguage,
-          example: example?.text?.value || '', form: example?.target?.exactText || '' });
-      }
+function definitionsFor(entries, mode) {
+  const meanings = new Map();
+  const meaningLanguage = model.primaryLanguage(mode.meaningLanguage);
+  for (const entry of entries) {
+    for (const sense of entry.senses || []) {
+      const definitions = (sense.definitions || []).filter(definition => {
+        const language = model.primaryLanguage(definition.text.language) || meaningLanguage;
+        return language !== 'uk' || isUkrainianDefinition(definition.text.value);
+      });
+      const gloss = definitions.find(definition => model.primaryLanguage(definition.text.language) === meaningLanguage)
+        || definitions.find(definition => !definition.text.language);
+      const meaning = gloss?.text?.value?.trim();
+      if (!meaning || meanings.has(meaning)) continue;
+      const examples = (sense.examples || []).filter(value => value.target?.exactText &&
+        (!value.text.language || model.primaryLanguage(value.text.language) === model.primaryLanguage(mode.language)))
+        .map(value => ({
+          sentence: value.text.value,
+          form: value.target.exactText,
+          source: [value.provenance?.sourceName || value.provenance?.sourceID,
+            value.provenance?.attribution, value.provenance?.sourceURL].filter(Boolean).join(' · '),
+        }));
+      meanings.set(meaning, { meaning, language: languageCode(gloss.text.language) || mode.meaningLanguage,
+        examples });
     }
-    return { decks, meanings, lemma: model.lemmaFromEntries(data, mode.language) };
-  } catch { return { decks, meanings: [] }; }
+  }
+  return [...meanings.values()];
+}
+
+const ukrainianReference = /^(?:Те саме, що|Див\.)\s+([\p{L}\p{M}'’ʼ-]+)\.?$/iu;
+
+async function lookUpMeanings(api, packId, expression, mode) {
+  async function search(word) {
+    const query = new URLSearchParams({ query: word, mode: 'exact', language: mode.language, limit: '20' });
+    const { data } = await api(`/v1/vocabulary-packs/${encodeURIComponent(packId)}/entries?${query}`);
+    return data;
+  }
+
+  const entries = await search(expression);
+  const meanings = (await Promise.all(definitionsFor(entries, mode).map(async gloss => {
+    const reference = model.primaryLanguage(gloss.language) === 'uk' && ukrainianReference.exec(gloss.meaning)?.[1];
+    if (!reference) return gloss;
+    // Follow one dictionary cross-reference and keep the original entry's example for the card.
+    const referred = await search(model.withoutStress(reference, mode.language)).catch(() => []);
+    const definition = definitionsFor(referred, mode).find(value => !ukrainianReference.test(value.meaning));
+    return definition ? { ...gloss, meaning: `${reference} — ${definition.meaning.replace(/^\)\.\s+/u, '')}` } : null;
+  }))).filter(Boolean);
+  return { meanings, lemma: model.lemmaFromEntries(entries, mode.language) };
+}
+
+async function readingDictionary(api, selectedPack, expression, mode) {
+  const empty = { meanings: [] };
+  if (!selectedPack) return empty;
+  const lookup = packId => lookUpMeanings(api, packId, expression, mode).catch(() => empty);
+  const selected = await lookup(selectedPack);
+  if (selected.meanings.length) return selected;
+
+  const { data: packs } = await api('/v1/vocabulary-packs').catch(() => ({ data: [] }));
+  const language = model.primaryLanguage(mode.language);
+  for (const pack of packs) {
+    if (pack.id === selectedPack || !pack.languages.some(code => model.primaryLanguage(code) === language)) continue;
+    const fallback = await lookup(pack.id);
+    if (fallback.meanings.length) return fallback;
+  }
+  return selected;
+}
+
+async function captureOptions(message, mode) {
+  const { config } = await readState();
+  const api = makeAPI(config);
+  const expression = String(message.expression || '');
+  const lookup = word => readingDictionary(api, config.packId, word, mode);
+  const [decks, local] = await Promise.all([allPages(api, '/v1/decks'), lookup(expression)]);
+  const deckKey = deckKeyFor(mode.language);
+  const { [deckKey]: lastDeck = '' } = await chrome.storage.local.get(deckKey);
+  return { decks, lastDeck, ...local };
 }
 
 async function handle(message, sender) {
@@ -148,6 +199,14 @@ async function handle(message, sender) {
   if (message.type === 'neoankiReadingDetails') return details(message, mode);
   if (message.type === 'neoankiReadingForms') return dictionaryForms(message, mode);
   if (message.type === 'neoankiReadingOptions') return captureOptions(message, mode);
+  if (message.type === 'neoankiReadingRememberDeck') {
+    const { deckID } = message;
+    if (deckID !== '' && (typeof deckID !== 'string' || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(deckID))) {
+      throw new Error('Choose a deck from the list.');
+    }
+    await writeState({ [deckKeyFor(mode.language)]: deckID });
+    return null;
+  }
   const { config } = await readState();
   const api = makeAPI(config);
   if (['neoankiReadingJudge', 'neoankiReadingBatch'].includes(message.type)
@@ -166,17 +225,16 @@ async function handle(message, sender) {
   if (message.type === 'neoankiReadingUndoBatches') return undoJudgmentBatches(api, message.batchIds, message.keys);
   if (message.type !== 'neoankiReadingCreate') throw new Error('Unknown Reading Mode action.');
   const { draft } = message;
-  const source = safeSource({ url: sender.url, title: sender.tab?.title });
-  const result = await api('/v1/vocabulary-sets', { method: 'POST', key: message.key, body: {
+  const page = draft.usePageSource !== false ? safeSource({ url: sender.url, title: sender.tab?.title }) : null;
+  const source = [page?.title, page?.url, ...(draft.dictionarySources || [])].filter(Boolean).join('\n');
+  return api('/v1/vocabulary-sets', { method: 'POST', key: message.key, body: {
     term: { ...draft.term, language: mode.language }, meaning: draft.meaning,
     meaningLanguage: draft.meaningLanguage || mode.meaningLanguage, sentence: draft.sentence,
     occurrence: draft.occurrence ?? 0,
     ...(draft.productionSentence && draft.productionForm ? { productionSentence: draft.productionSentence, productionForm: draft.productionForm } : {}),
     ...(draft.deckID ? { deckID: draft.deckID } : {}),
-    ...(source.url ? { source: [source.title, source.url].filter(Boolean).join('\n') } : {}),
+    ...(source ? { source } : {}),
   } });
-  await writeState({ lastDeck: draft.deckID || '' }).catch(() => {});
-  return result;
 }
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {

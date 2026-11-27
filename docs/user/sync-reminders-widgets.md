@@ -44,11 +44,8 @@ time without rebuilding maturity progress from the review history. A slow device
 service does not keep **Saving review…** visible or prevent the next grade.
 Leaving study refreshes the full Home summary with the latest saved results.
 
-Cards accepted through **Learn in Context**, including their saved speech, use
-ordinary item and media sync. Unfinished capture drafts and original source
-libraries stay on their device. Adding or undoing a set refreshes the normal due
-counts, badges, reminders, and widget data.
-
+Vocabulary Sets and saved Context Example items use ordinary item and media
+sync. Saving a set refreshes due counts, badges, reminders, and widget data.
 
 Items saved through **Add Word** use ordinary library sync and update due counts,
 including badges and the widget. Saved dictionary–deck capture configurations

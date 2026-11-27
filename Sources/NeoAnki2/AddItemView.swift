@@ -188,6 +188,9 @@ struct AddItemView: View {
                 accessibilityIdentifier: "field-\(field.name)",
                 isFocused: richTextFocusBinding(for: field.id)
             )
+        case .studyExercise:
+            StudyExerciseFieldEditor(label: fieldLabel(field), text: textBinding(for: field.id),
+                                     defaultMode: itemType?.preferredStudyExerciseMode ?? .target)
         case .number:
             TextField(fieldLabel(field), text: textBinding(for: field.id))
                 .focused($focusedFieldID, equals: field.id)

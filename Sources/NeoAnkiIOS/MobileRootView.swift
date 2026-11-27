@@ -20,7 +20,7 @@ public struct MobileRootView: View {
     @Bindable var model: MobileAppModel
     @State private var fixtureError: String?
     @State private var showsWordCapture = false
-    @State private var showsLearnInContext = false
+    @State private var showsVocabularySet = false
     @State private var wordCaptureDeckID: UUID?
     @State private var fixturesReady = false
     @State private var retriedFailureFixture = false
@@ -69,9 +69,9 @@ public struct MobileRootView: View {
         }
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
         .environment(\.vocabularyPackRootURL, vocabularyRootURL)
-        .environment(\.openLearnInContext, { deckID in
+        .environment(\.openVocabularySet, { deckID in
             wordCaptureDeckID = deckID
-            showsLearnInContext = true
+            showsVocabularySet = true
         })
         .environment(\.openWordCapture, { deckID in
             wordCaptureDeckID = deckID
@@ -86,10 +86,13 @@ public struct MobileRootView: View {
         .alert("Visual Fixture Failed", isPresented: Binding(get: { fixtureError != nil }, set: { if !$0 { fixtureError = nil } })) {
             Button("OK") { fixtureError = nil }
         } message: { Text(fixtureError ?? "") }
-        .sheet(isPresented: $showsLearnInContext) {
-            LearnInContextView(model: model.features.makeLearnInContext(rootURL: vocabularyRootURL) {
-                await model.authoringDidCommit()
-            }, deckID: wordCaptureDeckID).dynamicTypeSize(dynamicTypeSize)
+        .sheet(isPresented: $showsVocabularySet) {
+            if let vocabulary = model.features.personalVocabulary {
+                VocabularyComposerView(vocabulary: vocabulary, decks: model.features.vocabularyDecks, startsCreating: true,
+                                       deckID: wordCaptureDeckID, packRoot: vocabularyRootURL) {
+                    await model.authoringDidCommit()
+                }.dynamicTypeSize(dynamicTypeSize)
+            }
         }
         .onAppear { model.concealsAnswers = concealsAnswers }
         .onChange(of: model.concealsAnswers) { _, value in concealsAnswers = value }
@@ -130,6 +133,14 @@ public struct MobileRootView: View {
                 } catch {
                     fixtureError = MobileAppModel.message(for: error)
                     await model.refresh()
+                }
+            } else if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "grammar-exercise" {
+                do {
+                    try await fixtures?.prepareGrammarExercise()
+                    await model.refresh()
+                    await model.beginStudy(scope: .allDecks, title: "All Decks")
+                } catch {
+                    fixtureError = MobileAppModel.message(for: error)
                 }
             } else if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
                 do { try await fixtures?.prepareRedesign(); await model.refresh() }
@@ -263,7 +274,7 @@ private extension AppSection {
 
 private struct CreateHubView: View {
     @Environment(\.openWordCapture) private var openWordCapture
-    @Environment(\.openLearnInContext) private var openLearnInContext
+    @Environment(\.openVocabularySet) private var openVocabularySet
     @Bindable var model: MobileAppModel
     @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
     @Binding var path: NavigationPath
@@ -274,8 +285,8 @@ private struct CreateHubView: View {
         NavigationStack(path: $path) {
             List {
                 Section("Add") {
-                    Button("Learn in Context", systemImage: "text.bubble") { openLearnInContext(nil) }
-                        .accessibilityIdentifier("create-learn-in-context")
+                    Button("Create Vocabulary Set", systemImage: "text.bubble") { openVocabularySet(nil) }
+                        .accessibilityIdentifier("create-vocabulary-set")
                     Button("Add Word", systemImage: "character.book.closed") { openWordCapture(nil) }
                         .accessibilityIdentifier("create-add-word")
                     Button { isAddingItem = true } label: { Label("New Item", systemImage: "rectangle.stack.badge.plus") }

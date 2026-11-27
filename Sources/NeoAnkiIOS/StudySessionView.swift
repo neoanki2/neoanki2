@@ -39,6 +39,9 @@ struct StudySessionView: View {
         }
         .onDisappear { session.learningTime.setVisible(false) }
         .onChange(of: isEditing) { _, value in session.learningTime.setEditing(value) }
+        .task(id: isEditing ? nil : session.promptRefreshRevision) {
+            if !isEditing { await session.observeCurrentPromptChanges() }
+        }
         .onChange(of: recorder.isRecording || recorder.isPlaying) { _, value in
             session.learningTime.setMediaActivity(sourceID: recordingActivityID, isActive: value)
         }
@@ -139,13 +142,17 @@ struct StudySessionView: View {
             NavigationStack {
                 ScrollView {
                     if let card = session.currentCard {
-                        MobileStudyCompositionView(template: card.template, item: card.item,
-                            mediaStore: session.mediaStore, isAnswerRevealed: session.isAnswerRevealed,
-                            occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
-                            response: session.reviewResponse, evaluation: session.answerEvaluation)
-                            .id(card.id)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(24)
+                        if let exercise = card.studyExercise {
+                            StudyExerciseCard(card: card, exercise: exercise, model: session, showsControls: false)
+                        } else {
+                            MobileStudyCompositionView(template: card.template, item: card.item,
+                                mediaStore: session.mediaStore, isAnswerRevealed: session.isAnswerRevealed,
+                                occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
+                                response: session.reviewResponse, evaluation: session.answerEvaluation)
+                                .id(card.id)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(24)
+                        }
                     }
                 }
                 .navigationTitle("Full Card").navigationBarTitleDisplayMode(.inline)
@@ -260,10 +267,17 @@ struct StudySessionView: View {
             layout: StudyStageGeometry.effectiveLayout(
                 for: card.template,
                 item: card.item
-            )
+            ),
+            showsFooter: card.studyExercise == nil || session.isAnswerRevealed
         ) {
             Group {
-                if card.template.fitStudyArea && !session.isAnswerRevealed {
+                if let exercise = card.studyExercise {
+                    ScrollView {
+                        StudyExerciseCard(card: card, exercise: exercise, model: session)
+                    }
+                    .scrollDismissesKeyboard(.interactively)
+                    .accessibilityFocused($answerFocused)
+                } else if card.template.fitStudyArea && !session.isAnswerRevealed {
                     studyCardContents(card, fitPrompt: true)
                 } else {
                     ScrollView {
@@ -364,7 +378,7 @@ struct StudySessionView: View {
         } else if session.currentCard?.template.interaction == .record {
             recordingStudyActions
                 .disabled(session.isGrading || session.isCompletingSubmission)
-        } else {
+        } else if session.currentCard?.studyExercise == nil {
             Button {
                 session.performPrimaryAction()
             } label: {
@@ -803,6 +817,8 @@ struct MobileContentValueView: View {
             Text(number, format: .number)
         case let .imageOcclusion(content):
             ImageOcclusionStudyView(content: content, mediaStore: mediaStore, group: content.displayGroup(cardGroup: occlusionGroup, allowsPreview: !isStudyContent && isAnswerRevealed), revealed: isAnswerRevealed)
+        case let .studyExercise(exercise):
+            Text(exercise.stimulus)
         case let .cloze(text, blanks):
             Text(SharedStudyClozePresentation.displayText(
                 from: text,

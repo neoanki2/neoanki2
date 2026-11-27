@@ -11,6 +11,7 @@ public struct VocabularyCLI {
                [--media-directory DIR] [--source-id ID] [--source-name NAME]
                [--attribution TEXT] [--license TEXT] [--source-url URL]
       validate --pack Pack.neovocab
+      install  --pack Pack.neovocab --root "Vocabulary Packs"
       search   --pack Pack.neovocab --query TEXT [--exact] [--language CODE]
                [--limit 1...500] [--json]
 
@@ -36,6 +37,8 @@ public struct VocabularyCLI {
                 try compile(options: options, output: output)
             case "validate":
                 try await validate(options: options, output: output)
+            case "install":
+                try await install(options: options, output: output)
             case "search":
                 try await search(options: options, output: output)
             default:
@@ -108,6 +111,15 @@ public struct VocabularyCLI {
         output("Entries: \(pack.manifest.entryCount)")
         output("Languages: \(pack.manifest.languages.joined(separator: ", "))")
         output("Capabilities: \(pack.manifest.capabilities.map(\.rawValue).sorted().joined(separator: ", "))")
+    }
+
+    private func install(options: ParsedOptions, output: (String) -> Void) async throws {
+        try options.rejectUnknown(["pack", "root"])
+        let packURL = try localURL(options.required("pack"), label: "pack")
+        let rootURL = try localURL(options.required("root"), label: "root")
+        let installed = try await InstalledVocabularyPackStore(rootURL: rootURL).install(from: packURL)
+        output("Installed \(installed.title) (\(installed.id))")
+        output(installed.packageURL.path)
     }
 
     private func search(options: ParsedOptions, output: (String) -> Void) async throws {

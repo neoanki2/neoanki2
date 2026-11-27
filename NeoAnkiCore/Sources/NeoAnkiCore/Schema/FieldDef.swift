@@ -31,4 +31,5 @@ public enum FieldType: String, Codable, Sendable, CaseIterable {
     case number
     case cloze
     case imageOcclusion
+    case studyExercise
 }

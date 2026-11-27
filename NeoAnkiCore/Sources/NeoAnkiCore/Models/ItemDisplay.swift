@@ -27,6 +27,8 @@ public enum ItemDisplay {
             return content.image.altText ?? "Image Occlusion"
         case let .cloze(text, blanks):
             return ClozeValidation.displayText(from: text, blanks: blanks, revealed: false)
+        case let .studyExercise(exercise):
+            return exercise.stimulus.isEmpty ? exercise.options.map(\.label).joined(separator: " / ") : exercise.stimulus
         case .empty:
             return ""
         }
@@ -52,7 +54,7 @@ public enum ItemDisplay {
 public extension FieldDef {
     var supportsTextInput: Bool {
         switch type {
-        case .text, .richText, .number, .cloze:
+        case .text, .richText, .number, .cloze, .studyExercise:
             return true
         case .audio, .image, .gif, .video, .imageOcclusion:
             return false
@@ -92,6 +94,8 @@ public extension FieldDef {
         case .number:
             guard let number = Double(plain) else { return .empty }
             return .number(number)
+        case .studyExercise:
+            return (try? StudyExercise(editorText: plain)).map(ContentValue.studyExercise) ?? .empty
         case .cloze:
             return plain.isEmpty ? .empty : .cloze(plain, blanks: [])
         case .audio, .image, .gif, .video, .imageOcclusion:

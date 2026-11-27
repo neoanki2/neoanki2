@@ -62,6 +62,7 @@
         "Sources/NeoAnkiVocabularyKit/VocabularyKnownWords.swift",
         "Sources/NeoAnkiApplication/PersonalVocabulary.swift",
         "Sources/NeoAnkiCloudSync/VocabularyJudgmentSyncService.swift",
+        "Sources/NeoAnkiFeatures/KnownWordGroups.swift",
         "Sources/NeoAnkiSharedUI/KnownWordsView.swift",
         "Extensions/Chrome/reading-model.js",
         "Extensions/Chrome/reading-worker.js",
@@ -72,6 +73,7 @@
         "NeoAnkiCore/Tests/NeoAnkiCoreTests/KnownWordsImprovementTests.swift",
         "Tests/NeoAnkiVocabularyKitTests/VocabularyKnownWordsTests.swift",
         "Tests/NeoAnkiApplicationTests/LearningTimeSyncTests.swift",
+        "Tests/NeoAnkiFeaturesTests/KnownWordGroupsTests.swift",
         "Tests/NeoAnkiAPITests/APIVocabularyTests.swift",
         "Platforms/iOSUITests/NeoAnki2MobileUITests.swift",
         "Extensions/Chrome/tests/unit.test.js",
@@ -490,10 +492,17 @@
     },
     {
       "id": "learn-in-context",
-      "name": "Learn words and phrases through local contextual examples",
+      "name": "Find cited local examples and create vocabulary card sets",
       "article": "user/authoring-items.md",
-      "sources": ["Sources/NeoAnkiApplication/ContextAuthoring.swift", "Sources/NeoAnkiFeatures/LearnInContextModel.swift", "Sources/NeoAnkiFeatures/ContextExamplePreset.swift", "Sources/NeoAnkiFeatures/ContextOccurrences.swift", "Sources/NeoAnkiFeatures/AppleContextProviders.swift", "Sources/NeoAnkiFeatures/ContextSourceLibrary.swift", "Sources/NeoAnkiFeatures/ContextMediaPreparation.swift", "Sources/NeoAnkiSharedUI/LearnInContextView.swift", "Sources/NeoAnkiSharedUI/ContextAuthoringEntry.swift", "Sources/NeoAnkiApplication/LibraryRepository.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/BulkItems.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift"],
-      "tests": ["Tests/NeoAnkiFeaturesTests/LearnInContextTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/ContextCaptureRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/ContextProviderRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/ContextMediaPersistenceRegressionTests.swift", "Tests/NeoAnkiApplicationTests/ConditionalItemDeletionTests.swift"]
+      "sources": ["Sources/NeoAnkiFeatures/VocabularyExampleLookup.swift", "Sources/NeoAnkiFeatures/AppleContextProviders.swift", "Sources/NeoAnkiSharedUI/KnownWordsView.swift", "Sources/NeoAnkiSharedUI/VocabularyAuthoringEntry.swift", "Tools/VocabularySources/normalize_stardict_ukrainian.py"],
+      "tests": ["Tests/NeoAnkiFeaturesTests/VocabularyExampleLookupTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/ContextProviderRegressionTests.swift", "Extensions/Chrome/tests/integration.mjs"]
+    },
+    {
+      "id": "saved-context-examples",
+      "name": "Study and edit previously saved Context Example items",
+      "article": "user/authoring-items.md",
+      "sources": ["Sources/NeoAnkiFeatures/LearnInContextModel.swift", "Sources/NeoAnkiFeatures/ContextExamplePreset.swift", "Sources/NeoAnkiFeatures/ContextOccurrences.swift", "Sources/NeoAnkiFeatures/ContextSourceLibrary.swift", "Sources/NeoAnkiFeatures/ContextMediaPreparation.swift"],
+      "tests": ["Tests/NeoAnkiFeaturesTests/LearnInContextTests.swift", "Tests/NeoAnkiFeaturesTests/ContextCaptureRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/ContextMediaPersistenceRegressionTests.swift", "Tests/NeoAnkiApplicationTests/ConditionalItemDeletionTests.swift"]
     },
     {
       "id": "offline-vocabulary",

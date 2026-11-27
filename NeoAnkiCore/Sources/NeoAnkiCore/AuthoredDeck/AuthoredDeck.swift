@@ -1297,6 +1297,14 @@ private struct AuthoredDeckCompiler {
             let content = try JSONDecoder().decode(ImageOcclusionContent.self, from: JSONSerialization.data(withJSONObject: data))
             try ImageOcclusionValidation.validate(content)
             return .imageOcclusion(content)
+        case .studyExercise:
+            try exactKeys(object, required: ["studyExercise"])
+            guard let payload = object["studyExercise"] as? [String: Any] else {
+                throw DecodeFailure("AD250", "Study exercise needs an object.")
+            }
+            let exercise = try JSONDecoder().decode(StudyExercise.self, from: JSONSerialization.data(withJSONObject: payload))
+            try exercise.validate()
+            return .studyExercise(exercise)
         case .cloze:
             try exactKeys(object, required: ["cloze"])
             let parsed = try parseCloze(try requiredString(object, "cloze"))

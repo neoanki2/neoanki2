@@ -141,6 +141,12 @@ available, select the intended target:
 ./Scripts/release.sh --device NAME_OR_IDENTIFIER
 ```
 
+When paired iPhone delivery should wait, run `./Scripts/release.sh --defer-iphone`.
+This defers both building the phone update and installing it. If publication
+needs another invocation, keep using `--defer-iphone` with `--resume VERSION`.
+Resume that version without the flag when ready to install. Keep the pinned
+release source and other recovery inputs until the installation is verified.
+
 Missing devices, signing problems, and failed installations block local
 completion and return a nonzero exit status. Publication receipts remain intact.
 The ready-to-connect signal is streamed immediately. `IPHONE_DEPLOY_*` telemetry

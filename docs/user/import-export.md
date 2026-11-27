@@ -137,7 +137,7 @@ Look up a word, choose any relevant ambiguous content, and add the prepared
 item. The sheet stays open for another word. Each dictionary–deck pair keeps
 its own setup on this device. See [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
 
-For sentence-based vocabulary cards, choose **Learn in Context**.
+For contextual vocabulary pairs, choose **Create Vocabulary Set**.
 
 Import and lookup work offline. Import reads and copies the selected local
 package; lookup reads only the installed SQLite index and local media.
@@ -324,6 +324,9 @@ empty inheritance overrides. Exporting a subtree materializes the root's inherit
 choices. Supported older formats remain readable; imported definitions stay
 scoped to their decks rather than expanding Available Everywhere.
 
+Portable decks preserve Study Exercise fields and their answers. Importing a
+deck with these fields requires a NeoAnki2 version that supports Study Exercises.
+
 Template display preferences, including the opt-in **Fit study area** setting,
 are preserved with each item type. Older portable files and authored bundles
 that omit this setting retain the default, which leaves existing layouts
@@ -406,10 +409,9 @@ accepted by this format. Validate a bundle before import with the
 
 ## Image occlusion transfers
 
-Portable decks written by this version use format 6 and include occlusion
-images, rectangular masks, groups, masking mode, and the next-group allocator.
-Readers still accept versions 1–5; image occlusion requires version 6. Authored
-bundles also accept manifest version 6 for image occlusion fields.
+Portable format 6 introduced support for occlusion images, rectangular masks,
+groups, masking mode, and the next-group allocator. New exports use portable
+format 8. Authored bundles support image occlusion in manifest version 6.
 
 Structured JSON import represents an occlusion cell as:
 

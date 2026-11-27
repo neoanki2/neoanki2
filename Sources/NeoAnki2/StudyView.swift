@@ -72,6 +72,9 @@ struct StudyView: View {
         .task {
             if !model.session.isExtraStudy { await model.startSession(scope: scope) }
         }
+        .task(id: isEditingCard ? nil : model.session.promptRefreshRevision) {
+            if !isEditingCard { await model.session.observeCurrentPromptChanges() }
+        }
         .onChange(of: endSessionTrigger) { _, triggered in
             guard triggered else { return }
             endSessionTrigger = false
@@ -98,7 +101,7 @@ struct StudyView: View {
             cardEditor
         }
         .focusedSceneValue(\.studyPrimaryActionHandler, primaryActionHandler)
-        .editingShortcut(.space, modifiers: [], isEnabled: !isEditingCard && (canGrade || primaryActionHandler.isEnabled)) {
+        .editingShortcut(.space, modifiers: [], isEnabled: !isEditingCard && (canGrade || (model.currentCard?.studyExercise == nil && primaryActionHandler.isEnabled))) {
             if canGrade { Task { await model.grade(.good) } }
             else { primaryActionHandler.invoke() }
         }
@@ -303,7 +306,8 @@ struct StudyView: View {
                 layout: StudyStageGeometry.effectiveLayout(
                     for: card.template,
                     item: card.item
-                )
+                ),
+                showsFooter: card.studyExercise == nil || model.isAnswerRevealed || model.errorMessage != nil
             ) {
                 studyCardContent(card)
             } footer: {
@@ -405,6 +409,23 @@ struct StudyView: View {
 
     @ViewBuilder
     private func studyCardContent(_ card: DueCard) -> some View {
+        if let exercise = card.studyExercise {
+            GeometryReader { viewport in
+                ScrollView {
+                    StudyExerciseCard(card: card, exercise: exercise, model: model.session)
+                        .padding(.top, min(72, viewport.size.height * 0.12))
+                        .frame(minHeight: viewport.size.height, alignment: .top)
+                }
+            }
+            .id(card.id)
+            .accessibilityIdentifier(model.isAnswerRevealed ? "studyAnswer" : "studyPrompt")
+            .accessibilityFocused($answerAccessibilityFocused)
+        } else {
+            templateStudyCardContent(card)
+        }
+    }
+
+    private func templateStudyCardContent(_ card: DueCard) -> some View {
         StudyStageContent(spacing: DesignSystem.Spacing.md) {
             StudyCompositionView(
                 template: card.template,
@@ -669,7 +690,7 @@ struct StudyView: View {
                 gradeButtons
             } else if card.template.interaction == .record {
                 recordingStudyFooter
-            } else {
+            } else if card.studyExercise == nil {
                 Button(primaryActionTitle(for: card.template.interaction)) {
                     StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
                         model.performPrimaryAction()

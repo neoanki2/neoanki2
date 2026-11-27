@@ -97,6 +97,7 @@ public enum StudyResponseEvaluator {
         case let .rich(spans): [spans.map(\.text).joined()]
         case .imageOcclusion: []
         case let .cloze(text, _): [text]
+        case let .studyExercise(exercise): [exercise.stimulus]
         case let .number(number): [number.formatted(.number.grouping(.never))]
         case let .media(reference): reference.altText.map { [$0] } ?? []
         case .empty: []

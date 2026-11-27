@@ -940,3 +940,42 @@ func synchronizedImagesSurviveExpiryAndUnrelatedDeletion(mediaArrivesLater: Bool
     _ = try await store.collectMediaGarbage()
     #expect(try await destination.repository.currentChangeCursor() == cursor)
 }
+
+@Test func structuredExerciseSyncKeepsCardAndReviewOnSecondReplica() async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let deck = try await source.repository.createDeck(Deck(name: "Grammar"))
+    let field = FieldDef(name: "Exercise", type: .studyExercise, isRequired: true)
+    let type = ItemType(name: "Grammar target", fields: [field], templates: [
+        Template(name: "Type the target", layout: .split, components: [
+            .init(region: .primary, purpose: .question, source: .field(field.id)),
+            .init(region: .secondary, purpose: .expectedAnswer, source: .literal("I need advice."),
+                  presentation: .init(reveal: .hiddenUntilAnswer)),
+        ], interaction: .type, skill: .init(input: .text, output: .freeResponse, operation: .recall)),
+    ])
+    _ = try await source.repository.createItemType(type)
+    let exercise = StudyExercise(mode: .target, parts: ["I need ", " advice."],
+                                targets: [.init(allowsOmission: true)], answers: [[""]])
+    let item = Item(itemTypeID: type.id, fields: [
+        .init(fieldID: field.id, value: .studyExercise(exercise)),
+    ], deckID: deck.id)
+    _ = try await source.repository.createItem(item, asOf: .now)
+    let card = try #require(try await source.repository.cards().first { $0.itemID == item.id })
+    let review = try await source.repository.submitReview(
+        cardID: card.id, rating: .good, asOf: .now, durationMilliseconds: 300
+    )
+    let sourceAdapter = SQLiteLibrarySyncAdapter(repository: source.repository)
+    let destinationAdapter = SQLiteLibrarySyncAdapter(repository: destination.repository)
+    let changes = try await source.repository.changes(after: 0, limit: 1000)
+    let records = try await sourceAdapter.encode(changes: changes, deviceID: "source")
+    try await destinationAdapter.applyRemote(records, origin: .cloud)
+    let replica = try await destination.repository.card(id: card.id)
+    let reviewedCard = try await source.repository.card(id: card.id)
+    #expect(replica.templateID == type.templates[0].id)
+    #expect(replica.memory == reviewedCard.memory)
+    #expect(try await destination.repository.reviewLog(id: review.reviewLogID).rating == .good)
+    #expect(try await destination.repository.item(id: item.id)?.item.value(for: field.id) == .studyExercise(exercise))
+}

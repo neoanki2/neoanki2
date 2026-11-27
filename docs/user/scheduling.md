@@ -49,9 +49,8 @@ Words saved through **Add Word** follow these same rules: the selected item
 type generates the cards, and the destination deck's daily limits determine
 when new cards are available. Dictionary setup does not change scheduling.
 
-Each **Learn in Context** example is independently scheduled and uses the
-destination deck’s daily allowance. Grading one example does not grade the other
-examples of that expression.
+Each card in a **Vocabulary Set** or a previously saved **Context Example**
+is independently scheduled and uses its deck’s daily allowance.
 
 Independent cards receive **±15% interval variation** after successful recall,
 so cards learned together gradually acquire different due dates. Existing due

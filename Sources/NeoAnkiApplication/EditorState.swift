@@ -68,6 +68,7 @@ public enum ItemEditorState {
             case let .text(text, _): snapshot.fieldSpans[field.id] = text.isEmpty ? [] : [Span(text)]
             case let .rich(spans): snapshot.fieldSpans[field.id] = spans
             case let .number(number): snapshot.fieldText[field.id] = String(number)
+            case let .studyExercise(exercise): snapshot.fieldText[field.id] = exercise.editorText
             case let .media(reference):
                 snapshot.fieldMedia[field.id] = reference
                 snapshot.fieldMediaAltText[field.id] = reference.altText ?? ""
@@ -126,6 +127,9 @@ public enum ItemEditorState {
                    case let .text(_, language)? = original?.value(for: field.id) {
                     value = .text(text, lang: language)
                 }
+            case .studyExercise:
+                let input = snapshot.fieldText[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+                value = input.isEmpty ? .empty : .studyExercise(try StudyExercise(editorText: input))
             case .number:
                 let input = snapshot.fieldText[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
                 if input.isEmpty { value = .empty }
@@ -168,7 +172,7 @@ public enum ItemEditorState {
     private static func fieldIsUnchanged(_ field: FieldDef, _ current: ItemEditorSnapshot, _ initial: ItemEditorSnapshot) -> Bool {
         switch field.type {
         case .text, .richText: current.fieldSpans[field.id] == initial.fieldSpans[field.id]
-        case .number: current.fieldText[field.id] == initial.fieldText[field.id]
+        case .number, .studyExercise: current.fieldText[field.id] == initial.fieldText[field.id]
         case .cloze:
             current.fieldText[field.id] == initial.fieldText[field.id]
                 && current.fieldClozeBlanks[field.id] == initial.fieldClozeBlanks[field.id]
@@ -236,6 +240,8 @@ public struct ItemEditorDraft: Sendable, Equatable {
                 return .text(spans.map(\.text).joined(), lang: language)
             }
             return .rich(spans)
+        case .studyExercise:
+            return (try? StudyExercise(editorText: snapshot.fieldText[fieldID, default: ""])).map(ContentValue.studyExercise) ?? .empty
         case .number:
             return Double(snapshot.fieldText[fieldID, default: ""]).map(ContentValue.number) ?? .empty
         case .cloze:
@@ -257,7 +263,7 @@ public struct ItemEditorDraft: Sendable, Equatable {
             snapshot.fieldClozeBlanks[fieldID] = ClozeSpanRebaser.rebase(
                 spans: snapshot.fieldClozeBlanks[fieldID, default: []], from: previous, to: text).spans
             snapshot.fieldText[fieldID] = text
-        case .number: snapshot.fieldText[fieldID] = text
+        case .number, .studyExercise: snapshot.fieldText[fieldID] = text
         default: break
         }
     }
@@ -269,6 +275,7 @@ public struct ItemEditorDraft: Sendable, Equatable {
             snapshot.fieldSpans[fieldID] = spans
             if spans.contains(where: \.hasFormatting) { spanEditingFields.insert(fieldID) }
         case let .number(number): snapshot.fieldText[fieldID] = String(number)
+        case let .studyExercise(exercise): snapshot.fieldText[fieldID] = exercise.editorText
         case let .cloze(text, blanks):
             snapshot.fieldText[fieldID] = text
             snapshot.fieldClozeBlanks[fieldID] = blanks
@@ -279,7 +286,7 @@ public struct ItemEditorDraft: Sendable, Equatable {
         case .empty:
             let type = itemType.fields.first(where: { $0.id == fieldID })?.type
             snapshot.fieldSpans[fieldID] = type == .text || type == .richText ? [] : nil
-            snapshot.fieldText[fieldID] = type == .number || type == .cloze ? "" : nil
+            snapshot.fieldText[fieldID] = type == .number || type == .cloze || type == .studyExercise ? "" : nil
             snapshot.fieldMedia[fieldID] = nil
             snapshot.fieldMediaAltText[fieldID] = nil
             snapshot.fieldClozeBlanks[fieldID] = type == .cloze ? [] : nil

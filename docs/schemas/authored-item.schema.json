@@ -30,8 +30,48 @@
         {"$ref": "#/$defs/number"},
         {"$ref": "#/$defs/cloze"},
         {"$ref": "#/$defs/mediaValue"},
-        {"$ref": "#/$defs/imageOcclusionValue"}
+        {"$ref": "#/$defs/imageOcclusionValue"},
+        {"$ref": "#/$defs/studyExerciseValue"}
       ]
+    },
+    "studyExerciseValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["studyExercise"],
+      "properties": {
+        "studyExercise": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "prompt", "parts", "targets", "options", "answers"],
+          "properties": {
+            "mode": {"enum": ["target", "rewrite", "choose"]},
+            "prompt": {"type": "string"},
+            "parts": {"type": "array", "items": {"type": "string"}},
+            "targets": {
+              "type": "array", "maxItems": 16,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["choices", "allowsOmission"],
+                "properties": {
+                  "original": {"type": "string"},
+                  "choices": {"type": "array", "items": {"type": "string"}},
+                  "allowsOmission": {"type": "boolean"}
+                }
+              }
+            },
+            "options": {
+              "type": "array", "maxItems": 8,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["id", "label"],
+                "properties": {"id": {"type": "string"}, "label": {"type": "string"}}
+              }
+            },
+            "answers": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
+            "correctOptionID": {"type": "string"}
+          }
+        }
+      }
     },
     "text": {
       "type": "object",

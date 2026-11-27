@@ -68,6 +68,15 @@ is known (marked by you, from reviews, or kept from deleted cards), and
 **Cloze recall** once you can produce the word. Known and ignored words open
 with Option-click (Alt-click), so an ordinary click still selects text.
 
+The definition appears in the panel. Reading Mode checks the selected pack
+first, then tries other installed packs for the learning language when it needs
+a definition in your chosen meaning language. The selected definition fills
+**Meaning** in the card set and serves as the Cloze hint.
+
+For Ukrainian definitions and literary examples, install the СУМ-11 examples
+pack in NeoAnki2 and select it in the companion’s **Settings**. If the local
+dictionary has no result, enter a meaning yourself.
+
 - **I know this** marks the word known while reading. **Remove from Known**
   marks it not known again.
 - **Ignore** hides names, brands, and loanwords from underlines and from the
@@ -76,7 +85,10 @@ with Option-click (Alt-click), so an ordinary click still selects text.
 - **Undo** reverses your last change in the panel.
 - **Create card set** uses the selected word and its sentence to make one
   meaning-recall card and one Cloze card for producing the word. Review the
-  meaning and Cloze preview before saving.
+  meaning and Cloze preview before saving. You can choose a dictionary example
+  for Cloze, or use one for both cards when the page has no usable sentence.
+  The saved set includes the sources used. The Deck field remembers your last
+  choice for each learning language, including **Unassigned**.
 
 These choices apply to the word as a whole. When the dictionary offers several
 meanings, choose one only for **Create card set**.
@@ -84,10 +96,11 @@ meanings, choose one only for **Create card set**.
 ### Mark the rest of a page as known
 
 After you've opened the words you don't know, choose **Mark the rest as known**
-in the badge. The panel shows how many words it will mark, with examples. It
-skips words you opened on this page, words you're studying, and words you
-marked not known or ignored. Choose **Mark as known**, or **Undo** afterward to
-reverse the whole step.
+in the badge. The panel shows the count and a scrollable list of every word it
+will mark. It skips words you opened on this page, words you're studying, and
+words you already marked not known or ignored. Choose **× (Ignore)** beside a
+word to save it as ignored when you choose **Apply changes**. Choose **↶ (Keep)**
+to put it back among the words to mark known. **Undo** reverses the whole batch.
 
 ### Dictionary forms
 
@@ -135,8 +148,10 @@ change your card setups.
 
 ## Permissions and data
 
-The extension reads selected text when invoked and connects only to IPv4
-loopback (`127.0.0.1`). It requests `library.read`, `items.write`, and
+The extension reads selected text when invoked and uses IPv4 loopback
+(`127.0.0.1`) for the NeoAnki2 API. All dictionary lookups use installed packs
+through this local connection.
+It requests `library.read`, `items.write`, and
 `vocabulary.read`. Reading Mode and **Estimate my level** also use
 `known-words.read` and `known-words.write`. Its token, unfinished draft, and the
 saved copy of your known words are stored locally in Chrome, with access

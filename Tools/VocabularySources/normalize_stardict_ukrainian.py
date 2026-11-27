@@ -36,6 +36,8 @@ TAG_RE = re.compile(r"<[^>]+>")
 TOP_LEVEL_DIV_RE = re.compile(
     r'<div\s+style="margin-left:1em">(.*?)</div>', re.IGNORECASE | re.DOTALL
 )
+SUM_BLOCK_RE = re.compile(r'<div\s+style="margin-left:([123])em">(.*?)</div>', re.I | re.S)
+SUM_CITATION_RE = re.compile(r'<font\s+color="dodgerblue">(.*?)</font>', re.I | re.S)
 EXAMPLE_DIV_RE = re.compile(
     r'<div\s+style="margin-left:(?:2|3)em">(.*?)</div>', re.IGNORECASE | re.DOTALL
 )
@@ -45,8 +47,23 @@ EXAMPLE_SPAN_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 BOLD_RE = re.compile(r"<b\b[^>]*>(.*?)</b>", re.IGNORECASE | re.DOTALL)
+SUM_HEADWORD_RE = re.compile(r'<font\s+color="maroon">(.*?)</font>', re.IGNORECASE | re.DOTALL)
+SUM_SENSE_NUMBER_RE = re.compile(r"^\s*\d+\.\s+")
+SUM_ENDING = r"[-–]?[а-яіїєґ’ʼ'\u0300\u0301]{1,12}"
+SUM_ENDING_LIST_RE = re.compile(rf"^[\s,.]*(?:{SUM_ENDING}[\s,.]+)*{SUM_ENDING}[\s,.:]*$")
+SUM_PLAIN_ENDINGS_RE = re.compile(
+    r"^\s*,?\s*[-–]?[а-яіїєґ\u0300\u0301]{0,5}[ая][\u0300\u0301]*\s*[,.]\s*"
+    r"[-–]?[а-яіїєґ\u0300\u0301]{0,5}[еє][\u0300\u0301]*\s*[.,:](?:\s+|$)"
+)
+SUM_REFERENCE_RE = re.compile(r"^(?:див\.|пор\.|присл\.|прикм\.|зменш\.|збільш\.)$", re.IGNORECASE)
+SUM_LABELS = frozenset(
+    "а е я є и і ї у ю о ого ього ова ове ому ч ж с сер р мн одн род знах дав оруд місц клич відм "
+    "невідм незм збірн док недок безос присл прикм дієприкм дієпр розм діал заст перен спец пестл зменш "
+    "та знач сл пас мин перев іст рідко присудк".split()
+)
 CYRILLIC_RE = re.compile(r"[А-Яа-яІіЇїЄєҐґ]")
 WORD_RE = re.compile(r"[А-Яа-яІіЇїЄєҐґ'’\-]+")
+EXAMPLE_WORD_RE = re.compile(r"[А-Яа-яІіЇїЄєҐґ\u0301]+(?:['’ʼ-][А-Яа-яІіЇїЄєҐґ\u0301]+)*")
 SUPERSCRIPTS = str.maketrans({character: None for character in "¹²³⁴⁵⁶⁷⁸⁹⁰"})
 
 
@@ -82,6 +99,13 @@ def normalized_lookup(value: str) -> str:
     return unicodedata.normalize(
         "NFC", "".join(character for character in decomposed if character != "\u0301")
     ).casefold()
+
+
+def sum_has_definition(value: str) -> bool:
+    if not CYRILLIC_RE.search(value):
+        return False
+    words = WORD_RE.findall(normalized_lookup(value))
+    return not all(word.strip("-") in SUM_LABELS for word in words)
 
 
 def find_member(names: list[str], *, suffix: str | None = None, fragment: str | None = None) -> str:
@@ -137,31 +161,126 @@ def text_pronunciation(value: str, source: dict[str, str]) -> dict[str, Any]:
     }
 
 
-def sum_head_definition(first_div: str) -> str | None:
-    closing_italics = list(re.finditer(r"</i>", first_div, re.IGNORECASE))
-    if closing_italics:
-        candidate = plain_inline(first_div[closing_italics[-1].end() :]).lstrip(" ,.;:—-")
-        if candidate:
-            return candidate
+def sum_head_fields(first_div: str) -> tuple[str, str]:
+    bold = BOLD_RE.search(first_div)
+    colored = SUM_HEADWORD_RE.search(first_div)
+    headword = bold
+    if colored and (not bold or colored.start() < bold.start()
+                    or SUM_PLAIN_ENDINGS_RE.match(plain_inline(first_div[colored.end():bold.end()]))):
+        headword = colored
+    if not headword:
+        return "", ""
+
+    end = headword.end()
+    for label in ITALIC_RE.finditer(first_div, end):
+        gap = first_div[end:label.start()]
+        before = plain_inline(BOLD_RE.sub("", gap))
+        label_text = plain_inline(label.group())
+        if SUM_REFERENCE_RE.fullmatch(label_text) or re.search(r"[А-ЯІЇЄҐ]", label_text):
+            break
+        if (before.strip(" ,.;:—-()") and not SUM_ENDING_LIST_RE.fullmatch(before)
+                and not before.startswith("(")):
+            break
+        end = label.end()
+
+    header = plain_inline(first_div[:end]).strip(" ,;:—-")
+    tail = plain_inline(first_div[end:])
+    if header.count("(") > header.count(")"):
+        closing = re.match(rf"^(?:{SUM_ENDING})?\)[.;,]?\s*", tail)
+        if closing:
+            header += closing.group().rstrip()
+            tail = tail[closing.end():]
+    endings = SUM_PLAIN_ENDINGS_RE.match(tail)
+    if endings:
+        header += ", " + endings.group().strip(" ,")
+        tail = tail[endings.end():]
+    candidate = tail.lstrip(" ,.;:—-")
+    if not sum_has_definition(candidate) or (tail.startswith(",") and SUM_ENDING_LIST_RE.fullmatch(tail)):
+        return header + tail, ""
+    return header, candidate
+
+
+def example_target(sentence: str, forms: set[str]) -> dict[str, Any] | None:
+    spans = [match for match in EXAMPLE_WORD_RE.finditer(sentence) if example_key(match.group()) in forms]
+    if len(spans) != 1:
         return None
-    bold = BOLD_RE.search(first_div)
-    if bold:
-        candidate = plain_inline(first_div[bold.end() :]).lstrip(" ,.;:—-")
-        if candidate:
-            return candidate
-    return None
+    match = spans[0]
+    return {"exactText": match.group(), "scalarRange": {"location": match.start(), "length": len(match.group())}}
 
 
-def sum_dictionary_header(first_div: str) -> str | None:
-    closing_italics = list(re.finditer(r"</i>", first_div, re.IGNORECASE))
-    if closing_italics:
-        header = plain_inline(first_div[: closing_italics[-1].end()]).strip(" ,;:—-")
-        return header or None
-    bold = BOLD_RE.search(first_div)
-    if bold:
-        header = plain_inline(first_div[: bold.end()]).strip(" ,;:—-")
-        return header or None
-    return None
+def example_key(value: str) -> str:
+    return normalized_lookup(value).replace("’", "'").replace("ʼ", "'")
+
+
+def sum_examples(markup: str, word: str, source: dict[str, str]) -> list[dict[str, Any]]:
+    candidates = []
+    start = 0
+    for citation in SUM_CITATION_RE.finditer(markup):
+        candidates.append((markup[start:citation.start()], plain_inline(citation[1])))
+        start = citation.end()
+    candidates.append((markup[start:], ""))
+    examples = []
+    for text, citation in candidates:
+        sentence = plain_inline(text).lstrip(" ;.").strip()
+        if not CYRILLIC_RE.search(sentence):
+            continue
+        record = {**source, "sourceName": "Словник української мови в 11 томах (СУМ-11)"}
+        if citation:
+            record["attribution"] = citation
+        identity = stable_id("sum11-example", [source["recordID"], sentence, citation])
+        record["recordID"] += f":{identity}"
+        example = {"id": identity, "text": localized(sentence, "uk"), "provenance": record}
+        if target := example_target(sentence, {example_key(word)}):
+            example["target"] = target
+        examples.append(example)
+    return examples
+
+
+def sum_senses(article: str, word: str, source: dict[str, str]) -> list[dict[str, Any]]:
+    blocks = SUM_BLOCK_RE.findall(article) or [("1", article)]
+    senses = []
+    current = None
+    for index, (indent, block) in enumerate(blocks):
+        if indent != "1":
+            if current is not None:
+                current["examples"].extend(sum_examples(block, word, source))
+            continue
+
+        inline_examples = list(EXAMPLE_SPAN_RE.finditer(block))
+        definition = EXAMPLE_SPAN_RE.sub("", block)
+        value = plain_inline(definition)
+        if index == 0 or SUM_HEADWORD_RE.match(definition.lstrip()):
+            _, meaning = sum_head_fields(definition)
+            current = None
+        elif value.startswith(("♦", "◊", "◇", "□")):
+            current = None
+            continue
+        elif value.startswith("//") or SUM_SENSE_NUMBER_RE.match(value) or not senses:
+            meaning = value.lstrip("/ ")
+            current = None
+        elif inline_examples and not sum_has_definition(value):
+            meaning = ""
+        else:
+            continue
+        meaning = SUM_SENSE_NUMBER_RE.sub("", meaning)
+        if sum_has_definition(meaning):
+            identity = {"word": word, "record": source["recordID"], "block": index}
+            current = {
+                "id": stable_id("sense", identity),
+                "definitions": [{
+                    "id": stable_id("definition-head", {"text": meaning, "record": source["recordID"]}),
+                    "text": localized(meaning, "uk"),
+                }],
+                "examples": [],
+                "labels": [],
+            }
+            senses.append(current)
+        if current is not None:
+            for inline in inline_examples:
+                current["examples"].extend(sum_examples(inline.group(), word, source))
+    for sense in senses:
+        sense["examples"] = list({example["id"]: example for example in sense["examples"]}.values())
+    return senses
 
 
 def normalize_sum_entry(
@@ -175,28 +294,12 @@ def normalize_sum_entry(
     article_text = clean_html(article)
     if not article_text:
         return None
-    top_level_divs = list(TOP_LEVEL_DIV_RE.finditer(article))
-    first_div_match = top_level_divs[0] if top_level_divs else None
-    dictionary_header = sum_dictionary_header(first_div_match.group(1)) if first_div_match else None
-    head_definition = sum_head_definition(first_div_match.group(1)) if first_div_match else None
-    if not head_definition:
-        for candidate_match in top_level_divs[1:]:
-            candidate = plain_inline(candidate_match.group(1)).lstrip("/♦◊ ")
-            if candidate:
-                head_definition = candidate
-                break
-    if not head_definition:
-        head_definition = article_text.splitlines()[0]
-    definitions: list[dict[str, Any]] = []
-    definitions.append(
-        {
-                "id": stable_id("definition-head", {"text": head_definition, "record": record_id}),
-                "text": localized(head_definition, "uk"),
-            }
-    )
+    paragraphs = TOP_LEVEL_DIV_RE.findall(article)
+    first_div = paragraphs[0] if paragraphs else article
+    dictionary_header, _ = sum_head_fields(EXAMPLE_SPAN_RE.sub("", first_div))
 
     forms: list[dict[str, Any]] = []
-    bold = BOLD_RE.search(first_div_match.group(1) if first_div_match else article)
+    bold = BOLD_RE.search(first_div)
     if bold:
         stressed = plain_inline(bold.group(1)).translate(SUPERSCRIPTS).strip(" ,.;:—-")
         stressed_lookup = normalized_lookup(stressed)
@@ -226,14 +329,7 @@ def normalize_sum_entry(
         "canonicalForm": canonical,
         "forms": forms,
         "pronunciations": [text_pronunciation(form["text"]["value"], source) for form in forms],
-        "senses": [
-            {
-                "id": stable_id("sense", {"word": word, "record": record_id}),
-                "definitions": definitions,
-                "examples": [],
-                "labels": [],
-            }
-        ],
+        "senses": sum_senses(article, word, source),
         "provenance": source,
     }
 

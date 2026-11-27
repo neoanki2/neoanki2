@@ -978,6 +978,7 @@ struct ItemTypeStudioMobileView: View {
         case .text: "Text"
         case .richText: "Rich text"
         case .number: "Number"
+        case .studyExercise: "Study exercise"
         case .audio: "Audio"
         case .image: "Image"
         case .gif: "GIF"

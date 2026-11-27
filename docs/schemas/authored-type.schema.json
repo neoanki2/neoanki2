@@ -34,7 +34,7 @@
         "layout": {"enum": ["focus", "split", "mediaAside", "mediaHero", "actionStage"]},
         "components": {"type": "array", "maxItems": 512, "items": {"$ref": "#/$defs/component"}},
         "type": {
-          "enum": ["text", "richText", "audio", "image", "gif", "video", "number", "cloze", "imageOcclusion"]
+          "enum": ["text", "richText", "audio", "image", "gif", "video", "number", "cloze", "imageOcclusion", "studyExercise"]
         },
         "required": {"type": "boolean"}
       }

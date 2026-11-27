@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:1734a8fd9f22c9af754508c692a653af17965ac85fa6e2118be23fdefda00c85
+contract_digest: sha256:e90cdd87822e8ffb97df2e72eb528fa6c1a929e9e82143a9b932ae5979bbd8b4
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -173,7 +173,7 @@ Type: **object**.
 
 ## ContentValue {#schema-contentvalue}
 
-Type: **object or object or object or object or object or object or object**.
+Type: **object or object or object or object or object or object or object or object**.
 
 ## CreateDeckDeletionPlanInput {#schema-createdeckdeletionplaninput}
 
@@ -1082,6 +1082,39 @@ Type: **object**.
 - `revision` — integer; required
 - `templateId` — string; required
 
+## StudyExercise {#schema-studyexercise}
+
+Type: **object**.
+
+### Properties
+
+- `answers` — array of array of string; required
+- `correctOptionID` — string; optional
+- `mode` — string; required
+- `options` — array of StudyExerciseChoice; required
+- `parts` — array of string; required
+- `prompt` — string; required
+- `targets` — array of StudyExerciseTarget; required
+
+## StudyExerciseChoice {#schema-studyexercisechoice}
+
+Type: **object**.
+
+### Properties
+
+- `id` — string; required
+- `label` — string; required
+
+## StudyExerciseTarget {#schema-studyexercisetarget}
+
+Type: **object**.
+
+### Properties
+
+- `allowsOmission` — boolean; required
+- `choices` — array of string; required
+- `original` — string; optional
+
 ## StudyResponse {#schema-studyresponse}
 
 Type: **object**.
@@ -1400,6 +1433,6 @@ Type: **object**.
 - `lemma` — string or null; optional
 - `sense` — string or null; optional
 
-Contract digest: `sha256:1734a8fd9f22c9af754508c692a653af17965ac85fa6e2118be23fdefda00c85`.
+Contract digest: `sha256:e90cdd87822e8ffb97df2e72eb528fa6c1a929e9e82143a9b932ae5979bbd8b4`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

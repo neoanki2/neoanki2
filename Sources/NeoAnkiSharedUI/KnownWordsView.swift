@@ -1,6 +1,8 @@
+import CryptoKit
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -63,18 +65,21 @@ private func readWordListFile(at url: URL) throws -> String {
 
 public struct KnownWordsView: View {
     private static let filters: [VocabularyReadingState] = [.known, .learning, .unfamiliar, .ignored]
-    private struct Undo { let term: VocabularyTerm; let judgment: VocabularyJudgment; let message: String }
+    private struct Undo { let batchID: UUID; let undoID = UUID(); let message: String }
     private struct ImportRequest: Identifiable { let id = UUID(); let language: String; let text: String; let fromFile: Bool }
 
     private let vocabulary: any PersonalVocabulary
     private let decks: any LibraryDeckManaging
     private let onCreated: @MainActor () async -> Void
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.vocabularyPackRootURL) private var packRoot
 #if !os(macOS)
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 #endif
     @AppStorage("vocabularyLearningLanguage") private var language = ""
-    @State private var rows: [VocabularyStatus] = []
+    @State private var rows: [KnownWordGroup] = []
+    @State private var wordList: [VocabularyStatus] = []
+    @State private var index = KnownWordsIndex()
     @State private var counts: [VocabularyReadingState: Int] = [:]
     @State private var savedLanguages: [String] = []
     @State private var filter = VocabularyReadingState.known
@@ -82,6 +87,7 @@ public struct KnownWordsView: View {
     @State private var isAdding = false
     @State private var error: String?
     @State private var undo: Undo?
+    @State private var isChangingWord = false
     @State private var lastImport: VocabularyBatchReceipt?
     @State private var pendingRefresh: Task<Void, Never>?
     /// Identifies `pendingRefresh`, so a superseded debounce task cannot clear a newer one.
@@ -100,12 +106,8 @@ public struct KnownWordsView: View {
     }
 
     /// Rows are loaded for the selected language and already sorted.
-    private var visible: [VocabularyStatus] {
-        rows.filter {
-            $0.state == filter
-                && (query.isEmpty || $0.term.expression.localizedStandardContains(query)
-                    || ($0.term.sense?.localizedStandardContains(query) ?? false))
-        }
+    private var visible: [KnownWordGroup] {
+        rows.filter { $0.state == filter && (query.isEmpty || $0.matches(query)) }
     }
 
     public var body: some View {
@@ -126,6 +128,7 @@ public struct KnownWordsView: View {
                     Spacer()
                     Button("Undo") { Task { await revert(undo) } }
                         .buttonStyle(.borderless)
+                        .disabled(isChangingWord)
                         .accessibilityIdentifier("known-words-undo")
                 }
             }
@@ -157,7 +160,7 @@ public struct KnownWordsView: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(row.term.expression)
-                        if let sense = row.term.sense, !sense.isEmpty {
+                        if let sense = row.sense {
                             Text(sense).foregroundStyle(.secondary)
                         }
                         Text(caption(for: row)).font(.caption).foregroundStyle(.secondary)
@@ -172,6 +175,7 @@ public struct KnownWordsView: View {
                             .labelStyle(.iconOnly)
                     }
                     .buttonStyle(.borderless)
+                    .disabled(isChangingWord)
                 }
             }
         }
@@ -188,10 +192,13 @@ public struct KnownWordsView: View {
                 }
                 .accessibilityIdentifier("known-words-paste")
                 Button("Export Word List…", systemImage: "square.and.arrow.up") {
-                    exportDocument = KnownWordsCSV(VocabularyListFormat.csv(rows))
+                    let sorted = wordList.sorted {
+                        $0.term.expression.localizedStandardCompare($1.term.expression) == .orderedAscending
+                    }
+                    exportDocument = KnownWordsCSV(VocabularyListFormat.csv(sorted))
                     isExporting = true
                 }
-                .disabled(rows.isEmpty)
+                .disabled(wordList.isEmpty)
                 .accessibilityIdentifier("known-words-export")
             } label: {
                 Label("Word List", systemImage: "list.bullet.rectangle")
@@ -250,7 +257,7 @@ public struct KnownWordsView: View {
             }
         }
         .onChange(of: language) { _, _ in
-            rows = []; counts = [:]; undo = nil; lastImport = nil
+            rows = []; wordList = []; counts = [:]; undo = nil; lastImport = nil
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await refresh() } } }
         .onDisappear { pendingRefresh?.cancel(); pendingRefresh = nil; pendingRefreshID = nil }
@@ -310,11 +317,11 @@ public struct KnownWordsView: View {
         }
     }
 
-    private func caption(for row: VocabularyStatus) -> LocalizedStringKey {
+    private func caption(for row: KnownWordGroup) -> LocalizedStringKey {
         switch row.state {
         case .known:
-            if row.origin == .archivedReviews { return "Kept from deleted cards" }
-            return row.explicitJudgment == .known ? "Marked by you" : "From reviews"
+            if row.knownOrigin == .archivedReviews { return "Kept from deleted cards" }
+            return row.markedKnown ? "Marked by you" : "From reviews"
         case .learning: return "Learning"
         case .unfamiliar: return "Not known"
         case .ignored: return "Ignored"
@@ -322,7 +329,7 @@ public struct KnownWordsView: View {
         }
     }
 
-    @ViewBuilder private func actions(for row: VocabularyStatus) -> some View {
+    @ViewBuilder private func actions(for row: KnownWordGroup) -> some View {
         if row.state == .known {
             Button("Remove from Known") { Task { await change(.unfamiliar, for: row) } }
         } else {
@@ -331,7 +338,7 @@ public struct KnownWordsView: View {
         if row.state != .ignored {
             Button("Ignore") { Task { await change(.ignored, for: row) } }
         }
-        if row.explicitJudgment != nil {
+        if row.hasJudgment {
             Button("Use Review History") { Task { await change(.reviewHistory, for: row) } }
         }
     }
@@ -354,48 +361,55 @@ public struct KnownWordsView: View {
     /// Loads the selected language. Results apply only if no newer refresh started meanwhile.
     /// Returns the rows this call loaded, whether or not they were applied, or `nil` if loading failed.
     @discardableResult
-    private func refresh() async -> [VocabularyStatus]? {
+    private func refresh() async -> [KnownWordGroup]? {
         refreshGeneration += 1
         let generation = refreshGeneration
         let requested = language
-        guard !requested.isEmpty else { rows = []; counts = [:]; return nil }
+        guard !requested.isEmpty else { rows = []; wordList = []; counts = [:]; return nil }
         do {
             let loaded = try await vocabulary.vocabularyStatuses(language: requested)
-            let sorted = await Task.detached(priority: .userInitiated) {
-                loaded.sorted { $0.term.expression.localizedStandardCompare($1.term.expression) == .orderedAscending }
-            }.value
-            guard generation == refreshGeneration, requested == language else { return sorted }
-            rows = sorted
-            counts = Dictionary(grouping: sorted, by: \.state).mapValues(\.count)
+            let grouped = await index.groups(for: loaded, language: requested, packRoot: packRoot)
+            guard generation == refreshGeneration, requested == language, !Task.isCancelled else { return grouped }
+            rows = grouped
+            wordList = loaded
+            counts = Dictionary(grouping: grouped, by: \.state).mapValues(\.count)
             error = nil
-            return sorted
+            return grouped
         } catch {
             if generation == refreshGeneration, requested == language { self.error = error.localizedDescription }
             return nil
         }
     }
 
-    private func change(_ judgment: VocabularyJudgment, for row: VocabularyStatus) async {
+    private func change(_ judgment: VocabularyJudgment, for row: KnownWordGroup) async {
+        guard !isChangingWord else { return }
+        isChangingWord = true
+        defer { isChangingWord = false }
         let term = row.term
         do {
-            _ = try await vocabulary.setVocabularyJudgment(judgment, for: term, changeID: UUID())
+            let receipt = try await vocabulary.setVocabularyJudgments(row.entries(for: judgment), batchID: UUID())
             lastImport = nil
             // Use this call's own rows: a newer refresh may still be running and `rows` may be stale.
             let message: String
             if let loaded = await refresh() {
-                message = loaded.first { $0.term.id == term.id }
+                message = loaded.first { $0.id == row.id }
                     .map { "Moved “\(term.expression)” to \(Self.title(of: $0.state))." }
                     ?? "Removed “\(term.expression)” from Known Words."
             } else {
                 message = "Updated “\(term.expression)”."
             }
-            undo = Undo(term: term, judgment: row.explicitJudgment ?? .reviewHistory, message: message)
+            if receipt.recorded > 0, language == term.language {
+                undo = Undo(batchID: receipt.batchID, message: message)
+            }
         } catch { self.error = error.localizedDescription }
     }
 
     private func revert(_ undo: Undo) async {
+        guard !isChangingWord else { return }
+        isChangingWord = true
+        defer { isChangingWord = false }
         do {
-            _ = try await vocabulary.setVocabularyJudgment(undo.judgment, for: undo.term, changeID: UUID())
+            _ = try await vocabulary.undoVocabularyBatch(undo.batchID, undoID: undo.undoID)
             self.undo = nil
             await refresh()
         } catch { self.error = error.localizedDescription }
@@ -571,7 +585,11 @@ public struct VocabularyComposerView: View {
     private let onSaved: @MainActor () async -> Void
     private let selectingCard: Bool
     private let markOnly: Bool
+    private let lookup: VocabularyExampleLookup
+    private let explicitPackRoot: URL?
+    private let editorDraftSeed: VocabularySetDraft?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.vocabularyPackRootURL) private var packRoot
 #if !os(macOS)
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 #endif
@@ -584,21 +602,38 @@ public struct VocabularyComposerView: View {
     @State private var language: String
     @State private var deckOptions: [DeckSummary] = []
     @State private var makingCards: Bool
-    @State private var useSecondSentence = true
+    @State private var useSecondSentence = false
+    @State private var exactForm = ""
+    @State private var sourcedSentence: String?
+    @State private var sourcedWord: String?
+    @State private var meaningChoices: [VocabularyExampleLookup.Meaning] = []
+    @State private var meaningID: String?
+    @State private var exampleID: Int?
+    @State private var generationCapability: ContextCapability?
+    @State private var lookupTask: Task<Void, Never>?
+    @State private var lookupStatus: String?
+    @State private var lookupMessage: String?
+    @State private var recoveredDraftID: UUID?
     @State private var busy = false
     @State private var error: String?
     @State private var saveID = UUID()
 
     public init(vocabulary: any PersonalVocabulary, decks: any LibraryDeckManaging, language: String = "",
-                preset: VocabularySetDraft? = nil, markOnly: Bool = false, onSaved: @escaping @MainActor () async -> Void = {}) {
+                preset: VocabularySetDraft? = nil, markOnly: Bool = false, startsCreating: Bool = false, deckID: UUID? = nil,
+                packRoot: URL? = nil, restoreEditorDraft: Bool = false, lookup: VocabularyExampleLookup = .shared,
+                onSaved: @escaping @MainActor () async -> Void = {}) {
         self.vocabulary = vocabulary; deckManager = decks; self.onSaved = onSaved
+        self.lookup = lookup; explicitPackRoot = packRoot
+        editorDraftSeed = restoreEditorDraft ? preset : nil
         let initial = preset ?? .init(term: .init(language: language, expression: ""), meaning: "",
-                                      meaningLanguage: "", sentence: "")
+                                      meaningLanguage: "", sentence: "", deckID: deckID)
         _draft = State(initialValue: initial)
         _word = State(initialValue: initial.term.expression)
         _language = State(initialValue: initial.term.language)
-        _makingCards = State(initialValue: preset != nil && !markOnly)
-        selectingCard = preset != nil && !markOnly
+        _makingCards = State(initialValue: (startsCreating || preset != nil) && !markOnly)
+        _sourcedSentence = State(initialValue: initial.source == nil ? nil : initial.sentence)
+        _sourcedWord = State(initialValue: initial.source == nil ? nil : initial.term.expression)
+        selectingCard = (startsCreating || preset != nil) && !markOnly
         self.markOnly = markOnly
     }
 
@@ -621,8 +656,17 @@ public struct VocabularyComposerView: View {
                         }
 #endif
                     }
+                    if makingCards {
+                        Button("Find Examples", systemImage: "text.magnifyingglass", action: findExamples)
+                            .accessibilityIdentifier("vocabulary-find-examples")
+                            .disabled(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                                      language.isEmpty || draft.meaningLanguage.isEmpty || lookupStatus != nil)
+                    }
                 }
                 if makingCards {
+                    if lookupStatus != nil || lookupMessage != nil || !meaningChoices.isEmpty || generationCapability != nil {
+                        exampleLookup
+                    }
                     Section("Context") {
                         TextField("Example sentence", text: $draft.sentence, axis: .vertical)
                             .focused($focusedField, equals: .sentence)
@@ -630,6 +674,14 @@ public struct VocabularyComposerView: View {
                         TextField("Meaning", text: $draft.meaning, axis: .vertical)
                             .focused($focusedField, equals: .meaning)
                             .accessibilityIdentifier("vocabulary-set-meaning")
+                        if !draft.sentence.isEmpty {
+                            TextField(needsConfirmedForm ? "Exact form in sentence" : "Form in sentence (optional)", text: $exactForm)
+                                .autocorrectionDisabled()
+                                .accessibilityIdentifier("vocabulary-set-form")
+                        }
+                        if let source = draft.source, draft.sentence == sourcedSentence {
+                            LabeledContent("Source", value: source)
+                        }
                         VocabularyLanguagePicker(title: "Meaning language", selection: $draft.meaningLanguage)
                         Picker("Deck", selection: $draft.deckID) {
                             Text("Unassigned").tag(UUID?.none)
@@ -672,27 +724,270 @@ public struct VocabularyComposerView: View {
                 if language.isEmpty { language = activeLanguage }
                 if draft.meaningLanguage.isEmpty {
                     draft.meaningLanguage = preferredMeaningLanguage.isEmpty
-                        ? Locale.current.language.languageCode?.identifier ?? "en" : preferredMeaningLanguage
+                        ? (language.isEmpty ? Locale.current.language.languageCode?.identifier ?? "en" : language)
+                        : preferredMeaningLanguage
                 }
             }
             .task(id: makingCards) {
                 guard makingCards else { return }
                 do { deckOptions = try await deckManager.deckSummaries(asOf: .now) }
                 catch { self.error = error.localizedDescription }
+                await restoreLegacyDraft()
             }
-            .onChange(of: word) { _, _ in
+            .onChange(of: word) { previous, next in
                 saveID = UUID()
+                resetLookup()
+                if sourcedWord != next, !previous.isEmpty {
+                    exactForm = ""
+                    if draft.sentence == sourcedSentence {
+                        draft.sentence = ""
+                        draft.source = nil
+                    }
+                }
                 if VocabularyTerm.normalized(word) != VocabularyTerm.normalized(draft.term.expression) {
                     useSecondSentence = false
                 }
             }
             .onChange(of: useSecondSentence) { _, _ in saveID = UUID() }
             .onChange(of: draft) { _, _ in saveID = UUID() }
-            .onChange(of: language) { _, _ in saveID = UUID() }
+            .onChange(of: exactForm) { _, _ in saveID = UUID() }
+            .onChange(of: draft.sentence) { _, sentence in
+                if sentence != sourcedSentence {
+                    draft.source = nil
+                    exampleID = nil
+                }
+            }
+            .onChange(of: language) { previous, next in
+                saveID = UUID()
+                resetLookup()
+                if draft.meaning.isEmpty, preferredMeaningLanguage.isEmpty, !next.isEmpty,
+                   previous.isEmpty || draft.meaningLanguage == previous {
+                    draft.meaningLanguage = next
+                }
+            }
+            .onChange(of: draft.meaningLanguage) { _, _ in resetLookup() }
+            .onChange(of: makingCards) { _, value in if !value { resetLookup() } }
+            .onDisappear { lookupTask?.cancel() }
         }
 #if os(macOS)
         .frame(minWidth: 440, minHeight: 350)
 #endif
+    }
+
+    private var selectedMeaning: VocabularyExampleLookup.Meaning? {
+        meaningChoices.first { $0.id == meaningID }
+    }
+
+    private var needsConfirmedForm: Bool {
+        guard let example = selectedMeaning?.examples.first(where: { $0.id == exampleID }) else { return false }
+        return example.form == nil
+    }
+
+    private var exampleLookup: some View {
+        Section("Examples") {
+            if let lookupStatus {
+                ProgressView(lookupStatus)
+                Button("Cancel Search") { cancelLookup() }
+            }
+            if meaningChoices.count > 1 {
+                Picker("Dictionary meaning", selection: Binding(get: { meaningID }, set: selectMeaning)) {
+                    Text("Choose a meaning").tag(nil as String?)
+                    ForEach(meaningChoices) { choice in
+                        Text("\(choice.headword) — \(choice.text)").tag(Optional(choice.id))
+                    }
+                }
+            } else if let selectedMeaning {
+                LabeledContent("Headword", value: selectedMeaning.headword)
+            }
+            if let examples = selectedMeaning?.examples, !examples.isEmpty {
+                Picker("Dictionary example", selection: Binding(get: { exampleID }, set: selectExample)) {
+                    Text("Enter a sentence").tag(nil as Int?)
+                    ForEach(examples) { example in
+                        Text(example.sentence).tag(Optional(example.id))
+                    }
+                }
+            }
+            if let lookupMessage { Text(lookupMessage).foregroundStyle(.secondary) }
+            if !hasUsableDictionaryExample && (meaningChoices.isEmpty || selectedMeaning != nil) {
+                if generationCapability == .available {
+                    Button("Generate Example", action: generateExample).disabled(lookupStatus != nil)
+                } else if let reason = generationCapability?.reason {
+                    Text(reason).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("vocabulary-generation-unavailable")
+                }
+            }
+        }
+    }
+
+    private var hasUsableDictionaryExample: Bool {
+        guard let selectedMeaning else { return false }
+        return firstUsableExample(for: selectedMeaning) != nil
+    }
+
+    private func firstUsableExample(for choice: VocabularyExampleLookup.Meaning) -> VocabularyExampleLookup.Example? {
+        choice.examples.first { example in
+            guard let form = example.form else { return false }
+            let candidate = VocabularySetDraft(term: .init(language: language, expression: form),
+                meaning: choice.text, meaningLanguage: draft.meaningLanguage, sentence: example.sentence)
+            return (try? VocabularySet.makeItem(candidate, id: saveID)) != nil
+        }
+    }
+
+    private func cancelLookup() {
+        lookupTask?.cancel()
+        lookupTask = nil
+        lookupStatus = nil
+    }
+
+    private func resetLookup() {
+        cancelLookup()
+        meaningChoices = []
+        meaningID = nil
+        exampleID = nil
+        generationCapability = nil
+        lookupMessage = nil
+    }
+
+    private func findExamples() {
+        resetLookup()
+        let root = explicitPackRoot ?? packRoot
+        let expression = word.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetLanguage = language
+        let meaningLanguage = draft.meaningLanguage
+        lookupStatus = "Finding local examples…"
+        lookupTask = Task {
+            do {
+                let choices = if let root {
+                    try await lookup.meanings(for: expression, language: targetLanguage, meaningLanguage: meaningLanguage, root: root)
+                } else { [VocabularyExampleLookup.Meaning]() }
+                let capability = await lookup.generationAvailability(language: targetLanguage)
+                try Task.checkCancellation()
+                meaningChoices = choices
+                if choices.count == 1 { selectMeaning(choices[0].id) }
+                else if choices.isEmpty { lookupMessage = "No dictionary match. You can enter a meaning and sentence." }
+                generationCapability = capability
+                lookupStatus = nil
+            } catch {
+                guard !Task.isCancelled else { return }
+                lookupMessage = error.localizedDescription
+                lookupStatus = nil
+            }
+        }
+    }
+
+    private func selectMeaning(_ id: String?) {
+        meaningID = id
+        exampleID = nil
+        lookupMessage = nil
+        if draft.sentence == sourcedSentence {
+            draft.sentence = ""
+            exactForm = ""
+            draft.source = nil
+        }
+        draft.productionSentence = nil
+        useSecondSentence = false
+        guard let choice = selectedMeaning else { return }
+        draft.meaning = choice.text
+        if draft.sentence.isEmpty, let example = firstUsableExample(for: choice) {
+            selectExample(example.id)
+        }
+    }
+
+    private func selectExample(_ id: Int?) {
+        exampleID = id
+        lookupMessage = nil
+        guard let example = selectedMeaning?.examples.first(where: { $0.id == id }) else {
+            if draft.sentence == sourcedSentence {
+                draft.sentence = ""
+                exactForm = ""
+                draft.source = nil
+            }
+            return
+        }
+        applyExample(sentence: example.sentence, form: example.form, source: example.citation)
+        if example.form == nil { lookupMessage = "Enter the exact form you want to blank in this sentence." }
+    }
+
+    private func applyExample(sentence: String, form: String?, source: String?) {
+        sourcedSentence = sentence
+        sourcedWord = word
+        draft.sentence = sentence
+        exactForm = form ?? ""
+        draft.source = source
+    }
+
+    private func generateExample() {
+        let choice = selectedMeaning
+        let target = ContextTarget(expression: word, language: language, meaning: draft.meaning,
+                                   forms: choice.map { [$0.lemma] + $0.forms } ?? [])
+        let originalSentence = draft.sentence
+        lookupMessage = nil
+        lookupStatus = "Generating example…"
+        lookupTask = Task {
+            do {
+                guard let result = try await lookup.generate(target: target),
+                      let form = ([target.expression] + target.forms).first(where: {
+                          VocabularySet.occurrences(of: $0, in: result.sentence, language: target.language).count == 1
+                      }) else {
+                    try Task.checkCancellation()
+                    lookupMessage = "No usable example was generated. Try again or enter a sentence."
+                    lookupStatus = nil
+                    return
+                }
+                try Task.checkCancellation()
+                guard draft.sentence == originalSentence, draft.meaning == target.meaning else {
+                    lookupStatus = nil
+                    return
+                }
+                if draft.meaning.isEmpty, let meaning = result.meaning {
+                    draft.meaning = meaning
+                    if draft.meaningLanguage != language { draft.meaningLanguage = language }
+                }
+                applyExample(sentence: result.sentence, form: form, source: "Generated by Apple Intelligence")
+                lookupStatus = nil
+            } catch {
+                guard !Task.isCancelled else { return }
+                lookupMessage = error.localizedDescription
+                lookupStatus = nil
+            }
+        }
+    }
+
+    private func restoreLegacyDraft() async {
+        let startedWith = word
+        guard startedWith.isEmpty || startedWith == editorDraftSeed?.term.expression else { return }
+        let name: String
+        if let seed = editorDraftSeed, !startedWith.isEmpty {
+            let key = "\(seed.term.expression)||\(seed.deckID?.uuidString ?? "")"
+            let digest = SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
+            name = "draft-\(digest).json"
+        } else {
+            name = "draft.json"
+        }
+        guard let root = explicitPackRoot ?? packRoot,
+              let browsing = deckManager as? any LibraryBrowsing,
+              let libraryID = try? await browsing.libraryID(),
+              let data = try? Data(contentsOf: root.appendingPathComponent(".learn-in-context/\(libraryID)/\(name)")),
+              let saved = try? JSONDecoder().decode(ContextAuthoringDraft.self, from: data),
+              !saved.target.expression.isEmpty, word == startedWith, !Task.isCancelled,
+              !UserDefaults.standard.bool(forKey: "recovered-context-draft-\(saved.groupID)") else { return }
+        recoveredDraftID = saved.groupID
+        word = saved.target.expression
+        language = saved.target.language
+        if let deckID = saved.deckID, deckOptions.contains(where: { $0.id == deckID }) { draft.deckID = deckID }
+        if let example = saved.examples.first(where: { $0.isSelected && !$0.needsMeaningCheck }) {
+            let form = ([word] + saved.target.forms).first {
+                VocabularySet.occurrences(of: $0, in: example.sentence, language: language).count == 1
+            }
+            let source = [example.provenance.sourceName, example.provenance.attribution, example.provenance.sourceURL]
+                .compactMap { $0 }.joined(separator: " · ")
+            applyExample(sentence: example.sentence, form: form, source: source)
+            draft.meaning = example.meaning ?? saved.target.meaning
+        } else {
+            draft.meaning = saved.target.meaning
+            draft.sentence = saved.sourceSentence
+        }
+        if !draft.meaning.isEmpty { draft.meaningLanguage = language }
     }
 
     private var intentionPicker: some View {
@@ -705,14 +1000,22 @@ public struct VocabularyComposerView: View {
     }
 
     private var term: VocabularyTerm {
-        .init(language: language, expression: word,
-              sense: VocabularyTerm.normalized(word) == VocabularyTerm.normalized(draft.term.expression)
-                  && language == draft.term.language ? draft.term.sense : nil)
+        let sameTerm = language == draft.term.language
+            && VocabularyTerm.normalized(word) == VocabularyTerm.normalized(draft.term.expression)
+        let form = exactForm.trimmingCharacters(in: .whitespacesAndNewlines)
+        return .init(language: language, expression: makingCards && !form.isEmpty ? form : word,
+                     sense: selectedMeaning.flatMap { meaningChoices.count > 1 ? $0.text : nil }
+                        ?? (sameTerm ? draft.term.sense : nil),
+                     lemma: selectedMeaning?.lemma ?? (sameTerm ? draft.term.lemma : nil)
+                        ?? (makingCards && !form.isEmpty ? word : nil))
     }
 
     private var preview: String? {
+        if needsConfirmedForm && exactForm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return nil
+        }
         let sentence = (useSecondSentence ? draft.productionSentence : nil) ?? draft.sentence
-        let form = (useSecondSentence ? draft.productionForm : nil) ?? word.trimmingCharacters(in: .whitespacesAndNewlines)
+        let form = (useSecondSentence ? draft.productionForm : nil) ?? term.expression.trimmingCharacters(in: .whitespacesAndNewlines)
         let matches = VocabularySet.occurrences(of: form, in: sentence, language: language)
         guard matches.count == 1, let span = matches.first else { return nil }
         return ClozeValidation.displayText(from: sentence, blanks: [.init(group: 1,
@@ -734,6 +1037,9 @@ public struct VocabularyComposerView: View {
                 }
                 _ = try await vocabulary.createVocabularySet(submitted, id: saveID)
                 preferredMeaningLanguage = draft.meaningLanguage
+                if let recoveredDraftID {
+                    UserDefaults.standard.set(true, forKey: "recovered-context-draft-\(recoveredDraftID)")
+                }
             } else {
                 // A reading judgment applies to the word in every meaning.
                 _ = try await vocabulary.setVocabularyJudgment(.known, for: term.withoutSense, changeID: saveID)
@@ -780,7 +1086,9 @@ public struct VocabularyCaptureActions: View {
     }
 
     private var currentTerm: VocabularyTerm {
-        term.language.isEmpty ? .init(language: learningLanguage, expression: term.expression, sense: term.sense) : term
+        term.language.isEmpty
+            ? .init(language: learningLanguage, expression: term.expression, sense: term.sense, lemma: term.lemma)
+            : term
     }
 
     @ViewBuilder private var buttons: some View {

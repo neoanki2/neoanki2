@@ -52,6 +52,15 @@ import Testing
     #expect(searchCode == 0)
     #expect(output.first == "Matches: 1")
     #expect(output.contains { $0.contains("\tlocal\t") })
+
+    let installedRoot = root.appendingPathComponent("Installed")
+    let installArguments = ["install", "--pack", destination.path, "--root", installedRoot.path]
+    #expect(await cli.run(arguments: installArguments, output: { _ in }) == 0)
+    let store = InstalledVocabularyPackStore(rootURL: installedRoot)
+    let installed = try await store.installedPacks()
+    #expect(installed.map(\.id) == ["fixture"])
+    #expect(await cli.run(arguments: installArguments, output: { _ in }, errorOutput: { _ in }) == 1)
+    #expect(try await store.installedPacks() == installed)
 }
 
 @Test func cliRejectsRemoteLocationsBeforeVocabularyIO() async {

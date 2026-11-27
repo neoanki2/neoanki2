@@ -1,5 +1,7 @@
 import AppKit
+import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
 import NeoAnkiSharedUI
 import SwiftUI
 import Testing
@@ -388,5 +390,152 @@ private func paintedTextBounds<V: View>(_ view: V) throws -> CGRect {
         )
         #expect(abs(actual.width - reference.width) <= 2)
         #expect(abs(actual.height - reference.height) <= 2)
+    }
+}
+
+@Test @MainActor func structuredGrammarCardRendersPromptAndFeedbackTogether() async throws {
+    let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("grammar-layout-\(UUID())")
+    try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: scratch) }
+    let exercise = StudyExercise(mode: .target, parts: ["Then I opened ", " file from another folder."],
+                                targets: [.init(choices: ["a", "an", "the"], allowsOmission: true)], answers: [["a"]])
+    let fixture = try await structuredGrammarFixture(exercise: exercise, directory: scratch)
+    let model = fixture.model
+    let card = fixture.card
+    let canvasSizes = [CGSize(width: 950, height: 570), CGSize(width: 620, height: 440)]
+    for size in canvasSizes {
+        let host = NSHostingView(rootView: grammarCanvas(card: card, exercise: exercise, model: model, size: size))
+        host.frame = CGRect(origin: .zero, size: size)
+        host.layoutSubtreeIfNeeded()
+        let field = try #require(grammarNativeField(in: host))
+        let bounds = host.convert(field.bounds, from: field)
+        #expect(bounds.minX > max(12, (size.width - 560) / 2 - 4))
+        #expect(bounds.width < 240)
+        #expect(bounds.midY > size.height * 0.2 && bounds.midY < size.height * 0.8)
+    }
+    try renderGrammarCanvas(card: card, exercise: exercise, model: model, state: "prompt", sizes: canvasSizes)
+    model.updateExerciseTarget(0, value: "the")
+    model.submitTypedAnswer()
+    #expect(model.answerEvaluation == .incorrect)
+    #expect(model.reviewResponse == "the")
+    try renderGrammarCanvas(card: card, exercise: exercise, model: model, state: "checked", sizes: canvasSizes)
+}
+
+@Test @MainActor func structuredRewriteAndChoiceRenderBeforeAndAfterChecking() async throws {
+    let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("exercise-layout-\(UUID())")
+    try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: scratch) }
+    let exercises = [
+        StudyExercise(mode: .rewrite, prompt: "It works.", answers: [["Does it work?"]]),
+        StudyExercise(mode: .choose,
+                      prompt: "A. It rains here in winter.\nB. It rains here in the winter.",
+                      options: [.init(id: "a", label: "Only A"), .init(id: "b", label: "Only B"),
+                                .init(id: "both", label: "Both"), .init(id: "neither", label: "Neither")],
+                      correctOptionID: "both"),
+    ]
+    for exercise in exercises {
+        let folder = scratch.appendingPathComponent(exercise.mode.rawValue)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let fixture = try await structuredGrammarFixture(exercise: exercise, directory: folder)
+        let model = fixture.model
+        let sizes = [CGSize(width: 950, height: 570), CGSize(width: 620, height: 440)]
+        try renderGrammarCanvas(card: fixture.card, exercise: exercise, model: model,
+                                state: exercise.mode.rawValue + "-prompt", sizes: sizes)
+        #expect(!model.isAnswerRevealed)
+        if exercise.mode == .rewrite {
+            model.updateTypedAnswer("Does it work?")
+            model.submitTypedAnswer()
+        } else {
+            model.submitExerciseChoice("both")
+        }
+        #expect(model.isAnswerRevealed)
+        #expect(model.answerEvaluation == .correct)
+        try renderGrammarCanvas(card: fixture.card, exercise: exercise, model: model,
+                                state: exercise.mode.rawValue + "-checked", sizes: sizes)
+    }
+}
+
+@MainActor
+private func structuredGrammarFixture(exercise: StudyExercise, directory: URL) async throws -> (model: StudyFeatureModel, card: DueCard) {
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    let field = FieldDef(name: "Exercise", type: .studyExercise, isRequired: true)
+    let cue: String
+    let solution: String
+    let explanation: String
+    switch exercise.mode {
+    case .target:
+        cue = "A different file"
+        solution = "Then I opened a file from another folder."
+        explanation = "Introduce a new, unspecified file with a."
+    case .rewrite:
+        cue = "Yes/no question"
+        solution = "Does it work?"
+        explanation = "Use does and the base form of the main verb."
+    case .choose:
+        cue = "Standard American English"
+        solution = "Both"
+        explanation = "Both versions describe a recurring season."
+    }
+    let template = Template(name: exercise.mode.title, layout: .split, components: [
+        .init(region: .label, purpose: .supporting, source: .literal(cue)),
+        .init(region: .primary, purpose: .question, source: .field(field.id)),
+        .init(region: .secondary, purpose: .expectedAnswer, source: .literal(solution),
+              presentation: .init(reveal: .hiddenUntilAnswer)),
+        .init(region: .supporting, purpose: .supporting, source: .literal(explanation),
+              presentation: .init(reveal: .hiddenUntilAnswer)),
+    ], interaction: exercise.mode == .choose ? .choose : .type,
+       skill: .init(input: .text, output: .freeResponse, operation: .apply))
+    let type = ItemType(name: "Grammar layout fixture", fields: [field], templates: [template])
+    _ = try await store.createItemType(type)
+    _ = try await store.createItem(Item(itemTypeID: type.id, fields: [.init(fieldID: field.id, value: .studyExercise(exercise))]))
+    let model = StudyFeatureModel(library: SQLiteLibraryRepository(store: store), scope: .allDecks, title: "Grammar")
+    await model.start()
+    return (model, try #require(model.currentCard))
+}
+
+@MainActor
+private func grammarCanvas(card: DueCard, exercise: StudyExercise, model: StudyFeatureModel, size: CGSize) -> some View {
+    AdaptiveStudyStage(layout: .split, showsFooter: model.isAnswerRevealed) {
+        GeometryReader { viewport in
+            ScrollView {
+                StudyExerciseCard(card: card, exercise: exercise, model: model)
+                    .padding(.top, min(72, viewport.size.height * 0.12))
+                    .frame(minHeight: viewport.size.height, alignment: .top)
+            }
+        }
+    } footer: {
+        HStack {
+            ForEach(["Again (1)", "Hard (2)", "Good (3)", "Easy (4)"], id: \.self) { title in
+                Button(title) {}
+            }
+        }
+        .padding(16)
+    }
+    .frame(width: size.width, height: size.height)
+}
+
+@MainActor
+private func grammarNativeField(in view: NSView) -> NSTextField? {
+    if let field = view as? NSTextField, field.isEditable { return field }
+    return view.subviews.lazy.compactMap { grammarNativeField(in: $0) }.first
+}
+
+@MainActor
+private func renderGrammarCanvas(card: DueCard, exercise: StudyExercise, model: StudyFeatureModel, state: String, sizes: [CGSize]) throws {
+    guard let path = ProcessInfo.processInfo.environment["NEOANKI_GRAMMAR_LAYOUT_IMAGES"] else { return }
+    let directory = URL(fileURLWithPath: path)
+    for size in sizes {
+        for scheme in [ColorScheme.light, .dark] {
+            let host = NSHostingView(rootView: grammarCanvas(card: card, exercise: exercise, model: model, size: size)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .environment(\.colorScheme, scheme))
+            host.frame = CGRect(origin: .zero, size: size)
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let png = try #require(bitmap.representation(using: .png, properties: [:]))
+            try png.write(to: directory.appendingPathComponent("grammar-\(state)-\(Int(size.width))-\(scheme).png"))
+        }
     }
 }

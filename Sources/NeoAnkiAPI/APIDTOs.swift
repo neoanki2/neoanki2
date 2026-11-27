@@ -351,6 +351,7 @@ public struct APIContentValue: Codable, Sendable, Equatable {
     public let nextGroup: Int?
     public let blanks: [ClozeSpan]?
     public let number: Double?
+    public let exercise: StudyExercise?
 
     init(_ value: ContentValue) {
         var type = "empty"
@@ -369,6 +370,7 @@ public struct APIContentValue: Codable, Sendable, Equatable {
         var masks: [ImageOcclusionMask]?
         var nextGroup: Int?
         var number: Double?
+        var exercise: StudyExercise?
         switch value {
         case .empty:
             break
@@ -393,6 +395,8 @@ public struct APIContentValue: Codable, Sendable, Equatable {
             occlusionMode = content.mode; masks = content.masks; nextGroup = content.nextGroup
         case let .cloze(value, valueBlanks):
             type = "cloze"; text = value; blanks = valueBlanks
+        case let .studyExercise(value):
+            type = "studyExercise"; exercise = value
         case let .number(value):
             type = "number"; number = value
         }
@@ -412,6 +416,7 @@ public struct APIContentValue: Codable, Sendable, Equatable {
         self.nextGroup = nextGroup
         self.blanks = blanks
         self.number = number
+        self.exercise = exercise
     }
 
     package func domain(pointer: String) throws -> ContentValue {
@@ -459,6 +464,11 @@ public struct APIContentValue: Codable, Sendable, Equatable {
                 return .imageOcclusion(content)
             }
             return .media(reference)
+        case "studyExercise":
+            guard let exercise else { throw APIServiceError.validation("Exercise is required.", pointer: pointer + "/exercise") }
+            do { try exercise.validate() }
+            catch { throw APIServiceError.validation(error.localizedDescription, pointer: pointer + "/exercise") }
+            return .studyExercise(exercise)
         case "cloze":
             guard let text, let blanks else { throw APIServiceError.validation("Cloze text and blanks are required.", pointer: pointer) }
             return .cloze(text, blanks: blanks)

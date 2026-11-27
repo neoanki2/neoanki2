@@ -117,13 +117,16 @@ public struct AdaptiveStudyStage<Stage: View, Footer: View>: View {
     private let layout: CardLayoutID
     private let stage: Stage
     private let footer: Footer
+    private let showsFooter: Bool
 
     public init(
         layout: CardLayoutID,
+        showsFooter: Bool = true,
         @ViewBuilder stage: () -> Stage,
         @ViewBuilder footer: () -> Footer
     ) {
         self.layout = layout
+        self.showsFooter = showsFooter
         self.stage = stage()
         self.footer = footer()
     }
@@ -136,12 +139,14 @@ public struct AdaptiveStudyStage<Stage: View, Footer: View>: View {
             }
 
             VStack(spacing: 0) {
-                Divider()
-                footer
-                .fixedSize(horizontal: false, vertical: true)
-                .background(.regularMaterial)
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("studyFooter")
+                if showsFooter {
+                    Divider()
+                    footer
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(.regularMaterial)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("studyFooter")
+                }
             }
         }
         .accessibilityElement(children: .contain)

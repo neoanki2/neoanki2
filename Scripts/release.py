@@ -704,6 +704,8 @@ def main(argv=None):
     parser.add_argument("--config", type=Path, default=SIGNING / "app-store-connect.json")
     parser.add_argument("--signing-dir", type=Path, default=SIGNING)
     parser.add_argument("--device", help="target iPhone name, CoreDevice identifier, or UDID for local installation")
+    parser.add_argument("--defer-iphone", action="store_true",
+                        help="publish now and leave paired iPhone preparation and installation for an explicit resume")
     args = parser.parse_args(argv)
     args.config = args.config.expanduser().resolve()
     args.signing_dir = args.signing_dir.expanduser().resolve()
@@ -714,6 +716,8 @@ def main(argv=None):
             setattr(args, name, ".".join(map(str, version_tuple(getattr(args, name)))))
     if args.offline and not args.plan:
         parser.error("--offline is only available with --plan")
+    if args.defer_iphone and args.device:
+        parser.error("--defer-iphone cannot be combined with --device")
     WORK.mkdir(parents=True, exist_ok=True)
     with (WORK / "release.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -750,8 +754,9 @@ def main(argv=None):
             path = WORK / pointer["version"] / "release.json"
             if path.exists():
                 candidate = json.loads(path.read_text())
-                if not candidate.get("abandoned") and (not candidate.get("complete") or
-                        candidate.get("local_iphone", {}).get("status", "installed") != "installed"):
+                local_iphone = candidate.get("local_iphone", {})
+                phone_pending = local_iphone.get("status", "installed") != "installed" and not local_iphone.get("deferred")
+                if not candidate.get("abandoned") and (not candidate.get("complete") or phone_pending):
                     local = candidate
         pending_state = local or (baseline if baseline.get("complete") is False else None)
         if local and version_tuple(local["version"]) < version_tuple(baseline["version"]):
@@ -810,6 +815,13 @@ def main(argv=None):
             github.checkpoint(WORK / state["version"] / "release.json", state)
         release = Release(github, api, app_id, state, WORK / state["version"], args.config.resolve(), args.signing_dir.resolve())
         release.signing_preflighted = resume is None
+        local_iphone = state.setdefault("local_iphone", {"status": "planned"})
+        if args.defer_iphone and local_iphone["status"] != "installed":
+            local_iphone["deferred"] = True
+            release.save()
+        elif args.resume and not args.defer_iphone and local_iphone.pop("deferred", False):
+            release.save()
+        defer_iphone = args.defer_iphone or local_iphone.get("deferred", False)
         print("Release " + state["version"] + ": " + ", ".join(state["selected"]), flush=True)
         errors, waiting = {}, {}
         if not state.get("complete"):
@@ -821,12 +833,15 @@ def main(argv=None):
             for channel in state["selected"]:
                 release.export(channel)
             release.save(remote=True)
-            # Prepare the phone update during Apple upload/processing instead of after it.
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                preparing = pool.submit(prepare_release_iphone, release)
+            if defer_iphone:
                 errors, waiting = release.publish_until_ready(args.wait_seconds)
-                preparing.result()
-        if state.get("complete"):
+            else:
+                # Prepare the phone update while Apple processes the Store uploads.
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    preparing = pool.submit(prepare_release_iphone, release)
+                    errors, waiting = release.publish_until_ready(args.wait_seconds)
+                    preparing.result()
+        if state.get("complete") and not defer_iphone:
             try:
                 install_release_iphone(release, args.device)
             except Exception as error:
@@ -835,7 +850,11 @@ def main(argv=None):
         print("RELEASE_RECEIPT=" + str(release.path))
         for channel, message in {**waiting, **errors}.items():
             print(channel + ": " + message)
-        if waiting or "iphone" in errors:
+        if local_iphone.get("deferred"):
+            print("IPHONE_DEPLOY_STATUS=deferred")
+        if waiting and defer_iphone:
+            print("Resume publication with ./Scripts/release.sh --resume " + state["version"] + " --defer-iphone")
+        elif waiting or "iphone" in errors or local_iphone.get("deferred"):
             print("Resume with ./Scripts/release.sh --resume " + state["version"])
         return 1 if errors else 0
 
