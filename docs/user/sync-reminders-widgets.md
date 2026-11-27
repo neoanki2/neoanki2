@@ -220,7 +220,7 @@ When iCloud sync is enabled, imported vocabulary packs upload automatically to
 your private iCloud library. Other devices receive the dictionary catalog
 automatically; the dictionary files download only when you choose **Download**.
 
-Open **Library → Vocabulary Packs…** on Mac or **Create → Vocabulary Packs** on
+Open **Library → Vocabulary Packs…** on Mac or **Settings → Vocabulary Packs** on
 iOS. **On This Device** lists packs available offline. **In iCloud** shows the
 available dictionaries and their download sizes. Choose **Download** to install
 one, or cancel a download and resume it later. The catalog refreshes while the

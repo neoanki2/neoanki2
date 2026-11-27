@@ -407,11 +407,13 @@ grade keys type into the form instead of grading the card behind it.
 
 ## Keyboard and Study menu
 
-The **Study** menu mirrors the main actions:
+Use the **Study** menu to start or end a session, edit the current card, grade,
+undo a grade, or open **Study Day Settings…**. During a review, these keyboard
+shortcuts follow the current card's state:
 
 - Command-Shift-S: start studying the current scope.
-- Space or Return: continue with the primary action before reveal. After reveal,
-  Space grades Good.
+- Space or Return: continue with the primary action before reveal. Once grades
+  are available, Space selects Good (Pass in Fail / Pass mode).
 - 1, 2, 3, 4: grade Again, Hard, Good, or Easy after reveal. With Fail / Pass
   grades enabled, 1 selects Fail (Again) and 2 selects Pass (Good).
 - Right Arrow: reveal without checking for Type, Choose, Arrange, or Record.

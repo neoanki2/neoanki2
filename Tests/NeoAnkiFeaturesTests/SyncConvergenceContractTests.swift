@@ -351,7 +351,12 @@ private final class ContractFixture {
             }
         }
         try await verifyLedger()
-        if step.mode == .inactiveMac { await mac.service.setForeground(true) }
+        if step.mode == .inactiveMac {
+            await mac.service.setForeground(true)
+            // Foregrounding schedules a new catch-up after the assertions.
+            // Join that work before the fixture can remove its database.
+            await mac.service.synchronizeAndWait()
+        }
         await cloud.setPushesEnabled(true, for: "mac")
         completedSteps += 1
     }

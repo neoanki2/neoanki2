@@ -5,10 +5,8 @@ struct LibraryCommandHandlers {
     var openImport: (() -> Void)?
     var openPortableDeckImport: (() -> Void)?
     var openPortableDeckExport: (() -> Void)?
-    var openVocabularyPackImport: (() -> Void)?
     var openVocabularyPacks: (() -> Void)?
     var openAddFromVocabulary: (() -> Void)?
-    var openVocabularySet: (() -> Void)?
     var openDeckBuilder: (() -> Void)?
     var openTemplates: (() -> Void)?
     var openBrowse: (() -> Void)?
@@ -20,7 +18,6 @@ struct LibraryCommandHandlers {
     var canImport = false
     var canImportPortableDeck = false
     var canExportPortableDeck = false
-    var canImportVocabularyPack = false
     var canOpenVocabularyPacks = false
     var canAddFromVocabulary = false
     var canOpenDeckBuilder = false
@@ -60,9 +57,6 @@ struct LibraryCommands: Commands {
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(!(handlers?.canAddFromVocabulary ?? false))
-
-            Button("Create Vocabulary Set…") { handlers?.openVocabularySet?() }
-                .disabled(!(handlers?.canAddFromVocabulary ?? false))
         }
 
         CommandGroup(after: .importExport) {
@@ -77,11 +71,6 @@ struct LibraryCommands: Commands {
                 handlers?.openPortableDeckImport?()
             }
             .disabled(!(handlers?.canImportPortableDeck ?? false))
-
-            Button("Import Vocabulary Pack…") {
-                handlers?.openVocabularyPackImport?()
-            }
-            .disabled(!(handlers?.canImportVocabularyPack ?? false))
 
             Button("Export Deck…") {
                 handlers?.openPortableDeckExport?()

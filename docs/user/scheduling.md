@@ -136,7 +136,7 @@ first grade restores the slot, including when you choose **Undo Last Grade**
 from the session completion screen. Learning, relearning, and review cards
 never count toward this limit.
 
-Choose **Study Day → Study Day Settings…** to set when a new study day begins
+Choose **Study → Study Day Settings…** to set when a new study day begins
 in local time. The default is **4:00 AM**. The app follows the Mac's current
 time zone, and deferred new cards become available at the next rollover.
 

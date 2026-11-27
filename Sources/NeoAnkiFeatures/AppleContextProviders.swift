@@ -1,7 +1,6 @@
 import Foundation
 import NaturalLanguage
 import NeoAnkiApplication
-@preconcurrency import AVFoundation
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
@@ -248,91 +247,3 @@ private struct GenerationInput: Encodable {
     var meaning: String
 }
 #endif
-
-/// Buffer callbacks run off the main actor. This lock owns the file and single continuation.
-private final class ContextSpeechWriter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var file: AVAudioFile?
-    private var continuation: CheckedContinuation<Void, any Error>?
-    let url: URL
-    init(url: URL, continuation: CheckedContinuation<Void, any Error>) { self.url = url; self.continuation = continuation }
-    func receive(_ buffer: AVAudioBuffer) {
-        lock.lock()
-        guard continuation != nil else { lock.unlock(); return }
-        do {
-            guard let pcm = buffer as? AVAudioPCMBuffer else { throw ContextAuthoringError.message("The voice returned unsupported audio.") }
-            if pcm.frameLength == 0 {
-                file = nil
-                let pending = continuation; continuation = nil; lock.unlock(); pending?.resume(); return
-            }
-            if file == nil { file = try AVAudioFile(forWriting: url, settings: pcm.format.settings) }
-            try file?.write(from: pcm)
-            lock.unlock()
-        } catch {
-            file = nil
-            let pending = continuation; continuation = nil; lock.unlock(); pending?.resume(throwing: error)
-        }
-    }
-    func cancel() {
-        lock.lock(); file = nil
-        let pending = continuation; continuation = nil; lock.unlock()
-        pending?.resume(throwing: CancellationError())
-    }
-}
-
-@MainActor public final class AppleContextSpeech: NSObject, ContextSpeechSynthesizing, AVSpeechSynthesizerDelegate {
-    private let synthesizer = AVSpeechSynthesizer()
-    private var writer: ContextSpeechWriter?
-    private var activeRequest: UUID?
-    private var activeUtterance: ObjectIdentifier?
-    public override init() { super.init(); synthesizer.delegate = self }
-    public func availability(language: String) async -> ContextCapability {
-        voice(language) == nil ? .unavailable("No installed voice is available for this language. You can save text-only cards.") : .available
-    }
-    private func voice(_ language: String) -> AVSpeechSynthesisVoice? {
-        let voices = AVSpeechSynthesisVoice.speechVoices().filter { $0.identifier.hasPrefix("com.apple.") }
-        guard let requested = ContextGeneratedValidation.languageCode(language) else { return nil }
-        return voices.first { ContextGeneratedValidation.languageCode($0.language) == requested }
-            ?? voices.first { ContextGeneratedValidation.languageCode($0.language)?.split(separator: "-").first == requested.split(separator: "-").first }
-    }
-    public func audio(text: String, language: String) async throws -> ContextSpeechAsset {
-        do { return try await synthesize(text: text, language: language) }
-        catch is CancellationError { throw CancellationError() }
-        catch let error as ContextAuthoringError { throw error }
-        catch { throw ContextAuthoringError.message("Couldn’t prepare speech for this sentence. Try playing it again.") }
-    }
-    private func synthesize(text: String, language: String) async throws -> ContextSpeechAsset {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw ContextAuthoringError.message("There is no sentence to speak.")
-        }
-        guard writer == nil else { throw ContextAuthoringError.message("Another sentence is still being spoken. Try again when it finishes.") }
-        guard text.count <= 2_000, let voice = voice(language) else { throw ContextAuthoringError.message("No installed voice is available for this sentence.") }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("context-voice-\(UUID()).caf")
-        let request = UUID(); activeRequest = request
-        defer { writer = nil; activeRequest = nil; activeUtterance = nil; try? FileManager.default.removeItem(at: url) }
-        try await withTaskCancellationHandler {
-            try Task.checkCancellation()
-            try await withCheckedThrowingContinuation { continuation in
-                let output = ContextSpeechWriter(url: url, continuation: continuation)
-                writer = output
-                let utterance = AVSpeechUtterance(string: text); utterance.voice = voice
-                activeUtterance = ObjectIdentifier(utterance)
-                synthesizer.write(utterance) { output.receive($0) }
-            }
-            try Task.checkCancellation()
-        } onCancel: {
-            Task { @MainActor [weak self] in
-                guard let self, activeRequest == request else { return }
-                writer?.cancel(); synthesizer.stopSpeaking(at: .immediate)
-            }
-        }
-        return ContextSpeechAsset(data: try Data(contentsOf: url), voiceID: voice.identifier)
-    }
-    nonisolated public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        let utteranceID = ObjectIdentifier(utterance)
-        Task { @MainActor [weak self] in
-            guard let self, activeUtterance == utteranceID else { return }
-            writer?.cancel()
-        }
-    }
-}

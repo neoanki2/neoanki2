@@ -33,13 +33,6 @@ struct ContentView: View {
     @Bindable var schedulingModel: SchedulingModel
     @Bindable var vocabularyLibraryModel: VocabularyLibraryModel
     @State private var appSession = AppSession()
-    private var showsVocabularySet: Bool {
-        get { if case .vocabularySet = appSession.presentation { return true }; return false }
-        nonmutating set {
-            if newValue { appSession.show(.vocabularySet(deckID: decksModel.selectedDeckID)) }
-            else if case .vocabularySet = appSession.presentation { appSession.dismissPresentation() }
-        }
-    }
     /// Persisted per user, not per browse session: whether you want to see
     /// answers is a standing preference, not something to rediscover.
     @AppStorage(AppPreferences.browseShowsAnswerColumn) private var browseShowsAnswerColumn = false
@@ -342,18 +335,16 @@ struct ContentView: View {
         .sheet(isPresented: wordCapturePresentation, onDismiss: {
             Task { await vocabularyLibraryModel.load() }
         }) {
-            WordCaptureView(model: features.makeWordCapture(rootURL: vocabularyLibraryModel.rootURL) {
-                await decksModel.load(asOf: .now)
-                await reloadScope()
-            }, deckID: decksModel.selectedDeckID)
-        }
-        .sheet(isPresented: Binding(get: { showsVocabularySet }, set: { showsVocabularySet = $0 })) {
             if let vocabulary = features.personalVocabulary {
-                VocabularyComposerView(vocabulary: vocabulary, decks: features.vocabularyDecks, startsCreating: true,
-                                       deckID: decksModel.selectedDeckID, packRoot: vocabularyLibraryModel.rootURL) {
+                let refresh: @MainActor () async -> Void = {
                     await decksModel.load(asOf: .now)
                     await reloadScope()
                 }
+                VocabularyComposerView(vocabulary: vocabulary, decks: features.vocabularyDecks, startsCreating: true,
+                                       deckID: decksModel.selectedDeckID, packRoot: vocabularyLibraryModel.rootURL,
+                                       makeCustomCapture: {
+                                           features.makeWordCapture(rootURL: vocabularyLibraryModel.rootURL, onSaved: refresh)
+                                       }, onSaved: refresh)
             }
         }
         .sheet(isPresented: $schedulingModel.isShowingSettings) {
@@ -534,10 +525,8 @@ struct ContentView: View {
             openImport: { openImport() },
             openPortableDeckImport: openPortableDeckImport,
             openPortableDeckExport: { openPortableDeckExport() },
-            openVocabularyPackImport: openVocabularyPackImport,
             openVocabularyPacks: { isShowingVocabularyPacks = true },
             openAddFromVocabulary: { isAddingFromVocabulary = true },
-            openVocabularySet: { showsVocabularySet = true },
             openDeckBuilder: { isShowingDeckBuilder = true },
             openTemplates: { openTemplates() },
             openBrowse: { openBrowse() },
@@ -564,7 +553,6 @@ struct ContentView: View {
                 && !isAddingFromVocabulary,
             canImportPortableDeck: canTransferPortableDeck,
             canExportPortableDeck: canTransferPortableDeck && decksModel.selectedDeckID != nil,
-            canImportVocabularyPack: canUseVocabularyUI,
             canOpenVocabularyPacks: canUseVocabularyUI,
             canAddFromVocabulary: canUseVocabularyUI,
             canOpenDeckBuilder: canTransferPortableDeck && !deckBuilderRegistry.features.isEmpty,

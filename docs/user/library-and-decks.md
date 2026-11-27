@@ -27,7 +27,7 @@ item's current deck. See [Statistics](../statistics/) and
 The sidebar controls which items and due cards appear in the detail area.
 Decks organize items without changing their item type or generated cards.
 
-**Create Vocabulary Set** adds a single item with two independently scheduled
+**Add Word → Create Cards** adds a single item with two independently scheduled
 cards. Choose a destination deck in the composer.
 
 [![A populated library and its item list]({{ site.baseurl }}/assets/screenshots/library-populated.png)]({{ site.baseurl }}/assets/screenshots/library-populated.png)

@@ -105,6 +105,14 @@ public struct KnownWordsView: View {
         self.vocabulary = vocabulary; self.decks = decks; self.onCreated = onCreated
     }
 
+    private func exportWordList() {
+        let sorted = wordList.sorted {
+            $0.term.expression.localizedStandardCompare($1.term.expression) == .orderedAscending
+        }
+        exportDocument = KnownWordsCSV(VocabularyListFormat.csv(sorted))
+        isExporting = true
+    }
+
     /// Rows are loaded for the selected language and already sorted.
     private var visible: [KnownWordGroup] {
         rows.filter { $0.state == filter && (query.isEmpty || $0.matches(query)) }
@@ -191,13 +199,7 @@ public struct KnownWordsView: View {
                     importRequest = .init(language: language, text: "", fromFile: false)
                 }
                 .accessibilityIdentifier("known-words-paste")
-                Button("Export Word List…", systemImage: "square.and.arrow.up") {
-                    let sorted = wordList.sorted {
-                        $0.term.expression.localizedStandardCompare($1.term.expression) == .orderedAscending
-                    }
-                    exportDocument = KnownWordsCSV(VocabularyListFormat.csv(sorted))
-                    isExporting = true
-                }
+                Button("Export Word List…", systemImage: "square.and.arrow.up", action: exportWordList)
                 .disabled(wordList.isEmpty)
                 .accessibilityIdentifier("known-words-export")
             } label: {
@@ -207,9 +209,7 @@ public struct KnownWordsView: View {
             .accessibilityIdentifier("known-words-word-list")
         }
         .sheet(isPresented: $isAdding, onDismiss: { Task { await refresh() } }) {
-            VocabularyComposerView(vocabulary: vocabulary, decks: decks, language: language) {
-                await onCreated()
-            }
+            VocabularyComposerView(vocabulary: vocabulary, decks: decks, language: language, onSaved: onCreated)
         }
         .sheet(item: $importRequest) { request in
             KnownWordsImportView(vocabulary: vocabulary, language: request.language, text: request.text,
@@ -579,12 +579,21 @@ private struct KnownWordsImportView: View {
     }
 }
 
+// Keep reading unfinished drafts left by the original context authoring flow.
+private struct LegacyContextDraft: Decodable {
+    let target: ContextTarget
+    let sourceSentence: String
+    let deckID: UUID?
+    let examples: [ContextExample]
+    let groupID: UUID
+}
+
 public struct VocabularyComposerView: View {
     private let vocabulary: any PersonalVocabulary
     private let deckManager: any LibraryDeckManaging
     private let onSaved: @MainActor () async -> Void
     private let selectingCard: Bool
-    private let markOnly: Bool
+    private let makeCustomCapture: (() -> WordCaptureModel)?
     private let lookup: VocabularyExampleLookup
     private let explicitPackRoot: URL?
     private let editorDraftSeed: VocabularySetDraft?
@@ -602,7 +611,6 @@ public struct VocabularyComposerView: View {
     @State private var language: String
     @State private var deckOptions: [DeckSummary] = []
     @State private var makingCards: Bool
-    @State private var useSecondSentence = false
     @State private var exactForm = ""
     @State private var sourcedSentence: String?
     @State private var sourcedWord: String?
@@ -617,24 +625,26 @@ public struct VocabularyComposerView: View {
     @State private var busy = false
     @State private var error: String?
     @State private var saveID = UUID()
+    @State private var showsCustomCapture = false
 
     public init(vocabulary: any PersonalVocabulary, decks: any LibraryDeckManaging, language: String = "",
-                preset: VocabularySetDraft? = nil, markOnly: Bool = false, startsCreating: Bool = false, deckID: UUID? = nil,
+                preset: VocabularySetDraft? = nil, startsCreating: Bool = false, deckID: UUID? = nil,
                 packRoot: URL? = nil, restoreEditorDraft: Bool = false, lookup: VocabularyExampleLookup = .shared,
+                makeCustomCapture: (() -> WordCaptureModel)? = nil,
                 onSaved: @escaping @MainActor () async -> Void = {}) {
         self.vocabulary = vocabulary; deckManager = decks; self.onSaved = onSaved
         self.lookup = lookup; explicitPackRoot = packRoot
+        self.makeCustomCapture = makeCustomCapture
         editorDraftSeed = restoreEditorDraft ? preset : nil
         let initial = preset ?? .init(term: .init(language: language, expression: ""), meaning: "",
                                       meaningLanguage: "", sentence: "", deckID: deckID)
         _draft = State(initialValue: initial)
         _word = State(initialValue: initial.term.expression)
         _language = State(initialValue: initial.term.language)
-        _makingCards = State(initialValue: (startsCreating || preset != nil) && !markOnly)
+        _makingCards = State(initialValue: startsCreating || preset != nil)
         _sourcedSentence = State(initialValue: initial.source == nil ? nil : initial.sentence)
         _sourcedWord = State(initialValue: initial.source == nil ? nil : initial.term.expression)
-        selectingCard = (startsCreating || preset != nil) && !markOnly
-        self.markOnly = markOnly
+        selectingCard = preset != nil
     }
 
     public var body: some View {
@@ -645,7 +655,7 @@ public struct VocabularyComposerView: View {
                     TextField("Word or phrase", text: $word).autocorrectionDisabled()
                         .focused($focusedField, equals: .word)
                         .accessibilityIdentifier("vocabulary-set-word")
-                    if !selectingCard && !markOnly {
+                    if !selectingCard {
 #if os(macOS)
                         intentionPicker.pickerStyle(.menu)
 #else
@@ -687,9 +697,6 @@ public struct VocabularyComposerView: View {
                             Text("Unassigned").tag(UUID?.none)
                             ForEach(deckOptions) { deck in Text(deck.name).tag(Optional(deck.id)) }
                         }
-                        if draft.productionSentence != nil {
-                            Toggle("Use second sentence for Cloze", isOn: $useSecondSentence)
-                        }
                         if let preview {
                             LabeledContent("Cloze", value: preview)
                         } else if !draft.sentence.isEmpty {
@@ -698,17 +705,27 @@ public struct VocabularyComposerView: View {
                     }
                 }
                 if let error { Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.red) }
+                if makeCustomCapture != nil {
+                    Section {
+                        Button("Use Custom Item Type…") {
+                            focusedField = nil
+                            showsCustomCapture = true
+                        }
+                        .accessibilityIdentifier("vocabulary-use-custom-item-type")
+                    }
+                }
             }
             .formStyle(.grouped)
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(makingCards ? "Create Vocabulary Set" : "Add Known Word")
+            .navigationTitle("Add Word")
             .disabled(busy)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }.disabled(busy)
+                        .accessibilityIdentifier("vocabulary-set-cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(makingCards ? "Create Card Set" : "I Know This") { Task { await save() } }
+                    Button(makingCards ? "Add Cards" : "I Know This") { Task { await save() } }
                         .accessibilityIdentifier("vocabulary-set-save")
                         .disabled(busy || word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                   || language.isEmpty || (makingCards && (preview == nil || draft.meaning.isEmpty || draft.sentence.isEmpty)))
@@ -719,6 +736,14 @@ public struct VocabularyComposerView: View {
                     Button("Hide Keyboard") { focusedField = nil }
                 }
 #endif
+            }
+            .sheet(isPresented: $showsCustomCapture) {
+                if let makeCustomCapture {
+                    WordCaptureView(model: makeCustomCapture(), deckID: draft.deckID, word: word)
+#if os(iOS)
+                        .dynamicTypeSize(dynamicTypeSize)
+#endif
+                }
             }
             .task {
                 if language.isEmpty { language = activeLanguage }
@@ -744,11 +769,7 @@ public struct VocabularyComposerView: View {
                         draft.source = nil
                     }
                 }
-                if VocabularyTerm.normalized(word) != VocabularyTerm.normalized(draft.term.expression) {
-                    useSecondSentence = false
-                }
             }
-            .onChange(of: useSecondSentence) { _, _ in saveID = UUID() }
             .onChange(of: draft) { _, _ in saveID = UUID() }
             .onChange(of: exactForm) { _, _ in saveID = UUID() }
             .onChange(of: draft.sentence) { _, sentence in
@@ -885,8 +906,6 @@ public struct VocabularyComposerView: View {
             exactForm = ""
             draft.source = nil
         }
-        draft.productionSentence = nil
-        useSecondSentence = false
         guard let choice = selectedMeaning else { return }
         draft.meaning = choice.text
         if draft.sentence.isEmpty, let example = firstUsableExample(for: choice) {
@@ -969,7 +988,7 @@ public struct VocabularyComposerView: View {
               let browsing = deckManager as? any LibraryBrowsing,
               let libraryID = try? await browsing.libraryID(),
               let data = try? Data(contentsOf: root.appendingPathComponent(".learn-in-context/\(libraryID)/\(name)")),
-              let saved = try? JSONDecoder().decode(ContextAuthoringDraft.self, from: data),
+              let saved = try? JSONDecoder().decode(LegacyContextDraft.self, from: data),
               !saved.target.expression.isEmpty, word == startedWith, !Task.isCancelled,
               !UserDefaults.standard.bool(forKey: "recovered-context-draft-\(saved.groupID)") else { return }
         recoveredDraftID = saved.groupID
@@ -1015,8 +1034,8 @@ public struct VocabularyComposerView: View {
         if needsConfirmedForm && exactForm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return nil
         }
-        let sentence = (useSecondSentence ? draft.productionSentence : nil) ?? draft.sentence
-        let form = (useSecondSentence ? draft.productionForm : nil) ?? term.expression.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentence = draft.sentence
+        let form = term.expression.trimmingCharacters(in: .whitespacesAndNewlines)
         let matches = VocabularySet.occurrences(of: form, in: sentence, language: language)
         guard matches.count == 1, let span = matches.first else { return nil }
         return ClozeValidation.displayText(from: sentence, blanks: [.init(group: 1,
@@ -1031,11 +1050,9 @@ public struct VocabularyComposerView: View {
             if makingCards {
                 var submitted = draft
                 submitted.term = term
-                if !useSecondSentence {
-                    submitted.productionSentence = nil
-                    submitted.productionForm = nil
-                    submitted.productionOccurrence = nil
-                }
+                submitted.productionSentence = nil
+                submitted.productionForm = nil
+                submitted.productionOccurrence = nil
                 _ = try await vocabulary.createVocabularySet(submitted, id: saveID)
                 preferredMeaningLanguage = draft.meaningLanguage
                 if let recoveredDraftID {
@@ -1048,98 +1065,6 @@ public struct VocabularyComposerView: View {
             activeLanguage = language
             await onSaved()
             dismiss()
-        } catch { self.error = error.localizedDescription }
-    }
-}
-
-public struct VocabularyCaptureActions: View {
-    let vocabulary: any PersonalVocabulary
-    let decks: any LibraryDeckManaging
-    let term: VocabularyTerm
-    let preset: VocabularySetDraft
-    var onCreated: @MainActor () async -> Void
-    @AppStorage("vocabularyLearningLanguage") private var learningLanguage = ""
-    @State private var error: String?
-    @State private var isComposing = false
-    @State private var isChoosingLanguage = false
-    @State private var isKnown = false
-    @State private var busy = false
-    @State private var prior: VocabularyJudgment?
-
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 16) { buttons }
-                VStack(alignment: .leading) { buttons }
-            }
-            if let error { Text(error).font(.caption).foregroundStyle(.red) }
-        }
-        .task(id: currentTerm.id) {
-            prior = nil
-            await refresh()
-        }
-        .sheet(isPresented: $isComposing, onDismiss: { Task { await refresh() } }) {
-            VocabularyComposerView(vocabulary: vocabulary, decks: decks, preset: preset, onSaved: onCreated)
-        }
-        .sheet(isPresented: $isChoosingLanguage, onDismiss: { Task { await refresh() } }) {
-            VocabularyComposerView(vocabulary: vocabulary, decks: decks, preset: preset, markOnly: true)
-        }
-    }
-
-    private var currentTerm: VocabularyTerm {
-        term.language.isEmpty
-            ? .init(language: learningLanguage, expression: term.expression, sense: term.sense, lemma: term.lemma)
-            : term
-    }
-
-    @ViewBuilder private var buttons: some View {
-        Button(isKnown ? "Known" : "I Know This", systemImage: isKnown ? "checkmark.circle.fill" : "checkmark.circle") {
-            if currentTerm.language.isEmpty { isChoosingLanguage = true }
-            else { Task { await mark() } }
-        }
-        .buttonStyle(.borderless)
-        .disabled(busy || isKnown)
-        if let prior {
-            Button("Undo") {
-                Task {
-                    do {
-                        _ = try await vocabulary.setVocabularyJudgment(prior, for: currentTerm.withoutSense, changeID: UUID())
-                        self.prior = nil
-                        await refresh()
-                    } catch { self.error = error.localizedDescription }
-                }
-            }.buttonStyle(.borderless)
-        }
-        Button("Create Card Set…") { isComposing = true }.buttonStyle(.borderless)
-    }
-
-    /// The spelling is known when any of its meanings is, the same rule reading highlights use.
-    private func refresh() async {
-        let key = currentTerm
-        guard !key.language.isEmpty else { isKnown = false; return }
-        do {
-            let statuses = try await vocabulary.vocabularyStatuses(language: key.language, expression: key.expression)
-            guard !Task.isCancelled, key == currentTerm else { return }
-            isKnown = statuses.contains { ($0.expressionState ?? $0.state) == .known }
-            error = nil
-        } catch { self.error = error.localizedDescription }
-    }
-
-    /// Records the word without a meaning, so it is known in every sense; card sets keep the sense.
-    private func mark() async {
-        let key = currentTerm
-        let word = key.withoutSense
-        busy = true
-        defer { busy = false }
-        do {
-            let previous = try await vocabulary.vocabularyStatuses(language: word.language, expression: word.expression)
-                .first { $0.term.id == word.id }
-            _ = try await vocabulary.setVocabularyJudgment(.known, for: word, changeID: UUID())
-            guard key == currentTerm else { return }
-            prior = previous?.explicitJudgment ?? .reviewHistory
-            learningLanguage = key.language
-            isKnown = true
-            error = nil
         } catch { self.error = error.localizedDescription }
     }
 }

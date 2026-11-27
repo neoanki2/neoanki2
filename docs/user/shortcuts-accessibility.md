@@ -60,19 +60,13 @@ The app adds these commands to the standard macOS menu bar.
 ### File
 
 - **New Item** — **Command-N** — adds an item to the selected scope.
-- **Create Vocabulary Set…** opens the composer with the selected deck. Choose
-  **Find Examples** to look up a word or phrase in installed dictionaries.
-  Returning to a saved preview does not reopen the keyboard, and ready, error,
-  and saved states provide accessibility announcements.
-
-- **Add Word…** — **Command-Shift-N** — opens quick offline vocabulary capture.
-  Dictionary–deck setups are remembered. Arrow keys navigate matches, Return
+- **Add Word…** — **Command-Shift-N** — opens the word composer for the selected
+  deck. Choose **Find Examples** for a meaning-recall and Cloze pair. Under
+  **Use Custom Item Type…**, arrow keys navigate dictionary matches, Return
   selects one, and **Command-Return** adds a valid word without closing the sheet.
 - **Import…** opens a JSON or CSV file.
 - **Import Deck…** opens a `.neodeck` file or `.neoanki` bundle.
   You can also open an authored `.neoanki` bundle from Finder to start its import preview.
-- **Import Vocabulary Pack…** validates and installs a local `.neovocab`
-  directory.
 - **Export Deck…** exports the selected real deck as `.neodeck`.
 - **Build Deck…** opens the catalog containing Poem Deck and Prose Deck.
 
@@ -90,7 +84,7 @@ with the controls in the sidebar.
   selection, is also available from the row context menu, and each item returns
   after another lapse.
 - **Show All Items** clears that filter.
-- **Vocabulary Packs…** lists the packs installed in the current library.
+- **Vocabulary Packs…** lists installed packs and imports local `.neovocab` directories.
 - **Item Types…** — **Command-Shift-T**
 
 ### Study
@@ -100,12 +94,12 @@ with the controls in the sidebar.
 - **Edit Card…** — **Command-E** — opens the current card's item editor.
 - **Continue** — **Space** before reveal; **Return** also activates the
   in-view default action.
-- **Grade: Good with Space** — **Space** after reveal.
 - **Grade: Again** — **1**
 - **Grade: Hard** — **2**
-- **Grade: Good** — **3**
+- **Grade: Good** — **3** or **Space** after reveal
 - **Grade: Easy** — **4**
 - **Undo Last Grade** — **Command-Z**
+- **Study Day Settings…** sets when a new study day begins.
 
 Commands become available only in the relevant state. Grades are disabled until
 the answer is revealed, and every study command is disabled while the card
@@ -125,13 +119,6 @@ Recording**, then to **Reveal & Compare** or **Save & Complete**. Playback,
 replacement, and draft deletion move into the adjacent **Recording** menu once
 they are relevant, so a second primary action is not stranded at the lower edge
 of the card content.
-
-### Study Day
-
-- **Study Day Settings…** sets when a new study day begins.
-
-There is no optimization command. Parameter fitting runs by itself when review
-history warrants it, so there is no menu item to find, enable, or wait on.
 
 ## Keyboard shortcuts by task
 

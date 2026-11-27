@@ -27,7 +27,7 @@ static layouts presents them, and how the learner answers. The saved data model
 calls a Card setup a `Template`; the friendlier name is only a change in the
 app's interface.
 
-**Create Vocabulary Set** makes one Vocabulary Set item with a meaning-recall
+**Add Word → Create Cards** makes one Vocabulary Set item with a meaning-recall
 card and a Cloze card. Existing Context Example items are editable in the item editor.
 
 Open **Item Types** on Mac, or **Create → Item Types & Card Setups** on iPhone
@@ -69,8 +69,8 @@ The picker refreshes when a definition or a deck's type assignments change.
 - [Repair or delete an item type](#repair-or-delete-an-item-type)
 </nav>
 
-The focused **Add Word** flow can use an existing item type. Its **Card Setup**
-maps dictionary content to that type's fields and saves the mapping for the
+Choose **Use Custom Item Type…** in **Add Word**, then use **Card Setup** to map
+dictionary content to the item type's fields. The app saves the mapping for the
 dictionary–deck pair. Editing one word does not change that mapping. If a field
 is deleted or its type changes, repair the pair's setup before adding again;
 the app does not silently redirect content to another field. Standard

@@ -144,30 +144,17 @@ and configured limits before lookup.
 
 ## Application workflow
 
-The ordinary Add Item editor on Mac and iOS also supports generic field lookup:
-choose a pack and separate source/destination Text or Rich Text fields, then
-type in the source. A unique exact match fills editable dictionary text after
-a 300 ms debounce; other matches require selection. Forms, textual pronunciation
-representations, and definitions retain their source Unicode spelling. Manual
-destination edits are protected. The item is saved using its existing schema,
-templates, and selected deck.
+On Mac, open **Library → Vocabulary Packs…** and choose **Import Pack…**.
+On iPhone and iPad, open **Settings → Vocabulary Packs** and choose
+**Install Pack…**. NeoAnki copies the validated `.neovocab` package into
+its managed library directory.
 
-The SUM-11 normalizer emits stressed headwords as both lexical forms and textual
-pronunciation representations. Recompile and reimport older SUM-11 packs to
-expose these representations to pronunciation-card builders as well as field
-lookup. The offline-stack script identifies the updated pack as version 4.
-
-1. Choose **File → Import Vocabulary Pack…** and select the `.neovocab`
-   directory. NeoAnki copies the validated package into its managed library
-   directory; it does not keep a bookmark or live link to the source.
-2. Select an existing deck.
-3. Choose **Add from Vocabulary…**, select an installed pack, and search.
-4. Review the generated cards and choose **Add Cards**. The generated authored
-   item batch is validated and appended atomically to the selected deck without
-   creating a child deck.
-
-The add window remains open after a successful import so multiple words can be
-captured in one session.
+Use **Add Word → Create Cards → Find Examples** to look up a meaning and
+example sentence. The meaning-recall and Cloze cards use the selected
+example and retain its source. From **Add Word → Use Custom Item Type…**,
+choose a dictionary, deck, and field mappings. A unique exact match fills
+editable fields, including definitions, word forms, and textual pronunciation.
+The custom capture stays open after each save for repeated lookup.
 
 ## Device sync
 

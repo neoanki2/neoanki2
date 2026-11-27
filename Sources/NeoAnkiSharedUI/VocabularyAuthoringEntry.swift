@@ -3,17 +3,6 @@ import NeoAnkiCore
 import NeoAnkiFeatures
 import SwiftUI
 
-private struct OpenVocabularySetKey: EnvironmentKey {
-    static let defaultValue: @MainActor (UUID?) -> Void = { _ in }
-}
-
-public extension EnvironmentValues {
-    var openVocabularySet: @MainActor (UUID?) -> Void {
-        get { self[OpenVocabularySetKey.self] }
-        set { self[OpenVocabularySetKey.self] = newValue }
-    }
-}
-
 /// Uses the editor's live field content without changing or saving that item.
 public struct VocabularyAuthoringEntry: View {
     @Environment(\.vocabularyPackRootURL) private var rootURL
@@ -41,9 +30,9 @@ public struct VocabularyAuthoringEntry: View {
     }
 
     public var body: some View {
-        if let vocabulary = features.personalVocabulary, !fields.isEmpty {
+        if let vocabulary = features.personalVocabulary, !seedExpression.isEmpty {
             Section {
-                Button("Create Vocabulary Set…") { showing = true }.disabled(seedExpression.isEmpty)
+                Button("Add Word…") { showing = true }
             }
             .sheet(isPresented: $showing) {
                 let draft = VocabularySetDraft(term: .init(language: language, expression: seedExpression),

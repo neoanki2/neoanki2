@@ -20,7 +20,6 @@ public struct MobileRootView: View {
     @Bindable var model: MobileAppModel
     @State private var fixtureError: String?
     @State private var showsWordCapture = false
-    @State private var showsVocabularySet = false
     @State private var wordCaptureDeckID: UUID?
     @State private var fixturesReady = false
     @State private var retriedFailureFixture = false
@@ -69,31 +68,24 @@ public struct MobileRootView: View {
         }
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
         .environment(\.vocabularyPackRootURL, vocabularyRootURL)
-        .environment(\.openVocabularySet, { deckID in
-            wordCaptureDeckID = deckID
-            showsVocabularySet = true
-        })
         .environment(\.openWordCapture, { deckID in
             wordCaptureDeckID = deckID
             showsWordCapture = true
         })
         .sheet(isPresented: $showsWordCapture, onDismiss: { Task { await vocabularyLibrary.load() } }) {
-            WordCaptureView(model: model.features.makeWordCapture(rootURL: vocabularyRootURL) {
-                await model.authoringDidCommit()
-            }, deckID: wordCaptureDeckID)
-            .dynamicTypeSize(dynamicTypeSize)
+            if let vocabulary = model.features.personalVocabulary {
+                let refresh: @MainActor () async -> Void = { await model.authoringDidCommit() }
+                VocabularyComposerView(vocabulary: vocabulary, decks: model.features.vocabularyDecks, startsCreating: true,
+                                       deckID: wordCaptureDeckID, packRoot: vocabularyRootURL,
+                                       makeCustomCapture: {
+                                           model.features.makeWordCapture(rootURL: vocabularyRootURL, onSaved: refresh)
+                                       }, onSaved: refresh)
+                    .dynamicTypeSize(dynamicTypeSize)
+            }
         }
         .alert("Visual Fixture Failed", isPresented: Binding(get: { fixtureError != nil }, set: { if !$0 { fixtureError = nil } })) {
             Button("OK") { fixtureError = nil }
         } message: { Text(fixtureError ?? "") }
-        .sheet(isPresented: $showsVocabularySet) {
-            if let vocabulary = model.features.personalVocabulary {
-                VocabularyComposerView(vocabulary: vocabulary, decks: model.features.vocabularyDecks, startsCreating: true,
-                                       deckID: wordCaptureDeckID, packRoot: vocabularyRootURL) {
-                    await model.authoringDidCommit()
-                }.dynamicTypeSize(dynamicTypeSize)
-            }
-        }
         .onAppear { model.concealsAnswers = concealsAnswers }
         .onChange(of: model.concealsAnswers) { _, value in concealsAnswers = value }
         .task(id: model.syncEnabled) { vocabularyLibrary.sync.setEnabled(model.syncEnabled) }
@@ -244,7 +236,7 @@ private struct MobileTabView: View {
         switch section {
         case .home: HomeView(model: model, path: $homePath)
         case .library: LibraryView(model: model, navigationPath: $libraryPath)
-        case .create: CreateHubView(model: model, vocabularyLibrary: vocabularyLibrary, path: $createPath)
+        case .create: CreateHubView(model: model, path: $createPath)
         case .statistics:
             NavigationStack(path: $statisticsPath) {
                 StatisticsView(model: model.features.makeStatistics(scope: model.statisticsScope, sessionID: model.statisticsSessionID))
@@ -274,9 +266,7 @@ private extension AppSection {
 
 private struct CreateHubView: View {
     @Environment(\.openWordCapture) private var openWordCapture
-    @Environment(\.openVocabularySet) private var openVocabularySet
     @Bindable var model: MobileAppModel
-    @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
     @Binding var path: NavigationPath
     @State private var isAddingItem = false
     @State private var isAddingDeck = false
@@ -285,23 +275,23 @@ private struct CreateHubView: View {
         NavigationStack(path: $path) {
             List {
                 Section("Add") {
-                    Button("Create Vocabulary Set", systemImage: "text.bubble") { openVocabularySet(nil) }
-                        .accessibilityIdentifier("create-vocabulary-set")
                     Button("Add Word", systemImage: "character.book.closed") { openWordCapture(nil) }
                         .accessibilityIdentifier("create-add-word")
                     Button { isAddingItem = true } label: { Label("New Item", systemImage: "rectangle.stack.badge.plus") }
                     Button { isAddingDeck = true } label: { Label("New Deck", systemImage: "folder.badge.plus") }
+                    NavigationLink {
+                        List {
+                            NavigationLink { PoemBuilderMobileHost(model: model) } label: { Label("Poem Deck", systemImage: "text.quote") }
+                            NavigationLink { ProseBuilderMobileHost(model: model) } label: { Label("Prose Deck", systemImage: "text.book.closed") }
+                        }
+                        .navigationTitle("Build Deck")
+                        .modifier(MobileTabBarVisibility())
+                    } label: {
+                        Label("Build Deck", systemImage: "text.book.closed")
+                    }
                 }
                 Section("Design") {
                     NavigationLink { ItemTypesMobileView(model: model) } label: { Label("Item Types & Card Setups", systemImage: "square.stack.3d.up") }
-                }
-                Section("Deck Builders") {
-                    NavigationLink { PoemBuilderMobileHost(model: model) } label: { Label("Poem Deck", systemImage: "text.quote") }
-                    NavigationLink { ProseBuilderMobileHost(model: model) } label: { Label("Prose Deck", systemImage: "text.book.closed") }
-                }
-                Section("Transfer") {
-                    NavigationLink { TransferToolsView(model: model) } label: { Label("Import or Export", systemImage: "arrow.up.arrow.down.square") }
-                    NavigationLink { VocabularyToolsView(model: vocabularyLibrary) } label: { Label("Vocabulary Packs", systemImage: "books.vertical") }
                 }
             }
             .navigationTitle("Create")
@@ -343,6 +333,10 @@ private struct SettingsView: View {
                     Button("Sync Now") { Task { await model.synchronize(); await vocabularyLibrary.sync.refresh() } }
                         .disabled(!model.syncEnabled)
                 }
+                Section("Library") {
+                    NavigationLink { TransferToolsView(model: model) } label: { Label("Import or Export", systemImage: "arrow.up.arrow.down.square") }
+                    NavigationLink { VocabularyToolsView(model: vocabularyLibrary) } label: { Label("Vocabulary Packs", systemImage: "books.vertical") }
+                }
                 Section("Daily Reminder") {
                     Toggle("Remind me", isOn: reminderEnabled)
                     DatePicker("Time", selection: reminderTime, displayedComponents: .hourAndMinute)
@@ -365,9 +359,6 @@ private struct SettingsView: View {
                         .accessibilityIdentifier("study-day-rollover")
                 }
                 Section("About") {
-                    LabeledContent("Data", value: "Stored on this device")
-                    Text("NeoAnki2 keeps working offline. iCloud is optional and uses your private CloudKit database.")
-                        .foregroundStyle(.secondary)
                     Link("Privacy Policy", destination: URL(string: "https://neoanki2.github.io/user/privacy/")!)
                         .accessibilityIdentifier("mobilePrivacyPolicy")
                     Link("Help & Support", destination: URL(string: "https://neoanki2.github.io/user/support/")!)

@@ -13,18 +13,6 @@ struct StudyCommandHandlers {
     var canEditCurrentCard = false
     var canGrade = false
     var canUndoLastGrade = false
-
-    func canUseSpace(primaryAction: StudyPrimaryActionHandler?) -> Bool {
-        canGrade || (primaryAction?.isEnabled ?? false)
-    }
-
-    func useSpace(primaryAction: StudyPrimaryActionHandler?) {
-        if canGrade {
-            grade?(.good)
-        } else {
-            primaryAction?.invoke()
-        }
-    }
 }
 
 struct StudyPrimaryActionHandler {
@@ -60,6 +48,7 @@ extension FocusedValues {
 }
 
 struct StudyCommands: Commands {
+    let schedulingModel: SchedulingModel?
     @FocusedValue(\.studyCommandHandlers) private var handlers
     @FocusedValue(\.studyPrimaryActionHandler) private var primaryAction
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
@@ -86,12 +75,13 @@ struct StudyCommands: Commands {
 
             Divider()
 
-            Button(handlers?.canGrade == true ? "Grade: Good with Space" : "Continue") {
-                handlers?.useSpace(primaryAction: primaryAction)
+            if handlers?.canGrade != true {
+                Button("Continue") {
+                    primaryAction?.invoke()
+                }
+                .disabled(primaryAction?.isEnabled != true)
+                Divider()
             }
-            .disabled(!(handlers?.canUseSpace(primaryAction: primaryAction) ?? false))
-
-            Divider()
 
             ForEach(gradingMode.choices, id: \.rating) { choice in
                 Button("Grade: \(choice.title)") {
@@ -106,6 +96,13 @@ struct StudyCommands: Commands {
                 handlers?.undoLastGrade?()
             }
             .disabled(!(handlers?.canUndoLastGrade ?? false))
+
+            Divider()
+
+            Button("Study Day Settings…") {
+                schedulingModel?.openSettings()
+            }
+            .disabled(schedulingModel == nil)
         }
     }
 

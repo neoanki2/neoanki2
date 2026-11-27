@@ -5,7 +5,8 @@ extension FastFunctionalJourneyTests {
         let app = launchApp(scenario: "deck-with-due-items")
 
         runJourneyActivity("LibraryUITests.testSchedulingMenuOffersOnlySettings") {
-            app.menuBarItems["Study Day"].click()
+            XCTAssertFalse(app.menuBarItems["Study Day"].exists)
+            app.menuBarItems["Study"].click()
             let settings = app.menuItems.identified("Study Day Settings…")
             XCTAssertTrue(settings.waitUntilExists(timeout: 3))
             XCTAssertTrue(settings.isEnabled)

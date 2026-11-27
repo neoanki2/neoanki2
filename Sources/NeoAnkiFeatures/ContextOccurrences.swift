@@ -2,7 +2,6 @@ import Foundation
 import NaturalLanguage
 import NeoAnkiApplication
 import NeoAnkiCore
-import NeoAnkiVocabularyKit
 
 public enum ContextOccurrences {
     public static func validated(_ spans: [ContextSpan], in text: String) -> Bool {
@@ -14,20 +13,6 @@ public enum ContextOccurrences {
             end = span.start + span.length
         }
         return true
-    }
-
-    public static func fromPack(_ target: ExampleTarget?, text: String) -> [ContextSpan] {
-        guard let target else { return [] }
-        if let range = target.scalarRange {
-            guard range.location >= 0, range.length > 0, range.location <= text.unicodeScalars.count,
-                  range.length <= text.unicodeScalars.count - range.location else { return [] }
-            let start = text.unicodeScalars.index(text.unicodeScalars.startIndex, offsetBy: range.location)
-            let end = text.unicodeScalars.index(start, offsetBy: range.length)
-            guard String(text[start..<end]) == target.exactText,
-                  text.indices.contains(start), end == text.endIndex || text.indices.contains(end) else { return [] }
-            return [.init(start: text.distance(from: text.startIndex, to: start), length: text.distance(from: start, to: end))]
-        }
-        return exact(target.exactText, in: text, language: nil)
     }
 
     /// Exact forms are authoritative. Inferred forms stay sentence-local and bounded;
@@ -139,9 +124,6 @@ public enum ContextOccurrences {
         return matches
     }
 
-    public static func clozeSpans(for example: ContextExample, target: ContextTarget) -> [ContextSpan] {
-        merged(example.spans + find(target: target, in: example.sentence).spans)
-    }
     private static func merged(_ spans: [ContextSpan]) -> [ContextSpan] {
         var result: [ContextSpan] = []
         for span in spans.sorted(by: { $0.start == $1.start ? $0.length > $1.length : $0.start < $1.start }) {

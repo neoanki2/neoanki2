@@ -203,8 +203,7 @@ struct NeoAnki2App: App {
             TextEditingCommands()
             NativeEditingCommands()
             LibraryCommands()
-            StudyCommands()
-            SchedulingCommands(model: schedulingModel)
+            StudyCommands(schedulingModel: schedulingModel)
         }
 
         Settings {
