@@ -25,11 +25,13 @@ jobs:
         include:
           # App compilation and tests are the longest path to CI Gate.
           - package: app
-            runner: macos-26
+            runner: xcode-27
+            developer_dir: /Applications/Xcode_27.2.app/Contents/Developer
           - package: core
             runner: macos-26-intel
+            developer_dir: /Applications/Xcode_26.6.app/Contents/Developer
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: ${{ matrix.developer_dir }}
       UNIT_PACKAGE: ${{ matrix.package }}
       UNIT_SCRATCH_PATH: ${{ github.workspace }}/.build/ci-unit-${{ matrix.package }}
     steps:
@@ -45,10 +47,15 @@ jobs:
           UNIT_RUNNER: ${{ hashFiles('Scripts/test-unit.sh') }}
         run: |
           sdk="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+          xcode_build=$(plutil -extract ProductBuildVersion raw "$DEVELOPER_DIR/../version.plist")
+          if [[ "$UNIT_PACKAGE" == app && "$xcode_build" != "$(cat Config/app-unit-xcode-build.txt)" ]]; then
+            echo "App CI Xcode build $xcode_build does not match Config/app-unit-xcode-build.txt." >&2
+            exit 1
+          fi
           {
             # The Xcode build pins its bundled Swift toolchain.
             plutil -extract CFBundleShortVersionString raw "$DEVELOPER_DIR/../version.plist"
-            plutil -extract ProductBuildVersion raw "$DEVELOPER_DIR/../version.plist"
+            printf '%s\n' "$xcode_build"
             plutil -extract Version raw "$sdk/SDKSettings.plist"
             plutil -extract ProductBuildVersion raw "$sdk/System/Library/CoreServices/SystemVersion.plist"
             printf '%s\n' "$DEVELOPER_DIR" "$GITHUB_WORKSPACE" "$UNIT_MANIFESTS" "$UNIT_RUNNER"

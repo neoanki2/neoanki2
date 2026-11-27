@@ -29,12 +29,19 @@ and status checks do not create timing entries.
   and cleanup. Record blocked reports and leave their release
   IDs open for resumption. A completed, abandoned, or no-op release closes its
   entry.
-- Include a timing table in every release report with the current release and
-  the four most recent completed releases before it. Give the version and total
-  elapsed time for each, plus the absolute path to the timing log. Use the last
-  completed timing entry for each version and skip abandoned releases. Label
-  reconstructed intervals with their start and end milestones, and mark missing
-  measurements as unknown.
+- Include a timing table with the current release and the four most recent
+  completed versions. Give the selected channels, request-to-publication time,
+  controller-to-publication time, and total delivery time for each, plus the
+  absolute path to the timing log. Publication means every selected channel
+  has been published or accepted for Store review. Use the first complete
+  publication checkpoint or the earliest recorded confirmation. Report deferred
+  delivery and later workflow changes separately. Use the delivery and cleanup
+  milestone when later work extended the last completion entry. Skip abandoned
+  releases. Label reconstructed intervals and mark missing measurements as unknown.
+- For each PR candidate, record the CI run, revision, duration, and outcome.
+  Show how much time elapsed before merge and how much was spent on failed
+  candidates and their corrections. Measure from timestamps and count overlaps
+  once.
 
 ## Integrate the release source
 
@@ -72,28 +79,15 @@ or bypass branch protection to proceed.
 
 ## Local checks before every push
 
-Resolve the latest target `main` revision through authenticated `gh` and make
-that exact commit available locally. Record it as `release_base_sha`; do not use
-a stale tracking ref. Preserve unrelated edits in the main checkout; do not
-create a worktree unless the user explicitly asks.
-Commit the intended changes locally before validating: the strict documentation
-comparison examines `BASE...HEAD`, not uncommitted edits.
+Enable the repository's pre-push hook with
+`./Scripts/install-git-hooks.sh`. Commit the intended
+changes locally and integrate the latest GitHub main in this checkout. The
+hook verifies the actual pushed commit and current GitHub main through
+authenticated `gh`. It requires the pinned app CI Xcode build and runs the
+full PR unit suites and strict documentation. It also builds and validates
+the rendered Pages site and checks API freshness when their inputs change. Use focused tests while iterating to catch failures
+before this full run.
 
-Run these checks against the complete candidate before the first push and before
-pushing corrections to a failed PR:
-
-```bash
-git diff --check "${release_base_sha}...HEAD"
-swift Scripts/validate-docs.swift --require-screenshots --base-ref "$release_base_sha"
-```
-
-- The required GitHub CI Gate owns the broad unit suites. Avoid running the same
-  suites locally as a routine pre-push step. Use focused local checks to diagnose
-  a failure or exercise changed behavior that CI does not cover.
-- The controller checks generated API reference freshness for API source
-  changes. Run that check locally for changes to reference tooling or docs
-  that the release planner will not select. Run the architecture scan when
-  the change affects module boundaries.
 - GitHub's `.github/workflows/test.yml` is unit-only. Keep broader checks local
   before pushing: use the relevant campaign path filters in the manual
   `.github/workflows/validation.yml` to select additional headless checks, such
@@ -107,12 +101,9 @@ swift Scripts/validate-docs.swift --require-screenshots --base-ref "$release_bas
   regression coverage uses explicit clock boundaries and observable operation
   gates. Keep those regressions in CI or the relevant manual campaign.
 
-Keep the candidate HEAD, base SHA, commands, outcomes, and original logs under
-`.build/release-prepush/`. Reuse passing evidence only when the relevant source,
-build inputs, and toolchain are unchanged. After a fix, recommit and rerun affected
-checks. A failure blocks the push until its cause is corrected; never rerun an
-unchanged failed check just to obtain green. Before pushing, verify that HEAD
-still matches the checked candidate and that no intended edits remain uncommitted.
+Keep the candidate HEAD, base SHA, hook output, and unit lane logs under
+`.build/release-prepush/`. A failure blocks the push until its cause is fixed.
+Run the hook again after changing the candidate.
 The controller reuses a successful CI Gate result when it can prove that the
 workflow tested the exact merged tree. Otherwise it runs the affected suites
 from the pinned source. When retiring a required check, reconcile
@@ -222,9 +213,12 @@ releases, and uncertain uploads must retain their recovery inputs.
 ## Record release bottlenecks
 
 Use the timing history to identify avoidable delays and record external waits
-separately. A completed delivery and cleanup closes the release timing entry.
-Treat process changes and their PRs as separate work so their checks do not
-extend the release itself.
+separately. Compare releases with the same channel set and milestones when
+assessing speed. Record confirmed work avoided, such as reusing exact-tree CI
+in place of local tests, and report time saved only when a comparable baseline
+measures that phase. Check that downstream workflows still accept the replacement
+evidence when changing validation. A completed delivery and cleanup closes the
+release timing entry. Track workflow changes and their PRs separately.
 
 Read [the release guide](../../../docs/RELEASING.md) for setup, version examples,
 checkpoint behavior, and recovery. Return selected versions/source, each channel's

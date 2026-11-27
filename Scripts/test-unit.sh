@@ -29,7 +29,7 @@ run_swift() {
   if [[ "$skip_build" == --skip-build ]]; then
     build_flags=(--skip-build)
   fi
-  swift test "${build_flags[@]}" \
+  xcrun swift test "${build_flags[@]}" \
     --package-path "$path" --scratch-path "$build_root/ci-unit-$package" \
     --filter "$filter" "$@"
 }

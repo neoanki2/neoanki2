@@ -10,6 +10,12 @@
 - Documentation: `swift Scripts/validate-docs.swift`
 - Contributor guide: `docs/user/developer/index.md`
 
+Keep the repository's pre-push hook enabled with
+`./Scripts/install-git-hooks.sh`. It validates the clean
+commit being pushed against current GitHub main with the full PR unit suites,
+strict documentation, and rendered Pages and API checks when affected. Use the
+pinned app CI Xcode build and wait for validation to pass before pushing.
+
 Preserve unrelated working-tree changes. API changes must update the typed
 endpoint registry, tests, and generated `docs/api/` artifacts together.
 
