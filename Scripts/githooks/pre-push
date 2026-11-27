@@ -46,7 +46,14 @@ SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 printf 'Pre-push: validating %s against main %s.\n' "$head" "$base"
 git diff --check "$base...$head"
 xcrun swift Scripts/validate-docs.swift --require-screenshots --base-ref "$base"
-./Scripts/test-unit.sh
+python3 Scripts/test-docs-build.py --base "$base" &
+docs_pid=$!
+unit_status=0
+./Scripts/test-unit.sh || unit_status=$?
+docs_status=0
+wait "$docs_pid" || docs_status=$?
+[[ "$unit_status" == 0 && "$docs_status" == 0 ]] \
+  || fail "Unit or rendered documentation checks failed."
 api_changes=$(git diff --name-only "$base...$head" -- Sources/NeoAnkiAPI Tools/NeoAnkiAPIReferenceGenerator docs/api)
 if [[ -n "$api_changes" ]]; then
   xcrun swift run --scratch-path "${NEOANKI_UNIT_BUILD_ROOT:-$PWD/.build}/ci-unit-app" neoanki-api-reference check

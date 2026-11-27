@@ -80,12 +80,12 @@ or bypass branch protection to proceed.
 ## Local checks before every push
 
 Enable the repository's pre-push hook with
-`git config --local core.hooksPath Scripts/githooks`. Commit the intended
+`./Scripts/install-git-hooks.sh`. Commit the intended
 changes locally and integrate the latest GitHub main in this checkout. The
 hook verifies the actual pushed commit and current GitHub main through
 authenticated `gh`. It requires the pinned app CI Xcode build and runs the
-full PR unit suites, strict documentation, and the generated API freshness
-check when affected. Use focused tests while iterating to catch failures
+full PR unit suites and strict documentation. It also builds and validates
+the rendered Pages site and checks API freshness when their inputs change. Use focused tests while iterating to catch failures
 before this full run.
 
 - GitHub's `.github/workflows/test.yml` is unit-only. Keep broader checks local

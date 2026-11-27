@@ -40,14 +40,21 @@ validation. Performance benchmarks and native XCTest UI journeys are opt-in.
 Enable the tracked Git hook in this checkout:
 
 ```bash
-git config --local core.hooksPath Scripts/githooks
+./Scripts/install-git-hooks.sh
 ```
 
 Commit your changes, integrate current GitHub main, and push from a clean
 checkout of the commit you want to send. The hook verifies the current base,
 runs all four unit lanes, and checks the diff and strict documentation.
 Changes to the local API, its generator, or generated reference also run the
-API freshness check. A failure stops the push.
+API freshness check. When documentation build inputs change, the hook builds
+the site with the GitHub Pages Jekyll image and runs the same rendered-site,
+headless Chromium, and legacy redirect checks as the publish workflow.
+A failure stops the push.
+
+The rendered build needs a running Podman or Docker engine that supports Linux
+amd64 containers. Node and npm install the pinned browser tooling on first use.
+Run `python3 Scripts/test-docs-build.py` to check the rendered site on its own.
 
 The hook uses Apple Silicon and the exact Xcode build pinned for the app CI
 job in `Config/app-unit-xcode-build.txt`. Set `DEVELOPER_DIR` to that Xcode

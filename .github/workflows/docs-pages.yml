@@ -49,12 +49,8 @@ jobs:
           PREVIOUS_SHA: ${{ github.event.before }}
         run: |
           changed=true
-          if [[ "$GITHUB_EVENT_NAME" == push ]] &&
-            git diff --quiet "$PREVIOUS_SHA" HEAD -- docs .github/workflows/docs-pages.yml \
-              Scripts/validate-built-docs.py Scripts/check-docs-responsive.mjs \
-              Scripts/build-docs-redirect.py Scripts/validate-docs-redirect.py \
-              Scripts/check-published-docs.py; then
-            changed=false
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            changed=$(python3 Scripts/test-docs-build.py --changed "$PREVIOUS_SHA")
           fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
@@ -71,64 +67,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Add build metadata
-        env:
-          COMMIT_SHA: ${{ github.sha }}
-        run: |
-          python3 - <<'PY'
-          import datetime
-          import json
-          import os
-          from pathlib import Path
-
-          data_directory = Path("docs/_data")
-          data_directory.mkdir(exist_ok=True)
-          metadata = {
-              "commit_sha": os.environ["COMMIT_SHA"],
-              "published_at": datetime.datetime.now(
-                  datetime.timezone.utc
-              ).isoformat(timespec="seconds").replace("+00:00", "Z"),
-          }
-          (data_directory / "build.json").write_text(
-              json.dumps(metadata, indent=2) + "\n",
-              encoding="utf-8",
-          )
-          PY
       - name: Configure Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         id: pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697
-        with:
-          source: ./docs
-          destination: ./_site
-      - name: Validate rendered documentation
-        run: >-
-          python3 Scripts/validate-built-docs.py _site
-          --base-url https://neoanki2.github.io
-      - name: Install headless documentation browser
-        run: |
-          npm install --prefix .build/docs-playwright --no-save playwright@1.62.1
-          .build/docs-playwright/node_modules/.bin/playwright install --with-deps chromium
-      - name: Validate responsive and keyboard behavior
+      - name: Build and verify the rendered site and legacy redirects
         env:
-          PLAYWRIGHT_MODULE: ${{ github.workspace }}/.build/docs-playwright/node_modules/playwright/index.mjs
-        run: |
-          python3 -m http.server 4173 --directory _site >/tmp/neoanki-docs-server.log 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid"' EXIT
-          sleep 1
-          node Scripts/check-docs-responsive.mjs http://127.0.0.1:4173
-      - name: Build legacy project-site redirects
-        run: >-
-          python3 Scripts/build-docs-redirect.py _site _redirect_site
-          --canonical-base https://neoanki2.github.io
-          --legacy-prefix /neoanki2
-      - name: Validate legacy project-site redirects
-        run: >-
-          python3 Scripts/validate-docs-redirect.py _site _redirect_site
-          --canonical-base https://neoanki2.github.io
+          INPUT_TOKEN: ${{ github.token }}
+        run: python3 Scripts/test-docs-build.py --redirect-site _redirect_site
       - name: Upload compatibility redirect artifact
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
