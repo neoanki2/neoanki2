@@ -790,7 +790,8 @@ public struct VocabularyComposerView: View {
                 Button("Cancel Search") { cancelLookup() }
             }
             if meaningChoices.count > 1 {
-                Picker("Dictionary meaning", selection: Binding(get: { meaningID }, set: selectMeaning)) {
+                // Swift 6.3 crashes when adapting the isolated method as a Binding setter.
+                Picker("Dictionary meaning", selection: Binding(get: { meaningID }, set: { selectMeaning($0) })) {
                     Text("Choose a meaning").tag(nil as String?)
                     ForEach(meaningChoices) { choice in
                         Text("\(choice.headword) — \(choice.text)").tag(Optional(choice.id))
@@ -800,7 +801,7 @@ public struct VocabularyComposerView: View {
                 LabeledContent("Headword", value: selectedMeaning.headword)
             }
             if let examples = selectedMeaning?.examples, !examples.isEmpty {
-                Picker("Dictionary example", selection: Binding(get: { exampleID }, set: selectExample)) {
+                Picker("Dictionary example", selection: Binding(get: { exampleID }, set: { selectExample($0) })) {
                     Text("Enter a sentence").tag(nil as Int?)
                     ForEach(examples) { example in
                         Text(example.sentence).tag(Optional(example.id))
