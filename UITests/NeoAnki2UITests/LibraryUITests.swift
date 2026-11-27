@@ -633,11 +633,11 @@ extension FastFunctionalJourneyTests {
         assertEmptyLibrary(in: app)
     }
 
-    /// Fitting is automatic, so the Scheduling menu must not offer it — there is
-    /// no decision here for the learner to get wrong or forget to make.
+    /// Fitting is automatic. The Study menu offers the study-day boundary setting.
     func checkLibraryUITestsSchedulingMenuOffersOnlySettings() throws {
         let app = launchApp()
-        app.menuBarItems["Study Day"].click()
+        XCTAssertFalse(app.menuBarItems["Study Day"].exists)
+        app.menuBarItems["Study"].click()
         let settings = app.menuItems.identified("Study Day Settings…")
         XCTAssertTrue(settings.waitUntilExists(timeout: 3))
         XCTAssertTrue(settings.isEnabled)

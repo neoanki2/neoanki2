@@ -183,8 +183,9 @@ app has focus. To check immediately, choose **NeoAnki2 → Settings → iCloud �
 Sync Now**. If the devices still disagree, compare the same deck scope and
 check the sending device’s sync status.
 
-If **Vocabulary Packs** reports a catalog refresh problem, retry its iCloud
-refresh after sync becomes available. Packs already installed on the device
+Open **Library → Vocabulary Packs…** on Mac or **Settings → Vocabulary Packs**
+on iPhone and iPad. If the catalog reports a refresh problem, retry after iCloud
+sync becomes available. Packs already installed on the device
 remain available offline; another device's catalog entry does not download the
 pack until you choose it.
 
@@ -227,8 +228,9 @@ library-backed services are ready.
 
 ## Import and export errors
 
-- **Choose a JSON or CSV file:** use the File import for `.json`/`.csv`, or
-  **Import Deck…** for `.neodeck`/`.neoanki`.
+- **Choose a JSON or CSV file:** use **File → Import…** on Mac or
+  **Settings → Import or Export** on iPhone and iPad. On Mac, use
+  **File → Import Deck…** for `.neodeck` or `.neoanki`.
 - **File larger than 5 MB / row or field limit:** split a JSON or CSV import
   into smaller valid files.
 - **No item type named…:** create that item type first or correct JSON's

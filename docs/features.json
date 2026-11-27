@@ -450,7 +450,7 @@
       "id": "scheduling-optimize",
       "name": "Automatic FSRS scheduling optimization",
       "article": "user/scheduling.md",
-      "sources": ["Sources/NeoAnki2/SchedulingModel.swift", "Sources/NeoAnki2/SchedulingCommands.swift", "Sources/NeoAnkiApplication/ReviewTimingTracker.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSOptimizer.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift"],
+      "sources": ["Sources/NeoAnki2/SchedulingModel.swift", "Sources/NeoAnki2/StudyCommands.swift", "Sources/NeoAnkiApplication/ReviewTimingTracker.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSOptimizer.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift"],
       "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/SchedulingModelTests.swift", "Tests/NeoAnkiApplicationTests/ReviewTimingTrackerTests.swift"],
       "screenshot": "assets/screenshots/scheduling-result.png"
     },
@@ -458,7 +458,7 @@
       "id": "menus-shortcuts",
       "name": "Menus and keyboard shortcuts",
       "article": "user/shortcuts-accessibility.md",
-      "sources": ["Sources/NeoAnki2/LibraryCommands.swift", "Sources/NeoAnki2/StudyCommands.swift", "Sources/NeoAnki2/SchedulingCommands.swift"],
+      "sources": ["Sources/NeoAnki2/LibraryCommands.swift", "Sources/NeoAnki2/StudyCommands.swift"],
       "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift", "Tests/NeoAnki2Tests/StudyCommandsTests.swift"]
     },
     {
@@ -501,8 +501,8 @@
       "id": "saved-context-examples",
       "name": "Study and edit previously saved Context Example items",
       "article": "user/authoring-items.md",
-      "sources": ["Sources/NeoAnkiFeatures/LearnInContextModel.swift", "Sources/NeoAnkiFeatures/ContextExamplePreset.swift", "Sources/NeoAnkiFeatures/ContextOccurrences.swift", "Sources/NeoAnkiFeatures/ContextSourceLibrary.swift", "Sources/NeoAnkiFeatures/ContextMediaPreparation.swift"],
-      "tests": ["Tests/NeoAnkiFeaturesTests/LearnInContextTests.swift", "Tests/NeoAnkiFeaturesTests/ContextCaptureRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/ContextMediaPersistenceRegressionTests.swift", "Tests/NeoAnkiApplicationTests/ConditionalItemDeletionTests.swift"]
+      "sources": ["Sources/NeoAnkiFeatures/ContextExamplePreset.swift", "Sources/NeoAnkiFeatures/ContextOccurrences.swift", "Sources/NeoAnkiSharedUI/KnownWordsView.swift"],
+      "tests": ["Tests/NeoAnkiFeaturesTests/ContextOccurrencesTests.swift", "Tests/NeoAnkiFeaturesTests/ContextMediaPersistenceRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/ContextReviewOrderingRegressionTests.swift", "Tests/NeoAnkiApplicationTests/ConditionalItemDeletionTests.swift"]
     },
     {
       "id": "offline-vocabulary",

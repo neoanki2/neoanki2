@@ -555,11 +555,12 @@ class NeoAnki2MobileUITestCase: XCTestCase {
 
 @MainActor
 final class MobileNavigationUITests: NeoAnki2MobileUITestCase {
-    func testVocabularySetShortcutExplainsUnavailableGeneration() throws {
+    func testAddWordOpensContextualCaptureAndExplainsUnavailableGeneration() throws {
         let app = launchApp(additionalArguments: ["-vocabularyLearningLanguage", "en",
                                                    "-vocabularyMeaningLanguage", "en"])
         open("Create", in: app)
-        let entry = app.buttons["create-vocabulary-set"]
+        XCTAssertFalse(app.buttons["Create Vocabulary Set"].exists)
+        let entry = app.buttons["create-add-word"]
         XCTAssertTrue(entry.waitUntilExists(timeout: 10)); entry.tap()
         let expression = app.textFields["vocabulary-set-word"]
         XCTAssertTrue(expression.waitUntilExists(timeout: 10))
@@ -594,7 +595,7 @@ final class MobileNavigationUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(word.waitUntilExists(timeout: 8))
         let mode = app.buttons["Create Cards"]
         XCTAssertTrue(mode.waitUntilExists(timeout: 8)); mode.tap()
-        XCTAssertTrue(app.navigationBars["Create Vocabulary Set"].waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Add Word"].waitUntilExists(timeout: 5))
         word.tap(); word.typeText("laguna")
         let sentence = app.descendants(matching: .any)["vocabulary-set-sentence"].firstMatch
         XCTAssertTrue(sentence.waitUntilExists(timeout: 8)); sentence.tap()
@@ -790,15 +791,25 @@ final class MobileAuthoringSurfaceUITests: NeoAnki2MobileUITestCase {
     func testAuthoringTransferVocabularyAndSyncConsentSurfaces() throws {
         let app = launchApp()
         open("Create", in: app)
-        for title in ["Item Types & Card Setups", "Import or Export", "Poem Deck", "Prose Deck", "Vocabulary Packs"] {
+        for title in ["Item Types & Card Setups", "Build Deck"] {
             XCTAssertTrue(app.buttons[title].waitUntilExists(timeout: 3), "Missing \(title)")
         }
-        app.buttons["Vocabulary Packs"].tap()
+        for title in ["Import or Export", "Poem Deck", "Prose Deck", "Vocabulary Packs"] {
+            XCTAssertFalse(app.buttons[title].exists, "Unexpected Create action \(title)")
+        }
+        app.buttons["Build Deck"].tap()
+        for title in ["Poem Deck", "Prose Deck"] {
+            XCTAssertTrue(app.buttons[title].waitUntilExists(timeout: 3), "Missing \(title)")
+        }
+
+        open("Settings", in: app)
+        XCTAssertTrue(app.buttons["Import or Export"].waitUntilExists(timeout: 3))
+        scrollToAndTap(app.buttons["Vocabulary Packs"], in: app)
         XCTAssertTrue(app.navigationBars["Vocabulary Packs"].waitUntilExists(timeout: 3))
         XCTAssertTrue(app.buttons["Install Pack…"].waitUntilExists(timeout: 5))
         XCTAssertFalse(app.navigationBars["Vocabulary Packs"].buttons["Install Pack"].exists)
 
-        open("Settings", in: app)
+        app.navigationBars["Vocabulary Packs"].buttons.firstMatch.tap()
         let enableSync = app.buttons["Enable iCloud Sync…"]
         XCTAssertTrue(enableSync.waitUntilExists(timeout: 3))
         enableSync.tap()
@@ -1303,6 +1314,7 @@ final class MobileVisualRedesignUITests: NeoAnki2MobileUITestCase {
         app.textFields["e.g. Spanish vocabulary"].tap()
         app.textFields["e.g. Spanish vocabulary"].typeText("Audit Reading")
         app.buttons["new-deck-create"].tap()
+        open("Settings", in: app)
         app.buttons["Import or Export"].tap()
         XCTAssertTrue(app.navigationBars["Transfer"].waitUntilExists(timeout: 5))
         capture("07-transfer", app)
@@ -1310,16 +1322,19 @@ final class MobileVisualRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.navigationBars["Export Deck"].waitUntilExists(timeout: 5))
         capture("08-export", app)
         back(app); back(app)
+        open("Create", in: app)
+        app.buttons["Build Deck"].tap()
         for title in ["Poem Deck", "Prose Deck"] {
             scrollToAndTap(app.buttons[title], in: app)
             XCTAssertTrue(app.navigationBars[title].waitUntilExists(timeout: 5))
             capture("10-builder-" + title, app)
             back(app)
         }
+        open("Settings", in: app)
         scrollToAndTap(app.buttons["Vocabulary Packs"], in: app)
         XCTAssertTrue(app.navigationBars["Vocabulary Packs"].waitUntilExists(timeout: 5))
         capture("11-vocabulary-packs", app)
-        open("Settings", in: app); capture("12-settings", app)
+        back(app); capture("12-settings", app)
         app.buttons["Enable iCloud Sync…"].tap()
         XCTAssertTrue(app.buttons["Not Now"].waitUntilExists(timeout: 5))
         capture("13-sync-consent", app); app.buttons["Not Now"].tap()
@@ -1722,6 +1737,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.buttons["New Deck"].tap()
         app.textFields["e.g. Spanish vocabulary"].tap(); app.textFields["e.g. Spanish vocabulary"].typeText("Poems")
         app.buttons["new-deck-create"].tap()
+        app.buttons["Build Deck"].tap()
         scrollToAndTap(app.buttons["Poem Deck"], in: app)
         app.buttons["poemBuilderRootDeck"].tap(); app.buttons["Poems"].tap()
         app.textFields["poemBuilderAuthor"].tap(); app.textFields["poemBuilderAuthor"].typeText("A Writer")
@@ -1764,6 +1780,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         open("Create", in: app); app.buttons["New Deck"].tap()
         let deckName = app.textFields["e.g. Spanish vocabulary"]
         deckName.tap(); deckName.typeText("Reading"); app.buttons["new-deck-create"].tap()
+        app.buttons["Build Deck"].tap()
         scrollToAndTap(app.buttons["Prose Deck"], in: app)
         app.buttons["proseBuilderRootDeck"].tap(); app.buttons["Reading"].tap()
         let title = app.textFields["proseBuilderTitle"]
@@ -1870,19 +1887,20 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         open("Create", in: app)
         XCTAssertTrue(app.buttons["create-add-word"].exists)
         XCTAssertFalse(app.buttons["Vocabulary Deck"].exists)
+        open("Settings", in: app)
         scrollToAndTap(app.buttons["Vocabulary Packs"], in: app)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Acceptance Lexicon")).firstMatch.waitUntilExists(timeout: 10))
         capture("62-installed-vocabulary", app)
         app.terminate(); app.launchArguments.removeAll { $0 == "-NeoAnkiUITestingReset" }; app.launch()
-        open("Create", in: app); scrollToAndTap(app.buttons["Vocabulary Packs"], in: app)
+        open("Settings", in: app); scrollToAndTap(app.buttons["Vocabulary Packs"], in: app)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Acceptance Lexicon")).firstMatch.waitUntilExists(timeout: 10))
     }
 
     func testCloudVocabularyCatalogDownloadsAndRemovesOnlyLocalCopy() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-vocabulary-cloud"])
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
-        open("Create", in: app)
-        app.buttons["Vocabulary Packs"].tap()
+        open("Settings", in: app)
+        scrollToAndTap(app.buttons["Vocabulary Packs"], in: app)
         let download = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "downloadVocabularyPack-acceptance.cloud-")).firstMatch
         XCTAssertTrue(download.waitUntilExists(timeout: 15))
         XCTAssertFalse(app.staticTexts["Available offline"].exists)
@@ -1898,14 +1916,14 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(download.waitUntilExists(timeout: 10), "Local removal must leave the cloud pack available")
         download.tap()
         XCTAssertTrue(app.staticTexts["Available offline"].waitUntilExists(timeout: 15))
-        open("Settings", in: app)
+        back(app)
         app.switches["Sync this device"].switches.firstMatch.tap()
         XCTAssertTrue(app.buttons["Enable iCloud Sync…"].waitUntilExists(timeout: 5))
         app.terminate()
         app.launchArguments.removeAll { $0 == "-NeoAnkiUITestingReset" }
         app.launch()
-        open("Create", in: app)
-        app.buttons["Vocabulary Packs"].tap()
+        open("Settings", in: app)
+        scrollToAndTap(app.buttons["Vocabulary Packs"], in: app)
         XCTAssertTrue(app.staticTexts["Available offline"].waitUntilExists(timeout: 10))
     }
 
@@ -1977,6 +1995,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 30))
         open("Create", in: app)
         app.buttons["create-add-word"].tap()
+        scrollToAndTap(app.buttons["vocabulary-use-custom-item-type"], in: app)
         let query = app.textFields["word-capture-query"]
         XCTAssertTrue(query.waitUntilExists(timeout: 10))
         app.buttons["word-capture-deck"].tap()
@@ -2009,8 +2028,10 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(waitUntil(timeout: 10) { (pronunciation.value as? String) == "НА\u{301}ЧИНКА" })
         app.buttons["word-capture-done"].tap()
         app.buttons["Discard Changes"].tap()
+        app.buttons["vocabulary-set-cancel"].tap()
         XCTAssertTrue(app.buttons["create-add-word"].waitUntilExists(timeout: 5))
         app.buttons["create-add-word"].tap()
+        scrollToAndTap(app.buttons["vocabulary-use-custom-item-type"], in: app)
         XCTAssertTrue(query.waitUntilExists(timeout: 5))
         let destination = app.buttons["word-capture-deck"]
         XCTAssertTrue((destination.label + " " + (destination.value as? String ?? "")).contains("Наголоси"))
@@ -2026,6 +2047,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 30))
         open("Create", in: app)
         app.buttons["create-add-word"].tap()
+        scrollToAndTap(app.buttons["vocabulary-use-custom-item-type"], in: app)
         app.buttons["word-capture-deck"].tap(); app.buttons["Words"].tap()
         let query = app.textFields["word-capture-query"]
         query.tap(); query.typeText("swift")
@@ -2046,11 +2068,20 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.buttons["word-capture-add"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["word-capture-success"].waitUntilExists(timeout: 10))
         app.buttons["word-capture-done"].tap()
+        app.buttons["vocabulary-set-cancel"].tap()
         open("Home", in: app)
         scrollToAndTap(app.staticTexts["Words"], in: app)
         app.buttons["deck-add-word"].tap()
+        let expression = app.textFields["vocabulary-set-word"]
+        XCTAssertTrue(expression.waitUntilExists(timeout: 5))
+        expression.tap(); expression.typeText("swift")
+        app.buttons["Hide Keyboard"].tap()
+        scrollToAndTap(app.buttons["vocabulary-use-custom-item-type"], in: app)
         XCTAssertTrue(waitUntil(timeout: 5) { (app.buttons["word-capture-setup"].value as? String) == "Basic" })
+        XCTAssertEqual(query.value as? String, "swift")
         app.buttons["word-capture-done"].tap()
+        XCTAssertTrue(expression.waitUntilExists(timeout: 5))
+        XCTAssertEqual(expression.value as? String, "swift")
     }
 
     func testQuickWordCaptureLargestTypeKeepsContentAndAddReachable() throws {
@@ -2059,6 +2090,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 30))
         open("Create", in: app)
         scrollToAndTap(app.buttons["create-add-word"], in: app)
+        scrollToAndTap(app.buttons["vocabulary-use-custom-item-type"], in: app)
         let hideKeyboard = app.buttons["Hide Keyboard"]
         if hideKeyboard.waitUntilExists(timeout: 5) { hideKeyboard.tap() }
         scrollToAndTap(app.buttons["word-capture-deck"], in: app)
@@ -2075,7 +2107,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         let add = app.buttons["word-capture-add"]
         XCTAssertTrue(add.isHittable && add.isEnabled)
         XCTAssertGreaterThan(answer.frame.height, 40, "Capture must inherit the accessibility text size")
-        XCTAssertGreaterThanOrEqual(answer.frame.minY, app.navigationBars["Add Word"].frame.maxY)
+        XCTAssertGreaterThanOrEqual(answer.frame.minY, app.navigationBars["Custom Item Type"].frame.maxY)
         XCTAssertLessThanOrEqual(answer.frame.maxY, add.frame.minY - 8)
         capture("71-quick-word-largest-type", app)
         try auditVisibleContent(in: app)
@@ -2087,7 +2119,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         hideKeyboard.tap()
         scrollTo(app.buttons["word-capture-deck"], in: app, preferredDirection: .towardTop)
         for control in [app.buttons["word-capture-deck"], app.buttons["word-capture-dictionary"], query] {
-            XCTAssertGreaterThanOrEqual(control.frame.minY, app.navigationBars["Add Word"].frame.maxY)
+            XCTAssertGreaterThanOrEqual(control.frame.minY, app.navigationBars["Custom Item Type"].frame.maxY)
             XCTAssertLessThanOrEqual(control.frame.maxY, add.frame.minY - 8)
         }
         capture("72-quick-word-largest-type-header", app)
@@ -2174,7 +2206,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
 
     func testTransferPreviewImportAndConcealment() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-transfer"])
-        open("Create", in: app); app.buttons["Import or Export"].tap()
+        open("Settings", in: app); app.buttons["Import or Export"].tap()
         XCTAssertTrue(app.navigationBars["Review Import"].waitUntilExists(timeout: 5))
         XCTAssertTrue(app.staticTexts["Imported question"].exists)
         capture("46-transfer-preview", app)
@@ -2210,7 +2242,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         capture("69-sync-resolved", app)
         app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-transfer-error"])
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 15))
-        open("Create", in: app); app.buttons["Import or Export"].tap()
+        open("Settings", in: app); app.buttons["Import or Export"].tap()
         XCTAssertTrue(app.alerts["Import Failed"].waitUntilExists(timeout: 5))
         capture("70-transfer-error", app); app.buttons["OK"].tap()
         XCTAssertTrue(app.buttons["Choose File"].isHittable)

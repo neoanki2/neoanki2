@@ -102,16 +102,16 @@ new item and delete the old one after checking the result.
 
 ## Learn a word or phrase in context
 
-Open **Known Words → Add Word → Create Cards**, **Create → Create Vocabulary Set**
-on iPhone or iPad, or **File → Create Vocabulary Set…** on Mac. These open the
-same card composer.
+Choose **Create → Add Word** on iPhone or iPad, or **File → Add Word…** on
+Mac. Inside a deck, **Add Word** uses that deck as the destination. From **Known
+Words → Add Word**, choose **Create Cards**.
 
 1. Enter a word or phrase and choose its learning and meaning languages.
 2. Choose **Find Examples** to search installed packs. Choose a dictionary
    meaning and example if more than one matches. For Ukrainian, the updated
    СУМ-11 pack provides literary quotations and their citations.
 3. Check the meaning, the exact form to blank, and the Cloze preview. Choose a
-   deck or **Unassigned**, then choose **Create Card Set**.
+   deck or **Unassigned**, then choose **Add Cards**.
 
 You can enter a sentence and meaning yourself. When the dictionary has no usable
 sentence, **Generate Example** uses Apple Intelligence on supported devices and
@@ -183,10 +183,10 @@ summary, so those later updates do not hold the Study action.
 
 ## Add a word quickly
 
-Choose **Create → Add Word** on iPhone or iPad, or **Add Word** inside a deck.
-On Mac, use **File → Add Word…** (**Command-Shift-N**).
-Opening with a deck selected uses that destination; otherwise,
-the last dictionary–deck pair is restored.
+Open **Add Word**, then choose **Use Custom Item Type…** to map dictionary
+content into a deck's existing item type. The form carries over the word and
+selected deck. If you leave the deck unassigned, the last dictionary–deck pair
+is restored.
 
 1. Choose a deck and an installed dictionary, then type or paste a word or phrase.
 2. On first use of a pair, choose **Set Up**. Select one of this deck’s item types and
@@ -214,12 +214,10 @@ the capture sheet if needed, or use **Enter Manually** when no suitable entry is
 available. On Mac, arrow keys navigate matches, Return chooses a highlighted
 match, **Command-Return** adds a valid word, and Escape requests closing the sheet.
 
-Use **New Item** for general authoring or **Create Vocabulary Set** for contextual vocabulary pairs.
-
 ## Fill fields from a dictionary
 
-Dictionary-assisted capture is available through **Add Word**. Set up an
-installed dictionary and a deck's item type there, then map dictionary content
+Choose **Add Word → Use Custom Item Type…** to set up an installed
+dictionary and a deck's item type, then map dictionary content
 to its fields. The app remembers that setup for the dictionary–deck pair.
 Standard **Add Item** uses the selected type's fields directly and has no
 dictionary lookup section. See [Add a word quickly](#add-a-word-quickly) and
@@ -325,6 +323,6 @@ Deleting a deck is broader, not gentler: it deletes the deck's subdecks and ever
 item inside them too. See [Delete a
 deck](../library-and-decks/#delete-a-deck).
 
-Add Word's setup offers **Use another type…** for explicit reuse. An existing
+Custom item type setup offers **Use another type…** for explicit reuse. An existing
 pair mapping remains readable if its type is later detached from the deck;
 detaching does not rewrite stored field mappings or existing words.

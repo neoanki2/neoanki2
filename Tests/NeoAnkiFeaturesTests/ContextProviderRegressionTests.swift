@@ -33,8 +33,6 @@ import Testing
         let sentence = "She took her coat off, and he took his shoes off."
         let match = ContextOccurrences.find(target: target, in: sentence)
         #expect(ContextOccurrences.richText(sentence, spans: match.spans).filter { $0.styles.contains(.bold) }.map(\.text) == ["took", "off", "took", "off"])
-        let partial = ContextExample(sentence: sentence, spans: Array(match.spans.prefix(2)), provenance: .init(origin: .manual, sourceName: "Fixture"))
-        #expect(ContextOccurrences.clozeSpans(for: partial, target: target) == match.spans)
 
         let mixed = "I take off my coat while she took her jacket off."
         let all = ContextOccurrences.find(target: target, in: mixed)
@@ -65,20 +63,11 @@ import Testing
         #expect(example.map { ContextOccurrences.richText(sentence, spans: $0.spans).filter { $0.styles.contains(.bold) }.map(\.text) } == ["学校"])
     }
 
-    @Test func voiceLocaleNormalizationAcceptsStandardAppleVariants() {
+    @Test func languageCodeNormalizationAcceptsStandardAppleVariants() {
         #expect(ContextGeneratedValidation.languageCode(" EN_us ") == "en-US")
         #expect(ContextGeneratedValidation.languageCode("zh_hant_tw") == "zh-Hant-TW")
         #expect(ContextGeneratedValidation.languageCode("english") == nil)
         #expect(ContextGeneratedValidation.languageCode("en; instructions") == nil)
-    }
-
-    @Test @MainActor func blankSpeechFailsWithoutWaitingForAudioCallbacks() async {
-        do {
-            _ = try await AppleContextSpeech().audio(text: " \n ", language: "en")
-            Issue.record("Blank speech must fail before contacting the synthesizer")
-        } catch {
-            #expect(error.localizedDescription == "There is no sentence to speak.")
-        }
     }
 }
 

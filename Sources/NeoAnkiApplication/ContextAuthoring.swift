@@ -81,24 +81,9 @@ public enum ContextCapability: Equatable, Sendable {
     public var reason: String? { if case let .unavailable(reason) = self { reason } else { nil } }
 }
 
-public protocol LocalContextRetrieving: Sendable {
-    func examples(for target: ContextTarget, limit: Int) async throws -> [ContextExample]
-}
-
 public protocol ContextGenerating: Sendable {
     func availability(language: String) async -> ContextCapability
     func examples(for target: ContextTarget, count: Int, excluding: [String], simpler: Bool) async throws -> [ContextExample]
-}
-
-public struct ContextSpeechAsset: Sendable {
-    public var data: Data
-    public var voiceID: String
-    public init(data: Data, voiceID: String) { self.data = data; self.voiceID = voiceID }
-}
-
-public protocol ContextSpeechSynthesizing: Sendable {
-    func availability(language: String) async -> ContextCapability
-    func audio(text: String, language: String) async throws -> ContextSpeechAsset
 }
 
 public enum ContextAuthoringError: LocalizedError {

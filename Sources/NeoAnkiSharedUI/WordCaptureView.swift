@@ -27,9 +27,11 @@ public struct WordCaptureView: View {
     private enum CaptureFocus: Hashable { case query, field(UUID) }
     @FocusState private var focus: CaptureFocus?
     private let initialDeckID: UUID?
+    private let initialWord: String
 
-    public init(model: WordCaptureModel, deckID: UUID? = nil) {
+    public init(model: WordCaptureModel, deckID: UUID? = nil, word: String = "") {
         _model = State(initialValue: model); initialDeckID = deckID
+        initialWord = word
     }
 
     public init(library: any LibraryRepository, rootURL: URL, deckID: UUID? = nil,
@@ -55,7 +57,7 @@ public struct WordCaptureView: View {
                 .clipped()
                 footer
             }
-            .navigationTitle("Add Word")
+            .navigationTitle("Custom Item Type")
 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
@@ -76,6 +78,7 @@ public struct WordCaptureView: View {
             }
             .task {
                 await model.start(deckID: initialDeckID)
+                model.query = initialWord
                 focus = .query
             }
             .task(id: model.requestKey) {
@@ -102,7 +105,7 @@ public struct WordCaptureView: View {
                 case let .failure(error): model.errorMessage = error.localizedDescription
                 }
             }
-            .interactiveDismissDisabled(model.hasDraft || model.isSaving)
+            .interactiveDismissDisabled(hasUnsavedChanges || model.isSaving)
             .confirmationDialog("Discard this word’s changes?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
                 Button("Discard Changes", role: .destructive) {
                     if let change = pendingChange { pendingChange = nil; change() } else { dismiss() }
@@ -138,12 +141,6 @@ public struct WordCaptureView: View {
                 .disabled(model.isLoading || model.isSaving)
                 .accessibilityLabel("Word or phrase")
                 .accessibilityIdentifier("word-capture-query")
-            if let vocabulary = model.personalVocabulary,
-               !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let draft = model.vocabularySetDraft
-                VocabularyCaptureActions(vocabulary: vocabulary, decks: model.vocabularyDecks,
-                                         term: draft.term, preset: draft) {}
-            }
         }
         .padding(.horizontal)
         .padding(.bottom, 8)
@@ -389,7 +386,11 @@ public struct WordCaptureView: View {
         pendingChange = action; confirmsDiscard = true
     }
     private func requestClose() {
-        if model.hasDraft { pendingChange = nil; confirmsDiscard = true } else { dismiss() }
+        if hasUnsavedChanges { pendingChange = nil; confirmsDiscard = true } else { dismiss() }
+    }
+
+    private var hasUnsavedChanges: Bool {
+        model.hasManualEdits || (model.hasDraft && model.query != initialWord)
     }
 }
 

@@ -58,12 +58,4 @@ import Testing
         formatted.fields[0].value = .rich([Span("Please take off your coat.", styles: [.bold])])
         #expect(ContextDerivedContent.invalidatingSpeech(in: formatted, original: original, type: ContextExamplePreset.itemType) == formatted)
     }
-
-    @Test(arguments: ["Finished！", "終わった？", "He said, ‘Finished.’", "「終わった。」"])
-    func completeQuotedAndCJKSubtitleSentencesRemainSeparate(ending: String) {
-        let cues: [ContextTranscriptSegment] = [
-            .init(text: ending, start: 0, end: 1), .init(text: "Next sentence.", start: 1.1, end: 2)
-        ]
-        #expect(ContextSubtitles.joined(cues).count == 2)
-    }
 }

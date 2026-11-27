@@ -38,12 +38,8 @@ The Prose Deck builder is included in the same app targets; it adds no platform
 requirement. The feature test target also links the offline-first sync module to
 exercise cross-device convergence directly; this does not change app targets.
 
-To capture vocabulary after opening a library, choose **Create → Add Word** on
-iPhone/iPad, or **File → Add Word…** on Mac. Choose a destination and installed
-dictionary once; the app remembers each dictionary–deck setup on that device.
-See [Add a word quickly](../authoring-items/#add-a-word-quickly).
-
-Choose **Create Vocabulary Set** to find examples and make a meaning-recall and
+Choose **Create → Add Word** on iPhone or iPad, or **File → Add Word…** on
+Mac. Enter a word and choose **Find Examples** to make a meaning-recall and
 Cloze pair. See [Learn a word or phrase in context](../authoring-items/#learn-a-word-or-phrase-in-context).
 
 
@@ -191,9 +187,8 @@ files by hand can break references.
 Removing the source checkout or rebuilding `.build/NeoAnki2.app` does not
 remove the library. Deleting the Application Support directory does.
 
-Dictionary-assisted capture is available through **Add Word**, which uses
-locally installed vocabulary packs and remembers field mappings by
-dictionary–deck pair. Standard **Add Item** keeps the selected type's fields
+Choose **Add Word → Use Custom Item Type…** to fill fields from an installed
+dictionary. The app remembers field mappings by dictionary–deck pair. Standard **Add Item** keeps the selected type's fields
 ready for direct entry. See [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
 
 With private iCloud sync enabled, imported dictionary packs upload

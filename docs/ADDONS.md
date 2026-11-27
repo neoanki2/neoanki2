@@ -55,12 +55,12 @@ once. Blank lines in that context preserve stanza separation.
 
 `ProseDeckBuilder` creates ordered recall cards from a passage and keeps source
 editing and generated cards together. These two builders are the bundled catalog.
-On iPhone and iPad they open directly from Create.
+On iPhone and iPad, choose **Create → Build Deck** to open the catalog.
 
 The former vocabulary builder and generator have been removed. Their separate
 paradigm editor duplicated vocabulary authoring and required unnecessary setup.
-**Add Word** now fills a chosen deck's item type from an installed dictionary;
-**Create Vocabulary Set** creates meaning-recall and Cloze pairs. Offline `.neovocab` package
+**Add Word** creates meaning-recall and Cloze pairs and offers dictionary-assisted
+field filling through **Use Custom Item Type…**. Offline `.neovocab` package
 storage, lookup, and sync remain independent of deck builders. Existing generated
 vocabulary items remain ordinary library data and can still be studied and edited.
 

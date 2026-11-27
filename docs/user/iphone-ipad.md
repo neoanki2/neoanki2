@@ -164,9 +164,9 @@ Skip and failed recalls return on later passes. See
 
 ## Author and organize
 
-Open **Create → Create Vocabulary Set** to find a sentence from an installed
-dictionary and save a meaning-recall and Cloze pair. The same composer is
-available from **Known Words → Add Word → Create Cards**.
+Open **Create → Add Word** to find a sentence from an installed dictionary and
+save a meaning-recall and Cloze pair. The same composer is available from
+**Known Words → Add Word → Create Cards**.
 
 Use **Create → New Item** or the add action in a scope. Choose the deck and item
 type, then fill its typed fields. The primary picker shows this deck's types;
@@ -206,28 +206,27 @@ behavior with no controls or status surface. Maintenance runs locally after
 eligible sessions, sync, startup, or idle time; it never runs inline while a
 grade is saved.
 
-Use **Create → Add Word**, or **Add Word** inside a deck, for quick vocabulary
-capture. Look up a word, set up the dictionary–deck pair once, and add the
+Inside **Add Word**, choose **Use Custom Item Type…** for dictionary-assisted
+field filling. Look up a word, set up the dictionary–deck pair once, and add the
 prepared item. Each pair remembers its item type, field mappings, and preferred
 content variants on this device. Add stays above the keyboard, and the flow
 stays open for the next word. See [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
 
 The standard **New Item** form contains the selected type's fields. For
-dictionary-assisted capture, use **Add Word**, which remembers field mappings
-for each dictionary–deck pair and works with installed vocabulary packs.
-Install packs through **Create → Vocabulary Packs**. See
+dictionary-assisted capture, choose **Add Word → Use Custom Item Type…**.
+Install packs through **Settings → Vocabulary Packs**. See
 [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
 
 ## Import, export, and build decks
 
-Use **Create → Import or Export** to choose JSON, CSV, portable `.neodeck`, or
+Use **Settings → Import or Export** to choose JSON, CSV, portable `.neodeck`, or
 authored `.neoanki` content through the system document picker. Export prepares
 a portable `.neodeck` bundle for the selected deck and presents the system save
 sheet. The same [format and conflict rules](../import-export/) apply on Mac and
 iOS.
 
-**Create → Poem Deck** and **Create → Prose Deck** open the guided builders
-directly. Created poems and prose passages are placed in their selected parent
+**Create → Build Deck** offers guided **Poem Deck** and **Prose Deck** builders.
+Created poems and prose passages are placed in their selected parent
 decks. Editing a generated unit from item details opens the whole source
 editor for that passage.
 **Vocabulary Packs** imports and removes local `.neovocab` directories. Packs
