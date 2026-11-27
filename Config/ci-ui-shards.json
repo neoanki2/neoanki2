@@ -217,7 +217,8 @@
       "device": "iPhone 17 Pro Max",
       "workers": 1,
       "tests": [
-        "NeoAnki2MobileUITests/MobileFitStudyAreaUITests/testPromptFitsPortraitAndLandscapeAndKeepsAnswerReadable"
+        "NeoAnki2MobileUITests/MobileFitStudyAreaUITests/testPromptFitsPortraitAndLandscapeAndKeepsAnswerReadable",
+        "NeoAnki2MobileUITests/MobileGrammarExerciseUITests/testResponseControlsIdentifyAndCheckAllThreeModes"
       ]
     },
     {
