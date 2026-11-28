@@ -127,10 +127,12 @@ class AppStorePublisher:
                 return target
             self.cancel(target["id"])
             raise Pending("Apple has not made the previous version editable yet")
-        # A canceled version can become editable before its parent is CANCELED.
-        if self.receipt.get("prior_submission_id"):
-            parent = self.api.request("reviewSubmissions/" + self.receipt["prior_submission_id"])["data"]
-            if parent["attributes"]["state"] not in TERMINAL_SUBMISSIONS:
+        # A version can become editable before cancellation completes. Apple
+        # can also hide a canceled submission from its individual endpoint.
+        # Reconcile against the app's list of nonterminal submissions.
+        if prior := self.receipt.get("prior_submission_id"):
+            parent = next((submission for submission in self.submissions() if submission["id"] == prior), None)
+            if parent is not None:
                 raise Pending("Previous Apple review is still " + parent["attributes"]["state"])
         if state in AVAILABLE:
             if not same_build:

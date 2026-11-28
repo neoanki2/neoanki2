@@ -175,6 +175,9 @@ The normal command resumes a pending release when current app inputs still match
 It waits up to ten minutes for Apple processing/cancellation; `--wait-seconds 0`
 returns immediately with the resume command. Apple review itself is not waited
 on. Another version is never allocated just because processing is slow.
+The controller confirms that a superseded review is no longer active using
+Apple's submissions list. Apple may stop serving an individual canceled
+submission even while the list still records it.
 
 An unfinished iPhone update remains pending locally even after publication's
 `complete: true` checkpoint. Connect the phone or resolve the reported signing
