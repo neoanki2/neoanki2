@@ -2619,7 +2619,8 @@ actor SQLiteDatabase {
         _ plan: PortableDeckImportPlan,
         now: Date,
         initialDueDates: [UUID: Date] = [:],
-        result: PortableDeckImportResult? = nil
+        result: PortableDeckImportResult? = nil,
+        expandedVocabularyPreset: ItemType? = nil
     ) throws {
         let orderedDecks = try DeckImportOrdering.parentFirst(plan.decks)
         try inTransaction(recordNativeCommand: true, affectedCount: plan.items.count, nativeResult: try result.map { try JSONEncoder().encode($0) }) {
@@ -2637,6 +2638,12 @@ actor SQLiteDatabase {
             }
             for itemType in plan.itemTypes {
                 try insertItemType(itemType)
+            }
+            if let expanded = expandedVocabularyPreset {
+                guard try fetchValidatedItemType(id: expanded.id) == VocabularySet.itemType else {
+                    throw DatabaseError.invalidItemType("The Vocabulary Set changed during import. Try again.")
+                }
+                try updateItemType(expanded)
             }
             for itemTypeID in plan.libraryItemTypeIDs {
                 try markItemTypeAsLibrary(itemTypeID)
@@ -8300,6 +8307,7 @@ actor SQLiteDatabase {
     /// revision to cache clients.
     func inReadTransaction<Result>(_ body: () throws -> Result) throws -> Result {
         try refreshStudyRelationsIfNeeded()
+        if let handle, sqlite3_get_autocommit(handle) == 0 { return try body() }
         try executeTransactionControl("BEGIN DEFERRED TRANSACTION;")
         do {
             let result = try body()

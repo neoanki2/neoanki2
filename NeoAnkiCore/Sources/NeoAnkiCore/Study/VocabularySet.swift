@@ -457,6 +457,8 @@ public enum VocabularySet {
     private static let recognizeColumn = FieldDef(id: uuid("1117"), name: "Recognition", type: .checkbox)
     private static let produceColumn = FieldDef(id: uuid("1118"), name: "Cloze card", type: .checkbox)
     private static let originalTermColumn = FieldDef(id: uuid("1119"), name: "Original vocabulary identity", type: .text)
+    static let courseSentence = FieldDef(id: uuid("1120"), name: "Course sentence", type: .text)
+    static let importedRecognitionPrompt = FieldDef(id: uuid("1121"), name: "Imported recognition prompt", type: .text)
     static let examples = ItemList(id: uuid("1130"), name: "Examples", columns: [
         readingColumn, clozeColumn, sourceColumn, acceptedColumn, recognizeColumn, produceColumn, originalTermColumn
     ])
@@ -487,6 +489,40 @@ public enum VocabularySet {
     static let supportedItemTypeIDs = [legacyTypeID, typeID]
     static func isReading(_ templateID: UUID) -> Bool { templateID == readingID || templateID == legacyReadingID }
     static func isProduction(_ templateID: UUID) -> Bool { templateID == productionID || templateID == legacyProductionID }
+
+    static func courseRecognitionTemplate(in type: ItemType) -> Template? {
+        guard type.id == typeID, type.sourceField(courseSentence.id)?.type == .text else { return nil }
+        return type.templates.first {
+            $0.promptFormat == .standard && $0.cardCreation?.listIDs == [examples.id]
+                && $0.cardCreation?.checkedFieldIDs == [recognizeColumn.id]
+                && $0.generateWhen == .fieldNotEmpty(courseSentence.id)
+        }
+    }
+
+    public static func isCourseRecognition(_ card: DueCard) -> Bool {
+        card.template.id == courseRecognitionTemplate(in: card.itemType)?.id
+    }
+
+    static func hasCourseExample(in item: Item) -> Bool {
+        item.itemTypeID == typeID && examples.rows(in: item).contains { row in
+            row.values.contains { $0.fieldID == courseSentence.id && !$0.value.isEmpty }
+        }
+    }
+
+    /// The course can add optional fields and a recognition layout while normal
+    /// examples continue to use the two standard setups and the same identities.
+    static func supportsDefinition(_ type: ItemType) -> Bool {
+        if type == itemType { return true }
+        guard type.id == typeID, type.name == itemType.name,
+              type.fields.starts(with: itemType.fields),
+              type.fields.dropFirst(itemType.fields.count).allSatisfy({ !$0.isRequired }),
+              type.templates.starts(with: itemType.templates), type.templates.count == itemType.templates.count + 1,
+              courseRecognitionTemplate(in: type) != nil,
+              type.lists.count == 1, let list = type.lists.first,
+              list.id == examples.id, list.name == examples.name, list.sharedRows == nil,
+              list.columns == examples.columns + [courseSentence, importedRecognitionPrompt] else { return false }
+        return true
+    }
 
     /// Match complete tokens as well as selections in scripts that do not separate words with spaces.
     public static func occurrences(of expression: String, in sentence: String, language: String) -> [Range<String.Index>] {
@@ -590,6 +626,16 @@ public enum VocabularySet {
             && left.value(for: meaningField.id) == right.value(for: meaningField.id)
     }
 
+    static func firstExampleLabel(in item: Item) -> String {
+        let values = examples.rows(in: item).first?.values ?? []
+        for field in [readingColumn, courseSentence] {
+            if let value = values.first(where: { $0.fieldID == field.id })?.value, !value.isEmpty {
+                return ItemDisplay.plainText(from: value)
+            }
+        }
+        return ""
+    }
+
     private static func encodedIdentity(_ identity: Identity) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -619,7 +665,7 @@ public enum VocabularySet {
     public static func authoringList(_ list: ItemList, in itemType: ItemType) -> ItemList {
         guard itemType.id == typeID, list.id == examples.id else { return list }
         var visible = list
-        visible.columns.removeAll { $0.id == originalTermColumn.id }
+        visible.columns.removeAll { $0.id == originalTermColumn.id || $0.id == importedRecognitionPrompt.id }
         return visible
     }
 
@@ -676,9 +722,14 @@ public enum VocabularySet {
         let legacy = item.itemTypeID == legacyTypeID
         guard let term = term(in: item),
               let actual = type.templates.first(where: { $0.id == card.templateID }),
-              let expected = (legacy ? legacyItemType : itemType).templates.first(where: { $0.id == card.templateID }),
-              actual == expected,
               let bound = CardGenerator.boundItem(item, type: type, selections: card.rowSelections) else { return nil }
+        if actual.id == courseRecognitionTemplate(in: type)?.id {
+            let values = SideContent.resolvedComponents(for: actual, from: bound).map(\.value)
+            return fingerprint(term: term, content: CoursePrompt(template: actual, values: values))
+        }
+        guard actual == (legacy ? legacyItemType : itemType).templates.first(where: { $0.id == card.templateID }) else {
+            return nil
+        }
         let readingCard = isReading(card.templateID)
         if !readingCard, productionAnswer(in: bound, group: card.clozeGroup) == nil { return nil }
         let gloss = bound.value(for: legacy ? meaning.id : meaningField.id)
@@ -700,6 +751,22 @@ public enum VocabularySet {
             }
             content = [sentence, gloss, identityValue]
         }
+        return fingerprint(term: term, content: content)
+    }
+
+    static func importedPrompt(for card: Card, item: Item, type: ItemType) -> String? {
+        guard card.templateID == courseRecognitionTemplate(in: type)?.id,
+              let bound = CardGenerator.boundItem(item, type: type, selections: card.rowSelections),
+              case let .text(prompt, _)? = bound.value(for: importedRecognitionPrompt.id) else { return nil }
+        return prompt
+    }
+
+    private struct CoursePrompt: Encodable {
+        let template: Template
+        let values: [ContentValue]
+    }
+
+    private static func fingerprint(term: VocabularyTerm, content: some Encodable) -> String? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         guard let values = try? encoder.encode(content) else { return nil }

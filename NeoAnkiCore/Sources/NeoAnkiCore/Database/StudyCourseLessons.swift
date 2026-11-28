@@ -59,17 +59,26 @@ extension SQLiteDatabase {
         // read IDs, tags and counts here. A lesson's text and attachments load
         // when it becomes the active step. Walk the deck index so counting
         // new vocabulary never scans every new card once per lesson.
+        let courseTemplate = try fetchItemType(id: VocabularySet.typeID)
+            .flatMap(VocabularySet.courseRecognitionTemplate(in:))
         let rows = try query(scopeSQL + """
             SELECT lesson.id, lesson.deck_id, lesson.tags, chapter.parent_id AS course_id,
                    (SELECT COUNT(*) FROM cards INDEXED BY idx_cards_deck_due
                     JOIN items AS vocabulary ON vocabulary.id = cards.item_id
                     WHERE cards.deck_id = lesson.deck_id AND cards.phase = 'new' AND cards.is_suspended = 0
-                      AND vocabulary.item_type_id IN (SELECT id FROM item_types WHERE name = ?)) AS new_count
+                      AND (vocabulary.item_type_id IN (SELECT id FROM item_types WHERE name = ?)
+                           OR (vocabulary.item_type_id = ? AND cards.template_id = ?
+                               AND EXISTS (SELECT 1 FROM json_each(CAST(vocabulary.tags AS TEXT))
+                                           WHERE substr(value, 1, length(?)) = ?)))) AS new_count
             FROM items AS lesson
             JOIN decks AS unit ON unit.id = lesson.deck_id
             JOIN decks AS chapter ON chapter.id = unit.parent_id
             WHERE lesson.item_type_id IN (SELECT id FROM item_types WHERE name = ?) \(filter)
-            """, bindings: bindings + [.text(vocabularyType), .text(lessonType)])
+            """, bindings: bindings + [
+                .text(vocabularyType), .text(VocabularySet.typeID.uuidString),
+                courseTemplate.map { .text($0.id.uuidString) } ?? .null,
+                .text(sourceTagPrefix), .text(sourceTagPrefix), .text(lessonType)
+            ])
         let decoder = JSONDecoder()
         let parsed: [(lesson: StudyCourseLesson, chapter: Int, position: Int)] = try rows.compactMap { row in
             guard let id = (row["id"] as? String).flatMap(UUID.init(uuidString:)),

@@ -93,6 +93,8 @@ follows it to your other devices.
 Revealing a Japanese Academy vocabulary answer plays the word and sentence
 recordings in order. Use **Play Audio** to replay either recording. With
 **Reduce Motion** enabled, use the same controls to start playback manually.
+Course Vocabulary Sets retain the lesson order and contribute their meaning
+reviews to Japanese Known Words.
 
 ## Session states
 

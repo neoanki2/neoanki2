@@ -57,7 +57,7 @@ public struct CourseStudyPath: Sendable {
     public func isNewVocabulary(_ card: DueCard) -> Bool { unitIndex(for: card) != nil }
 
     package static func isAcademyVocabulary(_ card: DueCard) -> Bool {
-        card.itemType.name == AcademyStudyFormat.vocabularyType
+        (card.itemType.name == AcademyStudyFormat.vocabularyType || VocabularySet.isCourseRecognition(card))
             && card.item.tags.contains { $0.hasPrefix(AcademyStudyFormat.sourceTagPrefix) }
     }
 
