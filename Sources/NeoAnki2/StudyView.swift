@@ -749,11 +749,10 @@ struct StudyView: View {
 
     private var audioSubmissionActionsMenu: some View {
         Menu {
-            Button(
-                recording.state == .playing ? "Stop Playback" : "Play Recording",
-                systemImage: recording.state == .playing ? "stop.fill" : "play.fill"
-            ) {
+            Button {
                 recording.togglePlayback()
+            } label: {
+                AudioPlaybackLabel(isPlaying: recording.state == .playing, activeAction: .stop, playTitle: "Play Recording")
             }
             .accessibilityIdentifier("playAudioSubmission")
 
@@ -817,11 +816,10 @@ struct StudyView: View {
 
     private var recordingActionsMenu: some View {
         Menu {
-            Button(
-                recording.state == .playing ? "Stop Playback" : "Play My Recording",
-                systemImage: recording.state == .playing ? "stop.fill" : "play.fill"
-            ) {
+            Button {
                 recording.togglePlayback()
+            } label: {
+                AudioPlaybackLabel(isPlaying: recording.state == .playing, activeAction: .stop, playTitle: "Play My Recording")
             }
             .accessibilityIdentifier("playRecording")
 

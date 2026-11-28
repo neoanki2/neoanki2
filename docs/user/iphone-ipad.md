@@ -103,6 +103,8 @@ scroll in the study area while **Continue** stays visible. An unread
 introductory lesson can be studied even when its deck has zero due cards.
 When you reveal a vocabulary answer, the word and sentence recordings play
 in order. Tap **Play Audio** on either recording to replay it.
+Standalone audio clips use **Play Audio** and **Pause Audio**. Where a
+playback position slider appears, drag it to move within the clip.
 
 Choose **Study** from All Decks, Unassigned, or a deck. The session opens full
 screen and uses the same due-card queue and seven interactions as the Mac app:

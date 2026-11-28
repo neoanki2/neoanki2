@@ -58,4 +58,37 @@ import Testing
         formatted.fields[0].value = .rich([Span("Please take off your coat.", styles: [.bold])])
         #expect(ContextDerivedContent.invalidatingSpeech(in: formatted, original: original, type: ContextExamplePreset.itemType) == formatted)
     }
+
+    @Test func rewritesOfMigratedRowsKeepTheirSourceProvenance() throws {
+        var source = try item(voiceID: "installed-voice")
+        let sentence = source.fields.removeFirst()
+        var type = VocabularySet.itemType
+        type.fields += [ContextExamplePreset.audio, ContextExamplePreset.video,
+                        ContextExamplePreset.metadata, ContextExamplePreset.group]
+        type.lists[0].columns.append(ContextExamplePreset.context)
+        let list = try #require(type.lists.first)
+        let row = ItemListRow(id: source.id, values: [sentence])
+        source.itemTypeID = type.id
+        source.fields.append(.init(fieldID: list.id, value: .rows([row])))
+        let valueIndex = try #require(source.fields.indices.last)
+
+        var candidate = source
+        let other = ItemListRow(values: [
+            .init(fieldID: sentence.fieldID, value: .rich([Span("Please sit down.")]))
+        ])
+        candidate.fields[valueIndex].value = .rows([other, row])
+        #expect(ContextDerivedContent.invalidatingSpeech(in: candidate, original: source, type: type) == candidate)
+
+        var changed = row
+        changed.values[0].value = .rich([Span("Please take off your shoes.")])
+        candidate.fields[valueIndex].value = .rows([other, changed])
+        let result = ContextDerivedContent.invalidatingSpeech(in: candidate, original: source, type: type)
+        #expect(result.isFieldEmpty(ContextExamplePreset.audio.id))
+        #expect(result.isFieldEmpty(ContextExamplePreset.video.id))
+        let field = try #require(result.value(for: ContextExamplePreset.metadata.id))
+        guard case let .text(json, _) = field else { Issue.record("Missing context metadata"); return }
+        let metadata = try JSONDecoder().decode(SavedContextMetadata.self, from: Data(json.utf8))
+        #expect(metadata.provenance.sourceName == "Lesson")
+        #expect(metadata.provenance.originalText == "Please take off your coat.")
+    }
 }

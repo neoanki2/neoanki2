@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import NeoAnkiApplication
 import NeoAnkiCore
 import SwiftUI
@@ -13,6 +14,30 @@ package enum CardAudioSession {
         }
         try session.setActive(true)
         #endif
+    }
+}
+
+package struct AudioPlaybackLabel: View {
+    package enum ActiveAction {
+        case pause, stop
+    }
+
+    let isPlaying: Bool
+    let activeAction: ActiveAction
+    let playTitle: String
+    let activeTitle: String
+
+    package init(isPlaying: Bool, activeAction: ActiveAction, playTitle: String = "Play Audio",
+                 activeTitle: String? = nil) {
+        self.isPlaying = isPlaying
+        self.activeAction = activeAction
+        self.playTitle = playTitle
+        self.activeTitle = activeTitle ?? (activeAction == .pause ? "Pause Audio" : "Stop Playback")
+    }
+
+    package var body: some View {
+        Label(isPlaying ? activeTitle : playTitle,
+              systemImage: isPlaying ? (activeAction == .pause ? "pause.fill" : "stop.fill") : "play.fill")
     }
 }
 
@@ -43,7 +68,7 @@ package struct CardAudioButton: View {
                     playbackFailed = true
                 }
             } label: {
-                Label(pause == nil ? "Play Audio" : "Pause Audio", systemImage: pause == nil ? "play.fill" : "pause.fill")
+                AudioPlaybackLabel(isPlaying: pause != nil, activeAction: .pause)
                     #if os(iOS)
                     .neoAnkiTouchTarget()
                     #endif
@@ -56,6 +81,126 @@ package struct CardAudioButton: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// Shared audio surface for card media, previews, and lesson attachments.
+package struct AudioClipView: View {
+    let url: URL
+    let behavior: MediaBehavior
+    let description: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.academyCardAudioReplay) private var academyReplay
+
+    package init(url: URL, behavior: MediaBehavior, description: String) {
+        self.url = url
+        self.behavior = behavior
+        self.description = description
+    }
+
+    package var body: some View {
+        if let academyReplay, behavior != .loop {
+            CardAudioButton(description: description) { try academyReplay(url) }
+        } else {
+            StandaloneAudioClipView(url: url, behavior: behavior, description: description, reduceMotion: reduceMotion)
+        }
+    }
+}
+
+private struct StandaloneAudioClipView: View {
+    let url: URL
+    let behavior: MediaBehavior
+    let description: String
+    let reduceMotion: Bool
+    @State private var player: AVPlayer?
+    @State private var timeObserver: Any?
+    @State private var isPlaying = false
+    @State private var reachedEnd = false
+    @State private var position = 0.0
+    @State private var duration = 0.0
+    @State private var isScrubbing = false
+
+    private struct Configuration: Equatable {
+        let url: URL
+        let behavior: MediaBehavior
+        let reduceMotion: Bool
+    }
+
+    var body: some View {
+        Group {
+            if let player, let item = player.currentItem {
+                HStack(spacing: 12) {
+                    CardAudioButton(description: description, pause: isPlaying ? { player.pause() } : nil) {
+                        try CardAudioSession.preparePlayback()
+                        if reachedEnd {
+                            player.seek(to: .zero)
+                            reachedEnd = false
+                        }
+                        player.play()
+                    }
+                    if behavior != .playOnTap {
+                        Slider(value: $position, in: 0...max(1, duration), onEditingChanged: { editing in
+                            isScrubbing = editing
+                            if !editing {
+                                reachedEnd = false
+                                player.seek(to: CMTime(seconds: position, preferredTimescale: 600))
+                            }
+                        })
+                        .disabled(duration <= 0)
+                        .accessibilityLabel("Playback position")
+                    }
+                }
+                .onReceive(player.publisher(for: \.timeControlStatus).receive(on: RunLoop.main)) { status in
+                    isPlaying = status != .paused
+                }
+                .onReceive(item.publisher(for: \.status).receive(on: RunLoop.main)) { _ in
+                    let length = item.duration.seconds
+                    if length.isFinite, length > 0 { duration = length }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: item)
+                    .receive(on: RunLoop.main)) { _ in
+                    if behavior == .loop {
+                        player.seek(to: .zero)
+                        player.play()
+                    } else {
+                        reachedEnd = true
+                    }
+                }
+            } else {
+                ProgressView().accessibilityLabel("Loading audio")
+            }
+        }
+        .trackingLearningTimePlayback(player)
+        .task(id: Configuration(url: url, behavior: behavior, reduceMotion: reduceMotion)) {
+            reset()
+            let next = AVPlayer(url: url)
+            player = next
+            timeObserver = next.addPeriodicTimeObserver(
+                forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main
+            ) { time in
+                MainActor.assumeIsolated {
+                    guard player === next, !isScrubbing, time.seconds.isFinite else { return }
+                    position = min(time.seconds, duration)
+                }
+            }
+            if !reduceMotion, behavior == .autoplay || behavior == .loop {
+                if (try? CardAudioSession.preparePlayback()) != nil { next.play() }
+            }
+        }
+        .onDisappear { reset() }
+    }
+
+    private func reset() {
+        if let timeObserver { player?.removeTimeObserver(timeObserver) }
+        timeObserver = nil
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+        isPlaying = false
+        reachedEnd = false
+        isScrubbing = false
+        position = 0
+        duration = 0
     }
 }
 

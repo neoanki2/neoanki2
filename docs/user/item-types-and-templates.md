@@ -29,6 +29,8 @@ app's interface.
 
 **Add Word → Create Cards** makes one Vocabulary Set item with a meaning-recall
 card and a Cloze card. Existing Context Example items are editable in the item editor.
+Context Examples saved as Vocabulary Sets keep the source passage in an
+**Examples** row and retain the attached audio and provenance.
 Japanese Academy recognition cards in Vocabulary Sets keep their course prompts,
 audio, and illustrations. They contribute to Japanese Known Words through the
 same review rules as other recognition cards.

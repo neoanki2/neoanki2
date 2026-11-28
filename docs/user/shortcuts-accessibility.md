@@ -257,6 +257,9 @@ available.
 
 ## Media descriptions
 
+**Play Audio** and **Pause Audio** include the clip description when one is
+available. A clip’s position slider is labeled **Playback position**.
+
 Image, GIF, and image occlusion descriptions are optional. If you add one,
 write a short description that communicates the information the image contributes,
 not its filename. NeoAnki2 uses it as the image's VoiceOver label and uses a

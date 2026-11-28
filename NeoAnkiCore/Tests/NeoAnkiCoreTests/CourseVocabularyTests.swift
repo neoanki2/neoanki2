@@ -85,3 +85,34 @@ import Testing
     #expect(try await database.fetchCards(for: regularID).map(\.templateID).sorted(by: { $0.uuidString < $1.uuidString })
             == [VocabularySet.readingID, VocabularySet.productionID])
 }
+
+@Test func vocabularyExtensionsKeepTheirFieldIdentitiesWhenMergedInEitherOrder() throws {
+    let base = VocabularySet.itemType
+    let first = FieldDef(name: "Course text", type: .text)
+    let second = FieldDef(name: "Recorded context", type: .richText)
+    func extended(_ field: FieldDef) -> ItemType {
+        var type = base
+        type.lists[0].columns.append(field)
+        type.templates.append(Template(name: field.name, layout: .focus, components: [
+            .init(region: .primary, purpose: .question, source: .field(field.id)),
+            .init(region: .secondary, purpose: .expectedAnswer, source: .literal("Answer"),
+                  presentation: .init(reveal: .hiddenUntilAnswer))
+        ], interaction: .reveal, skill: .init(input: .text, output: .text, operation: .recognize),
+           generateWhen: .fieldNotEmpty(field.id), cardCreation: .init(listIDs: [type.lists[0].id])))
+        return type
+    }
+    let course = extended(first)
+    let context = extended(second)
+    let merged = try #require(VocabularySet.extending(course, with: context))
+    let reversed = try #require(VocabularySet.extending(context, with: course))
+    let values = [FieldValue(fieldID: base.lists[0].id, value: .rows([
+        .init(values: [.init(fieldID: second.id, value: .rich([Span("In context")]))])
+    ]))]
+    #expect(try ItemTypeContentMapping(source: context, destination: merged).fields(values) == values)
+    #expect(try ItemTypeContentMapping(source: context, destination: reversed).fields(values) == values)
+    let draft = VocabularySetDraft(term: .init(language: "en", expression: "lake"), meaning: "a body of water",
+                                   meaningLanguage: "en", sentence: "We walked around the lake.")
+    let regular = try VocabularySet.makeItem(draft, id: UUID())
+    #expect(CardGenerator.cards(for: regular, type: merged).map(\.templateID)
+            == CardGenerator.cards(for: regular, type: base).map(\.templateID))
+}

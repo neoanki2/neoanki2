@@ -512,16 +512,58 @@ public enum VocabularySet {
     /// The course can add optional fields and a recognition layout while normal
     /// examples continue to use the two standard setups and the same identities.
     static func supportsDefinition(_ type: ItemType) -> Bool {
-        if type == itemType { return true }
         guard type.id == typeID, type.name == itemType.name,
               type.fields.starts(with: itemType.fields),
               type.fields.dropFirst(itemType.fields.count).allSatisfy({ !$0.isRequired }),
-              type.templates.starts(with: itemType.templates), type.templates.count == itemType.templates.count + 1,
-              courseRecognitionTemplate(in: type) != nil,
+              type.templates.starts(with: itemType.templates),
               type.lists.count == 1, let list = type.lists.first,
               list.id == examples.id, list.name == examples.name, list.sharedRows == nil,
-              list.columns == examples.columns + [courseSentence, importedRecognitionPrompt] else { return false }
-        return true
+              list.columns.starts(with: examples.columns) else { return false }
+        let optionalColumns = list.columns.dropFirst(examples.columns.count)
+        let optionalIDs = Set(optionalColumns.map(\.id))
+        return optionalColumns.allSatisfy { !$0.isRequired } &&
+            type.templates.dropFirst(itemType.templates.count).allSatisfy { template in
+                template.cardCreation?.listIDs == [examples.id]
+                    && template.generateWhen.map { requiresExtensionValue($0, from: optionalIDs) } == true
+            }
+    }
+
+    private static func requiresExtensionValue(_ condition: SlotCondition, from fields: Set<UUID>) -> Bool {
+        switch condition {
+        case let .fieldNotEmpty(id): fields.contains(id)
+        case .fieldEmpty: false
+        case let .all(conditions): conditions.contains { requiresExtensionValue($0, from: fields) }
+        case let .any(conditions): !conditions.isEmpty && conditions.allSatisfy { requiresExtensionValue($0, from: fields) }
+        }
+    }
+
+    /// Combine compatible additions while preserving existing field and setup identities.
+    static func extending(_ existing: ItemType, with incoming: ItemType) -> ItemType? {
+        guard supportsDefinition(existing), supportsDefinition(incoming),
+              var list = existing.lists.first, let incomingList = incoming.lists.first,
+              let fields = merging(existing.fields, with: incoming.fields),
+              let templates = merging(existing.templates, with: incoming.templates),
+              let columns = merging(list.columns, with: incomingList.columns) else { return nil }
+        list.columns = columns
+        var result = existing
+        result.fields = fields
+        result.templates = templates
+        result.lists = [list]
+        guard (try? ItemTypeValidation.validate(result)) != nil else { return nil }
+        return result
+    }
+
+    private static func merging<T: Identifiable & Equatable>(_ existing: [T], with incoming: [T]) -> [T]? {
+        var result = existing
+        let byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for value in incoming {
+            if let prior = byID[value.id] {
+                guard prior == value else { return nil }
+            } else {
+                result.append(value)
+            }
+        }
+        return result
     }
 
     /// Match complete tokens as well as selections in scripts that do not separate words with spaces.

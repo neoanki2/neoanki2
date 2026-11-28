@@ -331,9 +331,9 @@ unchanged.
 NeoAnki2 validates the entire portable database—including its format version,
 schema, limits, item-type digests, and media—before changing the library.
 Imported decks, items, and cards receive fresh local identifiers. Media and
-exactly matching item-type schemas are reused when safe. A portable Japanese
-Academy deck can add its optional recognition setup and fields to an existing
-standard Vocabulary Set while keeping the cards there. Re-importing a
+exactly matching item-type schemas are reused when safe. A portable deck can
+add compatible Vocabulary Set fields and setups for Japanese Academy or
+Context Examples while preserving existing local cards. Re-importing a
 portable deck creates another copy of its content.
 
 Version-3 packages preserve the ordered item types offered by each deck.
