@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:e90cdd87822e8ffb97df2e72eb528fa6c1a929e9e82143a9b932ae5979bbd8b4
+contract_digest: sha256:c114fc88950349745721ed5dde845a5cbfabaac69eb2ab4e486831899501bc97
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -84,6 +84,7 @@ Type: **object**.
 - `memory` — Memory; required
 - `occlusionGroup` — integer or null; optional
 - `revision` — integer; required
+- `rowSelections` — array of CardRowSelection; optional
 - `skill` — Skill; required
 - `templateId` — string; required
 
@@ -95,6 +96,25 @@ Type: **object**.
 
 - `data` — array of Card; required
 - `page` — PageInfo; required
+
+## CardCreation {#schema-cardcreation}
+
+Type: **object**.
+
+### Properties
+
+- `checkedFieldIds` — array of string; optional
+- `listIds` — array of string; required
+- `startSuspended` — boolean; required
+
+## CardRowSelection {#schema-cardrowselection}
+
+Type: **object**.
+
+### Properties
+
+- `listId` — string; required
+- `rowId` — string; required
 
 ## Change {#schema-change}
 
@@ -173,7 +193,7 @@ Type: **object**.
 
 ## ContentValue {#schema-contentvalue}
 
-Type: **object or object or object or object or object or object or object or object**.
+Type: **object or object or object or object or object or object or object or object or object or object**.
 
 ## CreateDeckDeletionPlanInput {#schema-createdeckdeletionplaninput}
 
@@ -601,6 +621,7 @@ Type: **object**.
 - `fields` — array of FieldDefinition; required
 - `id` — string; required
 - `itemCount` — integer; required
+- `lists` — array of ListDefinition; optional
 - `name` — string; required
 - `provenance` — string; required
 - `revision` — integer; required
@@ -633,6 +654,7 @@ Type: **object**.
 - `deckId` — string or null; optional
 - `fields` — array of FieldDefinition; required
 - `id` — string; optional
+- `lists` — array of ListDefinition; optional
 - `name` — string; required
 - `templates` — array of TemplateDefinition; required
 
@@ -705,6 +727,26 @@ Type: **object**.
 ### Properties
 
 - `data` — array of LexicalEntry; required
+
+## ListDefinition {#schema-listdefinition}
+
+Type: **object**.
+
+### Properties
+
+- `columns` — array of FieldDefinition; required
+- `id` — string; required
+- `name` — string; required
+- `sharedRows` — array of ListRow; optional
+
+## ListRow {#schema-listrow}
+
+Type: **object**.
+
+### Properties
+
+- `id` — string; required
+- `values` — array of FieldValue; required
 
 ## LocalizedVocabularyText {#schema-localizedvocabularytext}
 
@@ -1079,7 +1121,10 @@ Type: **object**.
 - `memory` — Memory; required
 - `occlusionGroup` — integer or null; optional
 - `prompt` — array of ResolvedSlot; required
+- `promptFormat` — string; optional
+- `response` — string; optional
 - `revision` — integer; required
+- `rowSelections` — array of CardRowSelection; optional
 - `templateId` — string; required
 
 ## StudyExercise {#schema-studyexercise}
@@ -1216,6 +1261,7 @@ Type: **object**.
 ### Properties
 
 - `answer` — array of Slot; required
+- `cardCreation` — CardCreation; optional
 - `components` — array of TemplateComponent or null; optional
 - `fitStudyArea` — boolean; optional
 - `generateWhen` — Condition; optional
@@ -1224,6 +1270,7 @@ Type: **object**.
 - `layout` — string or null; optional
 - `name` — string; required
 - `prompt` — array of Slot; required
+- `responseOverride` — string; optional
 - `skill` — Skill; required
 
 ## TransferReport {#schema-transferreport}
@@ -1433,6 +1480,6 @@ Type: **object**.
 - `lemma` — string or null; optional
 - `sense` — string or null; optional
 
-Contract digest: `sha256:e90cdd87822e8ffb97df2e72eb528fa6c1a929e9e82143a9b932ae5979bbd8b4`.
+Contract digest: `sha256:c114fc88950349745721ed5dde845a5cbfabaac69eb2ab4e486831899501bc97`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

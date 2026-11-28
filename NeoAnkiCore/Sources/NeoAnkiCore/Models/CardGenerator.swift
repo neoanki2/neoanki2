@@ -12,35 +12,54 @@ public enum CardGenerator {
         deterministicIDs: Bool = false
     ) -> [Card] {
         type.templates.flatMap { template -> [Card] in
-            guard shouldGenerate(template, for: item) else { return [] }
-            let groups: [Int?]
-            if template.interaction == .cloze {
-                groups = clozeGroups(for: template, item: item).map(Optional.some)
-            } else if template.interaction == .imageOcclusion {
-                groups = occlusionGroups(for: template, item: item).map(Optional.some)
-            } else {
-                groups = [nil]
+            let selections = (template.cardCreation?.listIDs ?? []).reduce([[CardRowSelection]]([[]])) { partial, id in
+                guard let list = type.lists.first(where: { $0.id == id }) else { return [] }
+                let rows = list.rows(in: item)
+                return partial.flatMap { combination in
+                    rows.map { combination + [CardRowSelection(listID: id, rowID: $0.id)] }
+                }
             }
-            return groups.map { group in
-                Card(
-                    id: deterministicIDs
+            return selections.flatMap { selection -> [Card] in
+                guard let bound = boundItem(item, type: type, selections: selection),
+                      shouldGenerate(template, for: bound) else { return [] }
+                let groups: [Int?]
+                switch template.promptFormat {
+                case .standard: groups = [nil]
+                case .cloze: groups = clozeGroups(for: template, item: bound).map(Optional.some)
+                case .imageOcclusion: groups = occlusionGroups(for: template, item: bound).map(Optional.some)
+                }
+                return groups.map { group in Card(
+                    id: deterministicIDs || !selection.isEmpty
                         ? deterministicCardID(
                             itemID: item.id,
                             templateID: template.id,
                             clozeGroup: group,
-                            isOcclusion: template.interaction == .imageOcclusion
+                            isOcclusion: template.promptFormat == .imageOcclusion,
+                            rows: selection
                         )
                         : UUID(),
                     itemID: item.id,
                     templateID: template.id,
                     skill: template.skill,
                     memory: .new(due: now),
+                    isSuspended: template.cardCreation?.startSuspended ?? false,
                     deckID: item.deckID,
-                    occlusionGroup: template.interaction == .imageOcclusion ? group : nil,
-                    clozeGroup: template.interaction == .cloze ? group : nil
-                )
+                    occlusionGroup: template.promptFormat == .imageOcclusion ? group : nil,
+                    clozeGroup: template.promptFormat == .cloze ? group : nil,
+                    rowSelections: selection
+                ) }
             }
         }
+    }
+
+    public static func boundItem(_ item: Item, type: ItemType, selections: [CardRowSelection]) -> Item? {
+        var bound = item
+        for selection in selections {
+            guard let list = type.lists.first(where: { $0.id == selection.listID }),
+                  let row = list.rows(in: item).first(where: { $0.id == selection.rowID }) else { return nil }
+            bound.fields.append(contentsOf: row.values)
+        }
+        return bound
     }
 
     /// Stable identities are used by API bulk planning so a non-mutating dry
@@ -50,11 +69,15 @@ public enum CardGenerator {
         itemID: UUID,
         templateID: UUID,
         clozeGroup: Int?,
-        isOcclusion: Bool = false
+        isOcclusion: Bool = false,
+        rows: [CardRowSelection] = []
     ) -> UUID {
         let groupText = clozeGroup.map(String.init) ?? "none"
         let namespace = isOcclusion ? "neoanki-occlusion-card-v1" : "neoanki-card-v1"
-        let input = "\(namespace)|\(itemID.uuidString.lowercased())|\(templateID.uuidString.lowercased())|\(groupText)"
+        let suffix = rows.sorted { $0.listID.uuidString < $1.listID.uuidString }.map {
+            "|\($0.listID.uuidString.lowercased()):\($0.rowID.uuidString.lowercased())"
+        }.joined()
+        let input = "\(namespace)|\(itemID.uuidString.lowercased())|\(templateID.uuidString.lowercased())|\(groupText)" + suffix
         var bytes = Array(SHA256.hash(data: Data(input.utf8)).prefix(16))
         // RFC 9562-compatible name-derived UUID shape (version 5, variant 1).
         bytes[6] = (bytes[6] & 0x0f) | 0x50
@@ -68,8 +91,9 @@ public enum CardGenerator {
     }
 
     public static func shouldGenerate(_ template: Template, for item: Item) -> Bool {
-        guard let condition = template.generateWhen else { return true }
-        return evaluate(condition, for: item)
+        let flags = template.cardCreation?.checkedFieldIDs ?? []
+        return flags.allSatisfy { item.value(for: $0) == .checkbox(true) }
+            && (template.generateWhen.map { evaluate($0, for: item) } ?? true)
     }
 
     private static func evaluate(_ condition: SlotCondition, for item: Item) -> Bool {

@@ -272,6 +272,7 @@ struct MacItemTypeStudioView: View {
                             ))
                     }
                 }
+                Section("Lists") { ItemListsEditor(lists: draft.lists) }
             }
             .listStyle(.sidebar)
             .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupListScroll)
@@ -567,6 +568,9 @@ struct MacItemTypeStudioView: View {
 
     private func saveImpactMessage(_ impact: ItemTypeStudioSaveImpact) -> String {
         var messages: [String] = []
+        if let preview = impact.cardCreationPreview {
+            messages.append(CardCreationSummary.message(for: preview))
+        }
         if !impact.removedFields.isEmpty {
             messages.append("Remove \(impact.removedFields.map(\.name).joined(separator: ", ")).")
         }
@@ -579,7 +583,7 @@ struct MacItemTypeStudioView: View {
         if !impact.removedCardSetups.isEmpty {
             messages.append("Remove Card setups \(impact.removedCardSetups.map(\.name).joined(separator: ", ")).")
         }
-        if impact.generatedCardRetirementCount > 0 {
+        if impact.cardCreationPreview == nil, impact.generatedCardRetirementCount > 0 {
             let count = impact.generatedCardRetirementCount
             messages.append("Retire \(count) generated card\(count == 1 ? "" : "s").")
         }

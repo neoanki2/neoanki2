@@ -185,6 +185,10 @@ keeps the displayed card fixed while preparing the rest of the session.
 After the last grade, any newly due cards appear with the usual prompt and
 answer controls.
 
+Card Setup exposes **Prompt**, **Response**, and **Create cards from** as
+separate controls. In a generated card preview, use **Next Card** to move
+between variants and **Show Answer** to inspect the answer.
+
 ## VoiceOver and focus
 
 Rows combine their important text into one useful VoiceOver label: deck rows

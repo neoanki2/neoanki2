@@ -29,7 +29,9 @@ public enum ItemDisplay {
             return ClozeValidation.displayText(from: text, blanks: blanks, revealed: false)
         case let .studyExercise(exercise):
             return exercise.stimulus.isEmpty ? exercise.options.map(\.label).joined(separator: " / ") : exercise.stimulus
-        case .empty:
+        case let .checkbox(checked):
+            return checked ? "Checked" : "Unchecked"
+        case .rows, .empty:
             return ""
         }
     }
@@ -56,7 +58,7 @@ public extension FieldDef {
         switch type {
         case .text, .richText, .number, .cloze, .studyExercise:
             return true
-        case .audio, .image, .gif, .video, .imageOcclusion:
+        case .audio, .image, .gif, .video, .imageOcclusion, .checkbox:
             return false
         }
     }
@@ -98,7 +100,7 @@ public extension FieldDef {
             return (try? StudyExercise(editorText: plain)).map(ContentValue.studyExercise) ?? .empty
         case .cloze:
             return plain.isEmpty ? .empty : .cloze(plain, blanks: [])
-        case .audio, .image, .gif, .video, .imageOcclusion:
+        case .audio, .image, .gif, .video, .imageOcclusion, .checkbox:
             return .empty
         }
     }

@@ -242,7 +242,7 @@ extension ItemStore {
                     reusedCount += 1
                     continue
                 case .importAsDistinctRevision:
-                    let created = remappedPortableType(record.itemType)
+                    let created = record.itemType.duplicated(name: record.itemType.name)
                     typeMap[record.itemType.id] = created
                     createdTypes.append(created)
                     continue
@@ -260,8 +260,13 @@ extension ItemStore {
                 typeMap[record.itemType.id] = existing
                 reusedCount += 1
             } else {
-                let created = remappedPortableType(record.itemType)
-                typeMap[record.itemType.id] = created
+                // The Vocabulary Set preset's IDs connect imported examples to
+                // Known Words and its typed answer evaluator.
+                let source = record.itemType
+                let isVocabularyPreset = source == VocabularySet.itemType || source == VocabularySet.legacyItemType
+                let canKeepPresetID = isVocabularyPreset && !existingTypes.contains { $0.id == source.id }
+                let created = canKeepPresetID ? source : source.duplicated(name: source.name)
+                typeMap[source.id] = created
                 createdTypes.append(created)
             }
         }
@@ -284,37 +289,25 @@ extension ItemStore {
         guard package.items.count <= limits.maximumItems else {
             throw PortableDeckError.limitExceeded("Portable deck contains too many items.")
         }
-        let sourceTypesByID = Dictionary(uniqueKeysWithValues:
-            package.types.map { ($0.itemType.id, $0.itemType) }
-        )
-        let sourceOrdinalsByTypeID = Dictionary(uniqueKeysWithValues:
-            package.types.map { record in
-                (
-                    record.itemType.id,
-                    Dictionary(uniqueKeysWithValues:
-                        record.itemType.fields.enumerated().map { ($0.element.id, $0.offset) }
-                    )
-                )
+        let contentMappings = Dictionary(uniqueKeysWithValues: package.types.compactMap { record in
+            typeMap[record.itemType.id].map { destination in
+                (record.itemType.id, ItemTypeContentMapping(source: record.itemType, destination: destination))
             }
-        )
+        })
         for index in package.items.indices {
             let record = package.items[index]
             guard let type = typeMap[record.item.itemTypeID],
                   let oldDeckID = record.item.deckID,
                   let deckID = deckMap[oldDeckID]
             else { throw PortableDeckError.invalidPackage("Item references are invalid.") }
-            guard sourceTypesByID[record.item.itemTypeID] != nil,
-                  let sourceOrdinals = sourceOrdinalsByTypeID[record.item.itemTypeID]
-            else {
+            guard let mapping = contentMappings[record.item.itemTypeID] else {
                 throw PortableDeckError.invalidPackage("Item source type is missing.")
             }
-            let mappedFields = try record.item.fields.map { field -> FieldValue in
-                guard let ordinal = sourceOrdinals[field.fieldID], ordinal < type.fields.count else {
-                    throw PortableDeckError.invalidPackage("Item field ordinal is invalid.")
-                }
-                return FieldValue(fieldID: type.fields[ordinal].id, value: field.value)
-            }
-            try validatePortableFields(mappedFields, against: type)
+            let mappedFields: [FieldValue]
+            do { mappedFields = try mapping.fields(record.item.fields) }
+            catch { throw PortableDeckError.invalidPackage("Item field ordinal is invalid.") }
+            try validatePortableFields(mappedFields.filter { field in type.fields.contains { $0.id == field.fieldID } }, against: type)
+            try Self.validateContent(Item(itemTypeID: type.id, fields: mappedFields), against: type)
             package.items[index] = .init(
                 item: Item(
                     id: UUID(),
@@ -479,68 +472,13 @@ private func validatePortableFields(_ fields: [FieldValue], against itemType: It
 private func portableValue(_ value: ContentValue, matches type: FieldType) -> Bool {
     if case .empty = value { return true }
     switch (type, value) {
-    case (.studyExercise, .studyExercise), (.imageOcclusion, .imageOcclusion), (.text, .text), (.richText, .rich), (.number, .number), (.cloze, .cloze):
+    case (.studyExercise, .studyExercise), (.imageOcclusion, .imageOcclusion), (.text, .text), (.richText, .rich), (.number, .number), (.cloze, .cloze), (.checkbox, .checkbox), (.text, .rich):
         return true
     case let (.audio, .media(ref)): return ref.kind == .audio
     case let (.image, .media(ref)): return ref.kind == .image
     case let (.gif, .media(ref)): return ref.kind == .gif
     case let (.video, .media(ref)): return ref.kind == .video
     default: return false
-    }
-}
-
-private func remappedPortableType(_ source: ItemType) -> ItemType {
-    let fields = source.fields.map {
-        FieldDef(name: $0.name, type: $0.type, isRequired: $0.isRequired)
-    }
-    let idMap = Dictionary(uniqueKeysWithValues:
-        zip(source.fields.map(\.id), fields.map(\.id))
-    )
-    let templates = source.templates.map { template in
-        Template(
-            name: template.name,
-            layout: template.layout,
-            components: template.components.map { component in
-                TemplateComponent(
-                    region: component.region,
-                    purpose: component.purpose,
-                    source: remappedSource(component.source, ids: idMap),
-                    presentation: component.presentation
-                )
-            },
-            interaction: template.interaction,
-            skill: template.skill,
-            generateWhen: template.generateWhen.map { remappedCondition($0, ids: idMap) },
-            fitStudyArea: template.fitStudyArea
-        )
-    }
-    return ItemType(name: source.name, fields: fields, templates: templates)
-}
-
-private func remappedSource(_ source: SlotSource, ids: [UUID: UUID]) -> SlotSource {
-    switch source {
-    case let .field(id): .field(ids[id] ?? id)
-    case let .literal(value): .literal(value)
-    }
-}
-
-private func remappedSide(_ side: Side, ids: [UUID: UUID]) -> Side {
-    Side(slots: side.slots.map { slot in
-        let source: SlotSource
-        switch slot.source {
-        case let .field(id): source = .field(ids[id] ?? id)
-        case let .literal(value): source = .literal(value)
-        }
-        return Slot(source: source, presentation: slot.presentation)
-    })
-}
-
-private func remappedCondition(_ condition: SlotCondition, ids: [UUID: UUID]) -> SlotCondition {
-    switch condition {
-    case let .fieldNotEmpty(id): .fieldNotEmpty(ids[id] ?? id)
-    case let .fieldEmpty(id): .fieldEmpty(ids[id] ?? id)
-    case let .all(children): .all(children.map { remappedCondition($0, ids: ids) })
-    case let .any(children): .any(children.map { remappedCondition($0, ids: ids) })
     }
 }
 

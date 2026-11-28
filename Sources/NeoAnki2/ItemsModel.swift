@@ -385,6 +385,7 @@ final class ItemsModel {
         fieldMediaAltText: [UUID: String] = [:],
         fieldClozeBlanks: [UUID: [ClozeSpan]] = [:],
         fieldOcclusions: [UUID: ImageOcclusionContent] = [:],
+        listRows: [UUID: [ItemListRow]] = [:],
         deckID: UUID? = nil
     ) async -> Bool {
         errorMessage = nil
@@ -403,7 +404,7 @@ final class ItemsModel {
                 fieldMedia: fieldMedia,
                 fieldMediaAltText: fieldMediaAltText,
                 fieldClozeBlanks: fieldClozeBlanks,
-                fieldOcclusions: fieldOcclusions
+                fieldOcclusions: fieldOcclusions, listRows: listRows
             )
 
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
@@ -438,7 +439,8 @@ final class ItemsModel {
         fieldMedia: [UUID: MediaRef] = [:],
         fieldMediaAltText: [UUID: String] = [:],
         fieldClozeBlanks: [UUID: [ClozeSpan]] = [:],
-        fieldOcclusions: [UUID: ImageOcclusionContent] = [:]
+        fieldOcclusions: [UUID: ImageOcclusionContent] = [:],
+        listRows: [UUID: [ItemListRow]]? = nil
     ) async -> Bool {
         errorMessage = nil
 
@@ -450,7 +452,7 @@ final class ItemsModel {
             var draft = ItemEditorDraft(item: stored.item, itemType: stored.itemType)
             draft.snapshot = ItemEditorSnapshot(fieldSpans: fieldSpans, fieldText: fieldText,
                 fieldMedia: fieldMedia, fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks, fieldOcclusions: fieldOcclusions)
+                fieldClozeBlanks: fieldClozeBlanks, fieldOcclusions: fieldOcclusions, listRows: listRows ?? draft.snapshot.listRows)
             let item = try draft.item()
             let updated = ContextDerivedContent.invalidatingSpeech(in: item, original: stored.item, type: stored.itemType)
             let outcome = try await command("update-item") { try await library.updateItem(updated) }
@@ -479,12 +481,13 @@ final class ItemsModel {
         fieldMedia: [UUID: MediaRef],
         fieldMediaAltText: [UUID: String],
         fieldClozeBlanks: [UUID: [ClozeSpan]],
-        fieldOcclusions: [UUID: ImageOcclusionContent]
+        fieldOcclusions: [UUID: ImageOcclusionContent],
+        listRows: [UUID: [ItemListRow]]
     ) throws -> [FieldValue] {
         return try ItemEditorState.fields(from: ItemEditorSnapshot(
             fieldSpans: fieldSpans, fieldText: fieldText, fieldMedia: fieldMedia,
             fieldMediaAltText: fieldMediaAltText, fieldClozeBlanks: fieldClozeBlanks,
-            fieldOcclusions: fieldOcclusions), itemType: itemType)
+            fieldOcclusions: fieldOcclusions, listRows: listRows), itemType: itemType)
     }
 
     func deleteItem(id: UUID, scope: StudyScope = .allDecks) async -> Bool {

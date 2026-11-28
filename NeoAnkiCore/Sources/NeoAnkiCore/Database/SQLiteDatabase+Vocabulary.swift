@@ -4,8 +4,25 @@ import Foundation
 public extension ItemStore {
     func createVocabularySet(_ draft: VocabularySetDraft, id: UUID = UUID(), now: Date = .now) async throws -> UUID {
         let item = try VocabularySet.makeItem(draft, id: id)
-        try await database.insertVocabularySet(item, now: now)
+        let legacy = try VocabularySet.makeLegacyItem(draft, id: id)
+        try await database.insertVocabularySet(item, legacy: legacy, now: now)
         return id
+    }
+
+    func createVocabularyExample(_ draft: VocabularySetDraft, id: UUID, recognition: Bool, cloze: Bool) async throws -> UUID {
+        let item = try VocabularySet.makeExampleItem(draft, id: id, recognition: recognition, cloze: cloze)
+        try await database.insertVocabularySet(item, legacy: nil, now: .now)
+        return id
+    }
+
+    func matchingVocabularySets(_ draft: VocabularySetDraft) async throws -> [VocabularySetMatch] {
+        let item = try VocabularySet.makeItem(draft, id: UUID())
+        return try await database.matchingVocabularySets(item)
+    }
+
+    func appendVocabularyExample(_ draft: VocabularySetDraft, to itemID: UUID, exampleID: UUID, recognition: Bool = true, cloze: Bool = true, now: Date = .now) async throws {
+        let item = try VocabularySet.makeExampleItem(draft, id: exampleID, recognition: recognition, cloze: cloze)
+        try await database.appendVocabularyExample(item, to: itemID, now: now)
     }
 
     /// Statuses for terms that have a judgment or cards. `expression` filters by match key.
@@ -83,11 +100,11 @@ extension SQLiteDatabase {
         for observer in vocabularyObservers.values { observer.yield() }
     }
 
-    func insertVocabularySet(_ item: Item, now: Date) throws {
+    func insertVocabularySet(_ item: Item, legacy: Item?, now: Date) throws {
         let type = VocabularySet.itemType
         try inTransaction(recordNativeCommand: true, affectedCount: 1) {
             if let existing = try fetchItem(id: item.id) {
-                guard existing.item == item else { throw VocabularySetError.idConflict }
+                guard existing.item == item || existing.item == legacy else { throw VocabularySetError.idConflict }
                 return
             }
             if let deckID = item.deckID, try fetchDeck(id: deckID) == nil {
@@ -105,9 +122,40 @@ extension SQLiteDatabase {
         }
     }
 
+    func matchingVocabularySets(_ candidate: Item) throws -> [VocabularySetMatch] {
+        try fetchItems(itemTypeID: VocabularySet.typeID).compactMap { record in
+            guard VocabularySet.matches(record.item, candidate) else { return nil }
+            let rows = VocabularySet.examples.rows(in: record.item)
+            let label = rows.first?.values.first.map { ItemDisplay.plainText(from: $0.value) } ?? ""
+            return VocabularySetMatch(id: record.item.id, exampleCount: rows.count, firstExample: label)
+        }
+    }
+
+    func appendVocabularyExample(_ candidate: Item, to itemID: UUID, now: Date) throws {
+        try inTransaction(recordNativeCommand: true, affectedCount: 1) {
+            guard var target = try fetchItem(id: itemID)?.item,
+                  target.itemTypeID == VocabularySet.typeID, VocabularySet.matches(target, candidate),
+                  let row = VocabularySet.examples.rows(in: candidate).first else { throw VocabularySetError.idConflict }
+            let type = VocabularySet.itemType
+            guard try fetchItemType(id: type.id) == type else { throw VocabularySetError.changedPreset }
+            var rows = VocabularySet.examples.rows(in: target)
+            if let existing = rows.first(where: { $0.id == row.id }) {
+                guard existing == row else { throw VocabularySetError.idConflict }
+                return
+            }
+            rows.append(row)
+            target.fields.removeAll { $0.fieldID == VocabularySet.examples.id }
+            target.fields.append(FieldValue(fieldID: VocabularySet.examples.id, value: .rows(rows)))
+            try ItemStore.validateContent(target, against: type)
+            let cards = CardGenerator.cards(for: target, type: type, now: now, deterministicIDs: true)
+            try updateItemWithMediaWithoutTransaction(target, desiredCards: cards, updatedAt: now, mediaDescriptors: [:])
+            for card in try fetchCards(for: itemID) { _ = try ensureSchedulerCardHistory(cardID: card.id, now: now) }
+        }
+    }
+
     func vocabularyReview(_ log: ReviewLog) throws -> ReviewLog {
         guard let card = try fetchCard(id: log.cardID),
-              card.templateID == VocabularySet.readingID || card.templateID == VocabularySet.productionID,
+              VocabularySet.isReading(card.templateID) || VocabularySet.isProduction(card.templateID),
               let item = try fetchItem(id: card.itemID)?.item,
               let type = try fetchValidatedItemType(id: item.itemTypeID),
               let fingerprint = VocabularySet.prompt(for: card, item: item, type: type) else { return log }
@@ -181,12 +229,15 @@ extension SQLiteDatabase {
     /// Review evidence from Vocabulary Set cards, for every set or only `only`. Suspended cards keep
     /// the evidence they earned but no longer count as being studied.
     private func vocabularySetEvidence(only: Item? = nil) throws -> [VocabularyEvidence] {
-        guard let type = try fetchValidatedItemType(id: VocabularySet.typeID) else { return [] }
+        let types = try VocabularySet.supportedItemTypeIDs.compactMap { try fetchValidatedItemType(id: $0) }
+        guard !types.isEmpty else { return [] }
+        let byID = Dictionary(uniqueKeysWithValues: types.map { ($0.id, $0) })
+        let bindings: [Binding] = VocabularySet.supportedItemTypeIDs.map { .text($0.uuidString) }
         let items: [Item]
         let cardRows: [[String: Any?]]
         let columns = """
             cards.id, cards.item_id, cards.template_id, cards.skill, cards.memory, cards.is_suspended,
-            cards.deck_id, cards.cloze_group, cards.occlusion_group, cards.memory_model_version,
+            cards.deck_id, cards.cloze_group, cards.occlusion_group, cards.row_selections, cards.memory_model_version,
             cards.memory_parameter_set_id, cards.scheduling_history_origin
             """
         if let only {
@@ -194,13 +245,13 @@ extension SQLiteDatabase {
             cardRows = try query("SELECT \(columns) FROM cards WHERE cards.item_id = ?;",
                                  bindings: [.text(only.id.uuidString)])
         } else {
-            let ids = Set(try query("SELECT id FROM items WHERE item_type_id = ?;", bindings: [.text(type.id.uuidString)])
+            let ids = Set(try query("SELECT id FROM items WHERE item_type_id IN (?, ?);", bindings: bindings)
                 .compactMap { ($0["id"] as? String).flatMap(UUID.init(uuidString:)) })
             guard !ids.isEmpty else { return [] }
             items = try fetchItems(ids: ids).map(\.item)
             cardRows = try query("""
-                SELECT \(columns) FROM cards JOIN items ON items.id = cards.item_id WHERE items.item_type_id = ?;
-                """, bindings: [.text(type.id.uuidString)])
+                SELECT \(columns) FROM cards JOIN items ON items.id = cards.item_id WHERE items.item_type_id IN (?, ?);
+                """, bindings: bindings)
         }
         let cardsByItem = Dictionary(grouping: try cardRows.map(decodeCard(from:)), by: \.itemID)
 
@@ -208,7 +259,7 @@ extension SQLiteDatabase {
         var evidence: [VocabularyEvidence] = []
         var candidates: [Candidate] = []
         for item in items {
-            guard let term = VocabularySet.term(in: item) else { continue }
+            guard let type = byID[item.itemTypeID], let term = VocabularySet.term(in: item) else { continue }
             var row = VocabularyEvidence(term: term)
             for card in cardsByItem[item.id] ?? [] {
                 guard let fingerprint = VocabularySet.prompt(for: card, item: item, type: type) else { continue }
@@ -225,8 +276,8 @@ extension SQLiteDatabase {
             card.isSuspended = false
             let current = (logs[card.id] ?? []).reversed().prefix { $0.vocabularyPrompt == candidate.fingerprint }
             guard CardMaturityStatus.evaluate(card: card, reviews: Array(current)) == .maintaining else { continue }
-            if card.templateID == VocabularySet.readingID { evidence[candidate.evidence].readingMature = true }
-            if card.templateID == VocabularySet.productionID { evidence[candidate.evidence].clozeMature = true }
+            if VocabularySet.isReading(card.templateID) { evidence[candidate.evidence].readingMature = true }
+            if VocabularySet.isProduction(card.templateID) { evidence[candidate.evidence].clozeMature = true }
         }
         return evidence
     }
@@ -395,7 +446,7 @@ extension SQLiteDatabase {
     /// would silently forget words the learner demonstrably knows. Only this item's own evidence is
     /// read, so deleting a large deck stays linear.
     func archiveVocabularyEvidence(beforeDeleting item: Item, now: Date) throws {
-        guard item.itemTypeID == VocabularySet.typeID,
+        guard VocabularySet.supportedItemTypeIDs.contains(item.itemTypeID),
               let evidence = try vocabularySetEvidence(only: item).first, evidence.readingMature else { return }
         let term = evidence.term
         if let latest = try query("""

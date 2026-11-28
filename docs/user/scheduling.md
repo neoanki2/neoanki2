@@ -82,6 +82,11 @@ Home keeps the due count and Study action. Open **Statistics → Workload** from
 the sidebar or tab bar to inspect upcoming work; select the deck there instead
 of using a duplicate statistics link on Home.
 
+List-generated cards use FSRS and the deck’s existing daily introduction limit.
+Choose **Start new cards suspended** in Card Setup to release them in batches.
+A deck excluded from All Decks study still uses its own limit when you study
+that deck directly.
+
 ## Limit new cards per day
 
 In Japanese Academy, reading a lesson leaves the daily new-card allowance

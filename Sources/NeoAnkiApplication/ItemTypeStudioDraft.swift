@@ -301,7 +301,7 @@ public struct CardSetupRecommendation: Equatable, Sendable {
 
     private static func modality(for type: FieldType) -> Modality {
         switch type {
-        case .text, .richText, .number, .cloze, .studyExercise: .text
+        case .text, .richText, .number, .cloze, .studyExercise, .checkbox: .text
         case .audio: .audio
         case .image, .imageOcclusion, .gif: .image
         case .video: .video
@@ -344,6 +344,9 @@ public struct CardSetupDraft: Identifiable, Equatable, Sendable {
     public var layout: CardLayoutID
     public var fitStudyArea: Bool
     public var interaction: Interaction
+    public var cardCreation: CardCreation?
+    public var responseOverride: ResponseMode?
+    public var response: ResponseMode { responseOverride ?? interaction.defaultResponse }
     public var learningRoute: Skill
     public var availability: CardSetupAvailabilityDraft?
     public var components: [CardSetupComponentDraft]
@@ -382,6 +385,8 @@ public struct CardSetupDraft: Identifiable, Equatable, Sendable {
         layout = template.layout
         fitStudyArea = template.fitStudyArea
         interaction = template.interaction
+        cardCreation = template.cardCreation
+        responseOverride = template.responseOverride
         learningRoute = template.skill
         availability = template.generateWhen.map(CardSetupAvailabilityDraft.init)
         components = template.components.map(CardSetupComponentDraft.init)
@@ -575,7 +580,9 @@ public struct CardSetupDraft: Identifiable, Equatable, Sendable {
                 }
                 return condition
             },
-            fitStudyArea: fitStudyArea
+            fitStudyArea: fitStudyArea,
+            cardCreation: cardCreation,
+            responseOverride: responseOverride
         )
     }
 }
@@ -790,6 +797,8 @@ private struct PersistedCardSetupDraftState: Equatable, Sendable {
     let interaction: Interaction
     let learningRoute: Skill
     let availability: CardSetupAvailabilityDraft?
+    let cardCreation: CardCreation?
+    let responseOverride: ResponseMode?
     let components: [PersistedCardSetupComponentDraftState]
 
     init(_ draft: CardSetupDraft) {
@@ -799,6 +808,8 @@ private struct PersistedCardSetupDraftState: Equatable, Sendable {
         interaction = draft.interaction
         learningRoute = draft.learningRoute
         availability = draft.availability
+        cardCreation = draft.cardCreation
+        responseOverride = draft.responseOverride
         components = draft.components.map(PersistedCardSetupComponentDraftState.init)
     }
 }
@@ -809,6 +820,7 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
     public private(set) var originalSnapshot: ItemType?
     public var name: String
     public var fields: [ItemTypeFieldDraft]
+    public var lists: [ItemList] = []
     public var cardSetups: [CardSetupDraft]
 
     private var initialName: String
@@ -820,6 +832,7 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
     public init(itemType: ItemType) {
         id = itemType.id
         originalSnapshot = itemType
+        lists = itemType.lists
         name = itemType.name
         fields = itemType.fields.map(ItemTypeFieldDraft.init)
         cardSetups = itemType.templates.map(CardSetupDraft.init)
@@ -884,12 +897,22 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
     public var isDirty: Bool {
         name != initialName
             || fields != initialFields
+            || lists != (originalSnapshot?.lists ?? [])
             || cardSetups.map(PersistedCardSetupDraftState.init)
                 != initialCardSetups.map(PersistedCardSetupDraftState.init)
     }
 
     public var validationIssues: [ItemTypeStudioValidationIssue] {
-        Self.validationIssues(name: name, fields: fields, cardSetups: cardSetups)
+        Self.validationIssues(name: name, fields: fields, lists: lists, cardSetups: cardSetups)
+    }
+
+    public func sourceFields(for setup: CardSetupDraft) -> [ItemTypeFieldDraft] {
+        fields + Self.columns(for: setup, lists: lists)
+    }
+
+    private static func columns(for setup: CardSetupDraft, lists: [ItemList]) -> [ItemTypeFieldDraft] {
+        let selected = Set(setup.cardCreation?.listIDs ?? [])
+        return lists.filter { selected.contains($0.id) }.flatMap(\.columns).map(ItemTypeFieldDraft.init)
     }
 
     public var isValid: Bool { validationIssues.isEmpty }
@@ -901,7 +924,8 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
             id: id,
             name: name,
             fields: fields.map(\.fieldDefinition),
-            templates: try cardSetups.map { try $0.template() }
+            templates: try cardSetups.map { try $0.template() },
+            lists: lists
         )
         try ItemTypeValidation.validate(itemType)
         return itemType
@@ -1120,6 +1144,7 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
     private static func validationIssues(
         name: String,
         fields: [ItemTypeFieldDraft],
+        lists: [ItemList],
         cardSetups: [CardSetupDraft]
     ) -> [ItemTypeStudioValidationIssue] {
         var issues: [ItemTypeStudioValidationIssue] = []
@@ -1145,9 +1170,6 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
         if cardSetups.isEmpty {
             issues.append(.init(target: .itemTypeName, message: "Add at least one Card setup."))
         }
-        let fieldByID = Dictionary(fields.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in
-            first
-        })
         var setupIDs: Set<UUID> = []
         for setup in cardSetups {
             if !setupIDs.insert(setup.id).inserted {
@@ -1156,6 +1178,8 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
                     message: "Card setup identity must be unique."
                 ))
             }
+            let sources = fields + columns(for: setup, lists: lists)
+            let fieldByID = Dictionary(sources.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             validate(setup: setup, fieldByID: fieldByID, into: &issues)
         }
         return issues
@@ -1175,21 +1199,21 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
                 message: "Choose question content."
             ))
         }
-        if setup.interaction != .audioSubmission, setup.interaction != .imageOcclusion,
+        if setup.response != .audioSubmission, setup.interaction != .imageOcclusion,
            !setup.components.contains(where: { $0.purpose == .expectedAnswer }) {
             issues.append(.init(
                 target: .recipe(cardSetupID: setup.id, purpose: .expectedAnswer),
                 message: "Choose expected answer content."
             ))
         }
-        if setup.interaction == .audioSubmission,
+        if setup.response == .audioSubmission,
            setup.components.contains(where: { $0.purpose == .expectedAnswer }) {
             issues.append(.init(
                 target: .answerMethod(cardSetupID: setup.id),
                 message: "Audio Submission cannot reveal an expected answer."
             ))
         }
-        if setup.interaction == .audioSubmission, setup.learningRoute.output != .audio {
+        if setup.response == .audioSubmission, setup.learningRoute.output != .audio {
             issues.append(.init(
                 target: .answerMethod(cardSetupID: setup.id),
                 message: "Audio Submission needs an audio learning route."

@@ -496,7 +496,8 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
                     id: mapped(deck.id, kind: .deck),
                     name: deck.name,
                     parentID: deck.parentID.map { mapped($0, kind: .deck) },
-                    newCardsPerDay: deck.newCardsPerDay
+                    newCardsPerDay: deck.newCardsPerDay,
+                    includeInAllDecksStudy: deck.includeInAllDecksStudy
                 )
                 transformed = .deck(value); transformedID = value.id.uuidString
             case let .itemType(type):
@@ -504,7 +505,8 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
                     id: mapped(type.id, kind: .itemType),
                     name: type.name,
                     fields: type.fields,
-                    templates: type.templates
+                    templates: type.templates,
+                    lists: type.lists
                 )
                 transformed = .itemType(value); transformedID = value.id.uuidString
             case let .item(record):
@@ -533,7 +535,8 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
                     schedulingHistoryOrigin: card.schedulingHistoryOrigin,
                     isSuspended: card.isSuspended,
                     deckID: card.deckID.map { mapped($0, kind: .deck) },
-                    occlusionGroup: card.occlusionGroup, clozeGroup: card.clozeGroup
+                    occlusionGroup: card.occlusionGroup, clozeGroup: card.clozeGroup,
+                    rowSelections: card.rowSelections
                 )
                 transformed = .card(value); transformedID = value.id.uuidString
             case let .review(review):
@@ -673,7 +676,8 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
                 id: copy.id,
                 name: "\(deck.name) (Recovered)",
                 parentID: deck.parentID,
-                newCardsPerDay: deck.newCardsPerDay
+                newCardsPerDay: deck.newCardsPerDay,
+                includeInAllDecksStudy: deck.includeInAllDecksStudy
             )
             _ = try await repository.createDeck(restored)
         case let .item(record):
@@ -695,7 +699,8 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
                 id: copy.id,
                 name: "\(type.name) (Recovered)",
                 fields: type.fields,
-                templates: type.templates
+                templates: type.templates,
+                    lists: type.lists
             )
             try ItemTypeValidation.validate(restored)
             _ = try await repository.createItemType(restored)

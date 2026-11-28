@@ -21,6 +21,7 @@ public struct ItemEditorSnapshot: Sendable, Equatable {
     public var fieldMedia: [UUID: MediaRef]
     public var fieldMediaAltText: [UUID: String]
     public var fieldOcclusions: [UUID: ImageOcclusionContent]
+    public var listRows: [UUID: [ItemListRow]]
     public var fieldClozeBlanks: [UUID: [ClozeSpan]]
 
     public init(
@@ -29,8 +30,10 @@ public struct ItemEditorSnapshot: Sendable, Equatable {
         fieldMedia: [UUID: MediaRef],
         fieldMediaAltText: [UUID: String],
         fieldClozeBlanks: [UUID: [ClozeSpan]],
-        fieldOcclusions: [UUID: ImageOcclusionContent] = [:]
+        fieldOcclusions: [UUID: ImageOcclusionContent] = [:],
+        listRows: [UUID: [ItemListRow]] = [:]
     ) {
+        self.listRows = listRows
         self.fieldSpans = fieldSpans
         self.fieldText = fieldText
         self.fieldMedia = fieldMedia
@@ -62,6 +65,7 @@ public enum ItemEditorState {
 
     public static func hydrated(from item: Item, itemType: ItemType) -> ItemEditorSnapshot {
         var snapshot = empty(for: itemType)
+        snapshot.listRows = Dictionary(uniqueKeysWithValues: itemType.lists.filter { $0.sharedRows == nil }.map { ($0.id, $0.rows(in: item)) })
         for field in itemType.fields {
             guard let value = item.value(for: field.id) else { continue }
             switch value {
@@ -76,7 +80,8 @@ public enum ItemEditorState {
                 snapshot.fieldText[field.id] = text
                 snapshot.fieldClozeBlanks[field.id] = blanks
             case let .imageOcclusion(content): snapshot.fieldOcclusions[field.id] = content
-            case .empty: break
+            case let .checkbox(checked): snapshot.fieldText[field.id] = String(checked)
+            case .rows, .empty: break
             }
         }
         return snapshot
@@ -118,7 +123,7 @@ public enum ItemEditorState {
             }
         }
         let initial = original.map { hydrated(from: $0, itemType: itemType) }
-        return try itemType.fields.compactMap { field -> FieldValue? in
+        let scalars = try itemType.fields.compactMap { field -> FieldValue? in
             var value: ContentValue
             switch field.type {
             case .text, .richText:
@@ -130,6 +135,8 @@ public enum ItemEditorState {
             case .studyExercise:
                 let input = snapshot.fieldText[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
                 value = input.isEmpty ? .empty : .studyExercise(try StudyExercise(editorText: input))
+            case .checkbox:
+                value = snapshot.fieldText[field.id].map { .checkbox($0 == "true") } ?? (field.isRequired ? .checkbox(false) : .empty)
             case .number:
                 let input = snapshot.fieldText[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
                 if input.isEmpty { value = .empty }
@@ -167,12 +174,16 @@ public enum ItemEditorState {
             if value.isEmpty { return nil }
             return FieldValue(fieldID: field.id, value: value)
         }
+        return scalars + itemType.lists.filter { $0.sharedRows == nil }.compactMap { list in
+            guard let rows = snapshot.listRows[list.id], !rows.isEmpty else { return nil }
+            return FieldValue(fieldID: list.id, value: .rows(rows))
+        }
     }
 
     private static func fieldIsUnchanged(_ field: FieldDef, _ current: ItemEditorSnapshot, _ initial: ItemEditorSnapshot) -> Bool {
         switch field.type {
         case .text, .richText: current.fieldSpans[field.id] == initial.fieldSpans[field.id]
-        case .number, .studyExercise: current.fieldText[field.id] == initial.fieldText[field.id]
+        case .number, .studyExercise, .checkbox: current.fieldText[field.id] == initial.fieldText[field.id]
         case .cloze:
             current.fieldText[field.id] == initial.fieldText[field.id]
                 && current.fieldClozeBlanks[field.id] == initial.fieldClozeBlanks[field.id]
@@ -242,6 +253,8 @@ public struct ItemEditorDraft: Sendable, Equatable {
             return .rich(spans)
         case .studyExercise:
             return (try? StudyExercise(editorText: snapshot.fieldText[fieldID, default: ""])).map(ContentValue.studyExercise) ?? .empty
+        case .checkbox:
+            return .checkbox(snapshot.fieldText[fieldID] == "true")
         case .number:
             return Double(snapshot.fieldText[fieldID, default: ""]).map(ContentValue.number) ?? .empty
         case .cloze:
@@ -263,7 +276,7 @@ public struct ItemEditorDraft: Sendable, Equatable {
             snapshot.fieldClozeBlanks[fieldID] = ClozeSpanRebaser.rebase(
                 spans: snapshot.fieldClozeBlanks[fieldID, default: []], from: previous, to: text).spans
             snapshot.fieldText[fieldID] = text
-        case .number, .studyExercise: snapshot.fieldText[fieldID] = text
+        case .number, .studyExercise, .checkbox: snapshot.fieldText[fieldID] = text
         default: break
         }
     }
@@ -283,6 +296,8 @@ public struct ItemEditorDraft: Sendable, Equatable {
             snapshot.fieldMedia[fieldID] = reference
             snapshot.fieldMediaAltText[fieldID] = reference.altText ?? ""
         case let .imageOcclusion(content): snapshot.fieldOcclusions[fieldID] = content
+        case let .rows(rows): snapshot.listRows[fieldID] = rows
+        case let .checkbox(checked): snapshot.fieldText[fieldID] = String(checked)
         case .empty:
             let type = itemType.fields.first(where: { $0.id == fieldID })?.type
             snapshot.fieldSpans[fieldID] = type == .text || type == .richText ? [] : nil

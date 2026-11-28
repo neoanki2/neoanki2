@@ -76,25 +76,14 @@ extension ItemStore {
                     ),
                 ])
             }
-            let sourceOrdinals = Dictionary(uniqueKeysWithValues:
-                sourceType.fields.enumerated().map { ($0.element.id, $0.offset) }
-            )
-            let mappedFields = try record.item.fields.map { field -> FieldValue in
-                guard let ordinal = sourceOrdinals[field.fieldID],
-                      destinationType.fields.indices.contains(ordinal) else {
-                    throw AuthoredDeckError.invalid([
-                        .init(
-                            file: AuthoredDeck.manifestName,
-                            line: 1,
-                            code: "AD301",
-                            message: "An authored item field could not be resolved."
-                        ),
-                    ])
-                }
-                return FieldValue(
-                    fieldID: destinationType.fields[ordinal].id,
-                    value: field.value
-                )
+            let mappedFields: [FieldValue]
+            do {
+                mappedFields = try ItemTypeContentMapping(source: sourceType, destination: destinationType).fields(record.item.fields)
+            } catch {
+                throw AuthoredDeckError.invalid([
+                    .init(file: AuthoredDeck.manifestName, line: 1, code: "AD301",
+                          message: "An authored item field could not be resolved.")
+                ])
             }
             let orderedAt = firstCreatedAt.addingTimeInterval(Double(ordinal) * orderingStep)
             importedItems.append(.init(

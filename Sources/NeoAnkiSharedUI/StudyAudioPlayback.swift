@@ -62,7 +62,7 @@ package struct CardAudioButton: View {
 package enum AcademyCardAudio {
     package static func clips(for card: DueCard, answerRevealed: Bool) -> [MediaRef] {
         guard CourseStudyPath.isAcademyVocabulary(card) else { return [] }
-        let components = SideContent.resolvedComponents(for: card.template, from: card.item)
+        let components = card.studyComponents
         let descriptor = CardWireframeDescriptor.descriptor(for: card.template.layout)
         let visible = descriptor.renderedComponents(from: components, answerRevealed: answerRevealed)
         let collapsedExplanationIDs: Set<UUID> = if [.type, .choose, .arrange].contains(card.template.interaction) {

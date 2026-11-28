@@ -52,6 +52,11 @@ Maintainers can follow the [development setup](../developer/setup/) and
 [iOS release checklist]({{ '/IOS_RELEASE/' | relative_url }}) for unsigned builds, devices, CloudKit,
 widgets, and TestFlight.
 
+On iPhone and iPad, open **Create → Item Types & Card Setups** to define lists
+and set up generated cards. Edit item-owned rows in **Add Item** or **Edit
+Item**. To practice a deck separately, turn off **Include in All Decks study**
+in its deck settings and use **Study** from the deck itself.
+
 ## Navigate on iPhone and iPad
 
 On iPhone, five labeled tabs stay available at the bottom:

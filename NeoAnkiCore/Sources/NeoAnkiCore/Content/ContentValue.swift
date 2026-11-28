@@ -19,6 +19,8 @@ public enum ContentValue: Codable, Equatable, Sendable {
     case imageOcclusion(ImageOcclusionContent)
     /// A numeric value (measurements, dates-as-numbers, quantities).
     case number(Double)
+    case checkbox(Bool)
+    case rows([ItemListRow])
     case studyExercise(StudyExercise)
     /// No content.
     case empty
@@ -37,7 +39,9 @@ public enum ContentValue: Codable, Equatable, Sendable {
             }
         case let .cloze(string, _):
             return string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .imageOcclusion, .number, .media, .studyExercise:
+        case let .rows(rows):
+            return rows.isEmpty
+        case .imageOcclusion, .number, .checkbox, .media, .studyExercise:
             return false
         }
     }

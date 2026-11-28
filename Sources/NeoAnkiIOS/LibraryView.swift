@@ -274,8 +274,35 @@ struct AddItemView: View {
         dismiss()
     }
 
+    @State private var listRows: [UUID: [ItemListRow]] = [:]
+
+    private func completeDraft(for itemType: ItemType) throws -> [FieldValue] {
+        var snapshot = ItemEditorState.empty(for: itemType)
+        snapshot.listRows = listRows
+        snapshot.fieldText = values
+        snapshot.fieldMedia = mediaValues
+        snapshot.fieldMediaAltText = mediaDescriptions
+        snapshot.fieldClozeBlanks = clozeBlanks
+        snapshot.fieldOcclusions = occlusions
+        for field in itemType.fields {
+            if field.type == .text {
+                let input = values[field.id] ?? ""
+                snapshot.fieldSpans[field.id] = input.isEmpty ? [] : [Span(input)]
+            } else if field.type == .richText {
+                snapshot.fieldSpans[field.id] = richValues[field.id]
+            } else if field.type == .number, let raw = values[field.id], !raw.isEmpty {
+                let formatter = NumberFormatter()
+                formatter.locale = .current
+                formatter.numberStyle = .decimal
+                guard let number = formatter.number(from: raw) else { throw ItemDraftError.invalidNumber(field.name) }
+                snapshot.fieldText[field.id] = String(number.doubleValue)
+            }
+        }
+        return try ItemEditorState.fields(from: snapshot, itemType: itemType)
+    }
+
     private var hasChanges: Bool {
-        !occlusions.isEmpty || values.values.contains { !$0.isEmpty } || !richValues.isEmpty || !mediaValues.isEmpty || !clozeBlanks.isEmpty || mediaDescriptions.values.contains { !$0.isEmpty }
+        listRows.values.contains { !$0.isEmpty } || !occlusions.isEmpty || values.values.contains { !$0.isEmpty } || !richValues.isEmpty || !mediaValues.isEmpty || !clozeBlanks.isEmpty || mediaDescriptions.values.contains { !$0.isEmpty }
     }
 
     private var selectedType: ItemType? {
@@ -316,6 +343,22 @@ struct AddItemView: View {
                                     }
                                 }
                                 .padding(.vertical, 3)
+                            }
+                        }
+                        if selectedType.templates.contains(where: { $0.cardCreation != nil }),
+                           let fields = try? completeDraft(for: selectedType) {
+                            Section("Card changes") {
+                                let candidate = Item(id: selectedType.id, itemTypeID: selectedType.id, fields: fields, deckID: selectedDeckID)
+                                Text(CardCreationSummary.message(for: CardCreationSummary.preview(candidate, type: selectedType)))
+                                ItemGeneratedCardPreview(item: candidate, type: selectedType, mediaStore: model.mediaStore)
+                            }
+                        }
+                        ForEach(selectedType.lists.filter { $0.sharedRows == nil }) { list in
+                            Section(list.name) {
+                                ItemListRowsEditor(list: VocabularySet.authoringList(list, in: selectedType), rows: Binding(
+                                    get: { listRows[list.id, default: []] },
+                                    set: { listRows[list.id] = $0 }
+                                ))
                             }
                         }
                     }
@@ -417,6 +460,11 @@ struct AddItemView: View {
     private func fieldEditor(_ field: FieldDef) -> some View {
         let photoTitle = mediaValues[field.id] == nil ? "Photos" : "Replace from Photos"
         switch field.type {
+        case .checkbox:
+            Toggle(field.name, isOn: Binding(
+                get: { values[field.id] == "true" },
+                set: { values[field.id] = String($0) }
+            ))
         case .studyExercise:
             StudyExerciseFieldEditor(label: field.name, text: valueBinding(for: field.id),
                                      defaultMode: selectedType?.preferredStudyExerciseMode ?? .target)
@@ -567,6 +615,7 @@ struct AddItemView: View {
         })
     }
     private func clearFields() {
+        listRows = [:]
         values = [:]; richValues = [:]; mediaValues = [:]; mediaDescriptions = [:]; occlusions = [:]; clozeBlanks = [:]
     }
     private func loadChoices(resolve: Bool = true) async {
@@ -591,27 +640,8 @@ struct AddItemView: View {
         Task {
             defer { isSaving = false }
             do {
-                var content: [UUID: ContentValue] = [:]
-                for field in selectedType.fields {
-                    switch field.type {
-                    case .richText: content[field.id] = .rich(richValues[field.id] ?? [])
-                    case .audio, .image, .gif, .video:
-                        if var reference = mediaValues[field.id] {
-                            let description = (mediaDescriptions[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                            reference.altText = description.isEmpty ? nil : description
-                            content[field.id] = .media(reference)
-                        } else { content[field.id] = .empty }
-                    case .number:
-                        let raw = values[field.id] ?? ""
-                        let formatter = NumberFormatter(); formatter.locale = .current; formatter.numberStyle = .decimal
-                        guard raw.isEmpty || formatter.number(from: raw) != nil else { throw ItemDraftError.invalidNumber(field.name) }
-                        content[field.id] = raw.isEmpty ? .empty : .number(formatter.number(from: raw)!.doubleValue)
-                    case .imageOcclusion: content[field.id] = occlusions[field.id].map(ContentValue.imageOcclusion) ?? .empty
-                    case .studyExercise: content[field.id] = try .studyExercise(StudyExercise(editorText: values[field.id] ?? ""))
-                    case .cloze: content[field.id] = .cloze(values[field.id] ?? "", blanks: clozeBlanks[field.id] ?? [])
-                    case .text: content[field.id] = .text(values[field.id] ?? "")
-                    }
-                }
+                let fields = try completeDraft(for: selectedType)
+                let content = Dictionary(uniqueKeysWithValues: fields.map { ($0.fieldID, $0.value) })
                 let libraryID = try await model.libraryIdentity()
                 try await model.createItem(itemType: selectedType, deckID: selectedDeckID, values: content)
                 UserDefaults.standard.set(selectedType.id.uuidString, forKey: "authoring.type.\(libraryID).\(selectedDeckID?.uuidString ?? "unassigned")")
@@ -911,6 +941,7 @@ struct ItemEditMobileView: View {
     @State private var processingAttachments = 0
     @State private var isEditorActive = true
     @State private var mediaImportTask: Task<Void, Never>?
+    @State private var confirmsCardRetirement = false
     @State private var confirmsDiscard = false
     @State private var occlusionDraftReferences: [MediaRef] = []
 
@@ -940,6 +971,20 @@ struct ItemEditMobileView: View {
                         }
                     }
                 }
+                ForEach(itemType.lists.filter { $0.sharedRows == nil }) { list in
+                    Section(list.name) {
+                        ItemListRowsEditor(list: VocabularySet.authoringList(list, in: itemType), rows: Binding(
+                            get: { draft.snapshot.listRows[list.id, default: []] },
+                            set: { set(.rows($0), list.id) }
+                        ))
+                    }
+                }
+                if let cardPreview, let candidate = try? draft.item() {
+                    Section("Card changes") {
+                        Text(CardCreationSummary.message(for: cardPreview))
+                        ItemGeneratedCardPreview(item: candidate, type: itemType, mediaStore: model.mediaStore)
+                    }
+                }
                 VocabularyAuthoringEntry(features: model.features, deckID: draft.deckID, fields: ContextExamplePreset.authoringFields(in: itemType),
                     text: { id in
                         switch draft.value(for: id) {
@@ -961,7 +1006,10 @@ struct ItemEditMobileView: View {
                         .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button { Task { await save() } } label: {
+                    Button {
+                        if (cardPreview?.retired ?? 0) > 0 { confirmsCardRetirement = true }
+                        else { Task { await save() } }
+                    } label: {
                         if isSaving { ProgressView().accessibilityLabel("Saving changes") }
                         else { Text("Save") }
                     }
@@ -970,6 +1018,12 @@ struct ItemEditMobileView: View {
             }
             .interactiveDismissDisabled(isSaving || draft.hasChanges)
             .alert("Could Not Save", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
+            .confirmationDialog("Save card changes?", isPresented: $confirmsCardRetirement, titleVisibility: .visible) {
+                Button("Save Changes", role: .destructive) { Task { await save() } }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                if let cardPreview { Text(CardCreationSummary.message(for: cardPreview)) }
+            }
             .confirmationDialog("Discard changes?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
                 Button("Discard Changes", role: .destructive) { closeEditor() }
                 Button("Keep Editing", role: .cancel) {}
@@ -1072,6 +1126,11 @@ struct ItemEditMobileView: View {
                 get: { textFor(field.id) ?? "" },
                 set: { draft.setText($0, for: field.id); saveOperation.beginEditing() }
             ), defaultMode: draft.itemType.preferredStudyExerciseMode)
+        case .checkbox:
+            Toggle(field.name, isOn: Binding(
+                get: { draft.value(for: field.id) == .checkbox(true) },
+                set: { set(.checkbox($0), field.id) }
+            ))
         case .number:
             TextField("Number", value: Binding(get: { numberFor(field.id) }, set: { set($0.map(ContentValue.number) ?? .empty, field.id) }), format: .number)
                 .keyboardType(.decimalPad)
@@ -1164,6 +1223,12 @@ struct ItemEditMobileView: View {
         reference.altText = description.isEmpty ? nil : description
         set(.media(reference), field.id)
     }
+    private var cardPreview: CardCreationPreview? {
+        guard itemType.templates.contains(where: { $0.cardCreation != nil }),
+              let candidate = try? draft.item() else { return nil }
+        return CardCreationSummary.preview(candidate, type: itemType, original: draft.original)
+    }
+
     private func save() async {
         guard !isSaving, !isPreparingMedia, processingAttachments == 0 else { return }
         let saved: Item? = await saveOperation.perform {

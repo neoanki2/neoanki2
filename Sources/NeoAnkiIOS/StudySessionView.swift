@@ -145,7 +145,7 @@ struct StudySessionView: View {
                         if let exercise = card.studyExercise {
                             StudyExerciseCard(card: card, exercise: exercise, model: session, showsControls: false)
                         } else {
-                            MobileStudyCompositionView(template: card.template, item: card.item,
+                            MobileStudyCompositionView(template: card.template, item: card.studyItem,
                                 mediaStore: session.mediaStore, isAnswerRevealed: session.isAnswerRevealed,
                                 occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
                                 response: session.reviewResponse, evaluation: session.answerEvaluation)
@@ -317,7 +317,7 @@ struct StudySessionView: View {
     private func studyCardContents(_ card: DueCard, fitPrompt: Bool) -> some View {
         VStack(spacing: 24) {
             MobileStudyCompositionView(
-                template: card.template, item: card.item, mediaStore: session.mediaStore,
+                template: card.template, item: card.studyItem, mediaStore: session.mediaStore,
                 isAnswerRevealed: session.isAnswerRevealed, occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
                 response: session.reviewResponse, evaluation: session.answerEvaluation
             )
@@ -330,7 +330,7 @@ struct StudySessionView: View {
                 Label(evaluationLabel(evaluation), systemImage: evaluation == .correct ? "checkmark.circle" : "info.circle")
                     .font(.headline).accessibilityAddTraits(.isSummaryElement)
             }
-            if card.template.interaction == .record {
+            if card.response == .record {
                 practiceRecordingFeedback
             }
         }
@@ -343,7 +343,7 @@ struct StudySessionView: View {
 
     @ViewBuilder
     private var studyActions: some View {
-        if let card = session.currentCard, card.template.interaction == .audioSubmission {
+        if let card = session.currentCard, card.response == .audioSubmission {
             if session.isCompletingSubmission {
                 ProgressView("Saving response…")
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -375,7 +375,7 @@ struct StudySessionView: View {
                     }
                 }
             }
-        } else if session.currentCard?.template.interaction == .record {
+        } else if session.currentCard?.response == .record {
             recordingStudyActions
                 .disabled(session.isGrading || session.isCompletingSubmission)
         } else if session.currentCard?.studyExercise == nil {
@@ -448,12 +448,10 @@ struct StudySessionView: View {
 
     @ViewBuilder
     private func interaction(for card: DueCard) -> some View {
-        switch card.template.interaction {
-        case .cloze where !VocabularySet.supportsTypedResponse(card):
+        switch card.response {
+        case .onYourOwn, .record:
             EmptyView()
-        case .reveal, .imageOcclusion, .record:
-            EmptyView()
-        case .type, .cloze:
+        case .type:
             TextField("Type your answer", text: Binding(get: { session.typedAnswer }, set: { session.updateTypedAnswer($0) }), axis: .vertical)
                 .focused($typedAnswerFocused)
                 .autocorrectionDisabled(VocabularySet.supportsTypedResponse(card))
@@ -525,9 +523,7 @@ struct StudySessionView: View {
     }
 
     private var primaryActionLabel: String {
-        switch session.currentCard?.template.interaction {
-        case .cloze where session.currentCard.map(VocabularySet.supportsTypedResponse) == true
-            && !session.typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty: "Check Answer"
+        switch session.currentCard?.response {
         case .type: "Check Answer"
         case .choose: "Check Choice"
         case .arrange: "Check Order"
@@ -833,7 +829,9 @@ struct MobileContentValueView: View {
                 behavior: mediaBehavior,
                 isAnswerRevealed: isAnswerRevealed
             )
-        case .empty:
+        case let .checkbox(checked):
+            Text(checked ? "Checked" : "Unchecked")
+        case .rows, .empty:
             Text("No content")
                 .font(.body)
                 .foregroundStyle(.secondary)

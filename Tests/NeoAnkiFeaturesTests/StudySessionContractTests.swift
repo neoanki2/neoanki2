@@ -1371,3 +1371,31 @@ private actor FirstStudyQueueLoadGate {
     #expect(extra.isComplete)
     #expect(extra.completion.uniqueCards == 1)
 }
+
+@Test @MainActor func playingPromptUsesTheExistingShowAnswerAndFSRSReview() async throws {
+    let (model, store) = try await makeStudyFeatureModel()
+    var type = BuiltInItemTypes.basic
+    let tempo = FieldDef(name: "BPM", type: .number)
+    let row = ItemListRow(values: [.init(fieldID: tempo.id, value: .number(72))])
+    let list = ItemList(name: "Tempo", columns: [tempo], sharedRows: [row])
+    type.lists = [list]
+    type.templates[0].cardCreation = CardCreation(listIDs: [list.id])
+    type.templates[0].components.append(.init(region: .supporting, purpose: .supporting, source: .field(tempo.id)))
+    _ = try await store.updateItemType(type)
+    _ = try await store.createItem(Item(itemTypeID: type.id, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Play the E major scale.")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Check rhythm and evenness."))
+    ]))
+
+    await model.start()
+    let card = try #require(model.currentCard)
+    #expect(card.response == .onYourOwn)
+    #expect(card.studyComponents.contains { $0.value == .number(72) })
+    model.performPrimaryAction()
+    #expect(model.isAnswerRevealed)
+    #expect(model.answerEvaluation == nil)
+    await model.grade(.good)
+    let saved = try await store.card(id: card.id)
+    #expect(saved.memory.reps == 1)
+    #expect(saved.rowSelections == [.init(listID: list.id, rowID: row.id)])
+}

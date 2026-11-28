@@ -18,6 +18,7 @@ import Testing
         case .text, .richText: snapshot.fieldSpans[field] = [Span("A 🧠 e\u{301}", styles: [.bold])]
         case .studyExercise: snapshot.fieldText[field] = StudyExercise(mode: .rewrite, prompt: "It works.", answers: [["Does it work?"]]).editorText
         case .number: snapshot.fieldText[field] = "-42.5"
+        case .checkbox: snapshot.fieldText[field] = "true"
         case .cloze:
             snapshot.fieldText[field] = "A 🧠 e\u{301}"
             snapshot.fieldClozeBlanks[field] = [.init(group: 1, start: 2, length: 1, hint: "brain")]
@@ -36,7 +37,7 @@ import Testing
     func requiredAndOptionalValues(kind: FieldType, required: Bool) {
         let field = FieldDef(name: "Value", type: kind, isRequired: required)
         let type = ItemType(name: "Editor", fields: [field], templates: [])
-        #expect(ItemEditorState.canSave(ItemEditorState.empty(for: type), itemType: type) == !required)
+        #expect(ItemEditorState.canSave(ItemEditorState.empty(for: type), itemType: type) == (!required || kind == .checkbox))
         #expect(ItemEditorState.canSave(populated(kind, field: field.id), itemType: type))
     }
 
@@ -72,6 +73,7 @@ import Testing
         case .richText: value = .rich(try #require(expected.fieldSpans[field.id]))
         case .studyExercise: value = .studyExercise(try StudyExercise(editorText: #require(expected.fieldText[field.id])))
         case .number: value = .number(-42.5)
+        case .checkbox: value = .checkbox(true)
         case .cloze: value = .cloze(try #require(expected.fieldText[field.id]), blanks: try #require(expected.fieldClozeBlanks[field.id]))
         case .image, .audio, .gif, .video: value = .media(try #require(expected.fieldMedia[field.id]))
         case .imageOcclusion: value = .imageOcclusion(try #require(expected.fieldOcclusions[field.id]))
@@ -82,7 +84,7 @@ import Testing
         switch kind {
         case .text: #expect(hydrated.fieldSpans[field.id] == [Span("A 🧠 e\u{301}")])
         case .richText: #expect(hydrated.fieldSpans == expected.fieldSpans)
-        case .number, .studyExercise: #expect(hydrated.fieldText == expected.fieldText)
+        case .number, .studyExercise, .checkbox: #expect(hydrated.fieldText == expected.fieldText)
         case .cloze:
             #expect(hydrated.fieldText == expected.fieldText)
             #expect(hydrated.fieldClozeBlanks == expected.fieldClozeBlanks)
@@ -94,7 +96,7 @@ import Testing
         #expect(ItemEditorState.hydrated(from: .init(itemTypeID: type.id, fields: [.init(fieldID: field.id, value: .empty)]), itemType: type) == ItemEditorState.empty(for: type))
     }
 
-    @Test(arguments: Array(0..<6))
+    @Test(arguments: Array(0..<7))
     func everySnapshotDimensionParticipatesInDiscardDetection(dimension: Int) {
         let id = UUID()
         let initial = ItemEditorState.empty(for: nil)
@@ -105,7 +107,8 @@ import Testing
         case 2: changed.fieldMedia[id] = reference()
         case 3: changed.fieldMediaAltText[id] = "Changed"
         case 4: changed.fieldClozeBlanks[id] = [.init(group: 1, start: 0, length: 1)]
-        default: changed.fieldOcclusions[id] = populated(.imageOcclusion, field: id).fieldOcclusions[id]
+        case 5: changed.fieldOcclusions[id] = populated(.imageOcclusion, field: id).fieldOcclusions[id]
+        default: changed.listRows[id] = [ItemListRow()]
         }
         #expect(EditorDecisionState.dismissalDecision(initial: initial, current: changed) == .confirmDiscard)
         changed = initial

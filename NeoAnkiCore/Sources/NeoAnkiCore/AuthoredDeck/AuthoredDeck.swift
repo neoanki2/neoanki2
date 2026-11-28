@@ -257,6 +257,7 @@ private struct TypeRecord {
     let name: String
     let fields: [FieldRecord]
     let templates: [TemplateRecord]
+    var lists: [ListRecord] = []
     let location: SourceLocation
 }
 
@@ -265,6 +266,19 @@ private struct FieldRecord {
     let name: String
     let kind: FieldType
     let required: Bool
+}
+
+private struct ListRecord {
+    let key: String
+    let name: String
+    let columns: [FieldRecord]
+    let sharedRows: [[String: Any]]?
+}
+
+private struct CreationRecord {
+    let lists: [String]
+    let checked: [String]
+    let startSuspended: Bool
 }
 
 private struct TemplateRecord {
@@ -277,6 +291,8 @@ private struct TemplateRecord {
     let skill: Skill
     let condition: ConditionRecord?
     let fitStudyArea: Bool
+    var creation: CreationRecord? = nil
+    var response: ResponseMode? = nil
 }
 
 private struct ComponentRecord {
@@ -307,6 +323,7 @@ private struct ItemRecord {
     let type: String
     let deck: String
     let fields: [String: Any]
+    var lists: [String: Any] = [:]
     let tags: [String]
     let location: SourceLocation
 }
@@ -383,6 +400,13 @@ private struct AuthoredDeckLoader {
                 code: "AD112",
                 message: "Template layout and components require authored deck version 5."
             ))
+        }
+        if manifest.version < 7, types.contains(where: {
+            !$0.lists.isEmpty || $0.fields.contains { $0.kind == .checkbox }
+                || $0.templates.contains { $0.creation != nil || $0.response != nil }
+        }) {
+            diagnostics.append(.init(file: manifest.location.file, line: manifest.location.line, code: "AD114",
+                                     message: "Lists, checkboxes, and response settings require authored deck version 7."))
         }
         var decks: [DeckRecord] = []
         for record in rawDecks {
@@ -665,8 +689,8 @@ private struct AuthoredDeckLoader {
             throw DecodeFailure("AD110", "Manifest kind must be \"neoanki\".")
         }
         let version = try requiredInteger(object, "version")
-        guard (1...6).contains(version) else {
-            throw DecodeFailure("AD111", "Only authored deck versions 1 through 6 are supported.")
+        guard (1...7).contains(version) else {
+            throw DecodeFailure("AD111", "Only authored deck versions 1 through 7 are supported.")
         }
         return .init(
             version: version,
@@ -695,38 +719,47 @@ private struct AuthoredDeckLoader {
         )
     }
 
-    private func decodeType(
+    fileprivate func decodeType(
         _ object: [String: Any],
         location: SourceLocation
     ) throws -> TypeRecord {
-        try exactKeys(object, required: ["kind", "id", "name", "fields", "templates"])
-        let fields = try objectArray(object, "fields").map { field -> FieldRecord in
-            try exactKeys(field, required: ["id", "name", "type"], optional: ["required"])
-            guard let kind = FieldType(rawValue: try requiredString(field, "type")) else {
-                throw DecodeFailure("AD120", "Field type is not supported.")
+        try exactKeys(object, required: ["kind", "id", "name", "fields", "templates"], optional: ["lists"])
+        let fields = try objectArray(object, "fields").map(decodeField)
+        let lists = try object["lists"].map { _ in
+            try objectArray(object, "lists").map { list -> ListRecord in
+                try exactKeys(list, required: ["id", "name", "columns"], optional: ["sharedRows"])
+                return ListRecord(
+                    key: try identifier(list, "id"), name: try nonemptyString(list, "name"),
+                    columns: try objectArray(list, "columns").map(decodeField),
+                    sharedRows: try list["sharedRows"].map { _ in try objectArray(list, "sharedRows") }
+                )
             }
-            return .init(
-                key: try identifier(field, "id"),
-                name: try nonemptyString(field, "name"),
-                kind: kind,
-                required: try optionalBool(field, "required") ?? false
-            )
-        }
+        } ?? []
         let templates = try objectArray(object, "templates").map(decodeTemplate)
         return .init(
             key: try identifier(object, "id"),
             name: try nonemptyString(object, "name"),
             fields: fields,
             templates: templates,
+            lists: lists,
             location: location
         )
+    }
+
+    private func decodeField(_ field: [String: Any]) throws -> FieldRecord {
+        try exactKeys(field, required: ["id", "name", "type"], optional: ["required"])
+        guard let kind = FieldType(rawValue: try requiredString(field, "type")) else {
+            throw DecodeFailure("AD120", "Field type is not supported.")
+        }
+        return FieldRecord(key: try identifier(field, "id"), name: try nonemptyString(field, "name"),
+                           kind: kind, required: try optionalBool(field, "required") ?? false)
     }
 
     private func decodeTemplate(_ object: [String: Any]) throws -> TemplateRecord {
         try exactKeys(
             object,
             required: ["name", "prompt", "answer", "interaction", "skill"],
-            optional: ["generateWhen", "layout", "components", "fitStudyArea"]
+            optional: ["generateWhen", "layout", "components", "fitStudyArea", "createCardsFrom", "response"]
         )
         guard let interaction = Interaction(rawValue: try requiredString(object, "interaction")) else {
             throw DecodeFailure("AD121", "Template interaction is not supported.")
@@ -759,7 +792,22 @@ private struct AuthoredDeckLoader {
                     throw DecodeFailure("AD128", "Template fitStudyArea must be a boolean.")
                 }
                 return value
-            } ?? false
+            } ?? false,
+            creation: try object["createCardsFrom"].map { _ in
+                let creation = try requiredObject(object, "createCardsFrom")
+                try exactKeys(creation, required: ["lists"], optional: ["checked", "startSuspended"])
+                return CreationRecord(
+                    lists: try optionalIdentifierArray(creation, "lists") ?? [],
+                    checked: try optionalIdentifierArray(creation, "checked") ?? [],
+                    startSuspended: try optionalBool(creation, "startSuspended") ?? false
+                )
+            },
+            response: try optionalString(object, "response").map { value in
+                guard let mode = ResponseMode(rawValue: value) else {
+                    throw DecodeFailure("AD121", "Unknown response mode.")
+                }
+                return mode
+            }
         )
     }
 
@@ -825,11 +873,11 @@ private struct AuthoredDeckLoader {
         }
     }
 
-    private func decodeItem(
+    fileprivate func decodeItem(
         _ object: [String: Any],
         location: SourceLocation
     ) throws -> ItemRecord {
-        try exactKeys(object, required: ["kind", "deck", "type", "fields"], optional: ["tags"])
+        try exactKeys(object, required: ["kind", "deck", "type", "fields"], optional: ["tags", "lists"])
         guard let fields = object["fields"] as? [String: Any] else {
             throw DecodeFailure("AD130", "Item fields must be a JSON object.")
         }
@@ -837,6 +885,7 @@ private struct AuthoredDeckLoader {
             type: try identifier(object, "type"),
             deck: try identifier(object, "deck"),
             fields: fields,
+            lists: try object["lists"].map { _ in try requiredObject(object, "lists") } ?? [:],
             tags: try optionalStringArray(object, "tags") ?? [],
             location: location
         )
@@ -907,13 +956,15 @@ private struct AuthoredDeckCompiler {
 
         var compiledTypes: [String: ItemType] = [:]
         var fieldKeysByType: [String: [String: FieldDef]] = [:]
+        var listKeysByType: [String: [String: (definition: ItemList, columns: [String: FieldDef])]] = [:]
         for record in types {
-            if record.fields.count > limits.portable.maximumFieldsPerType
+            let allFields = record.fields + record.lists.flatMap(\.columns)
+            if allFields.count > limits.portable.maximumFieldsPerType
                 || record.templates.count > limits.portable.maximumTemplatesPerType {
                 diagnostics.append(diag("AD209", "Item type exceeds field or template limits.", at: record.location))
                 continue
             }
-            let duplicateFields = Dictionary(grouping: record.fields, by: \.key)
+            let duplicateFields = Dictionary(grouping: allFields, by: \.key)
                 .first(where: { $0.value.count > 1 })?.key
             if let duplicateFields {
                 diagnostics.append(diag(
@@ -936,10 +987,26 @@ private struct AuthoredDeckCompiler {
                 }) else {
                     throw DecodeFailure("AD212", "A template exceeds slot or condition limits.")
                 }
-                let templates = try record.templates.map {
-                    try compileTemplate($0, fields: fieldsByKey)
+                var lists: [ItemList] = []
+                var listsByKey: [String: (definition: ItemList, columns: [String: FieldDef])] = [:]
+                var sources = fieldsByKey
+                for list in record.lists {
+                    guard listsByKey[list.key] == nil else {
+                        throw DecodeFailure("AD210", "List identifier is duplicated.")
+                    }
+                    let columns = list.columns.map { FieldDef(name: $0.name, type: $0.kind, isRequired: $0.required) }
+                    let byKey = Dictionary(uniqueKeysWithValues: zip(list.columns.map(\.key), columns))
+                    let rows = try list.sharedRows.map { try compileRows($0, columns: byKey) }
+                    let definition = ItemList(name: list.name, columns: columns, sharedRows: rows)
+                    lists.append(definition)
+                    listsByKey[list.key] = (definition, byKey)
+                    sources.merge(byKey) { first, _ in first }
                 }
-                let itemType = ItemType(name: record.name, fields: fields, templates: templates)
+                let templates = try record.templates.map {
+                    try compileTemplate($0, fields: sources, lists: listsByKey.mapValues(\.definition.id))
+                }
+                let itemType = ItemType(name: record.name, fields: fields, templates: templates, lists: lists)
+                listKeysByType[record.key] = listsByKey
                 try ItemTypeValidation.validate(itemType)
                 compiledTypes[record.key] = itemType
                 fieldKeysByType[record.key] = fieldsByKey
@@ -1081,14 +1148,22 @@ private struct AuthoredDeckCompiler {
                       }) else {
                     throw DecodeFailure("AD224", "Item tags are empty, too long, or too numerous.")
                 }
+                let listValues = try record.lists.map { key, raw -> FieldValue in
+                    guard manifest.version >= 7, let list = listKeysByType[record.type]?[key],
+                          list.definition.sharedRows == nil, let rows = raw as? [[String: Any]] else {
+                        throw DecodeFailure("AD225", "Unknown or invalid item list.")
+                    }
+                    return FieldValue(fieldID: list.definition.id, value: .rows(try compileRows(rows, columns: list.columns)))
+                }
                 let item = Item(
                     itemTypeID: type.id,
                     fields: type.fields.map { definition in
                         values.first(where: { $0.fieldID == definition.id })!
-                    },
+                    } + listValues,
                     tags: record.tags,
                     deckID: deckID
                 )
+                if !type.lists.isEmpty { try ItemStore.validateContent(item, against: type) }
                 compiledItems.append(.init(item: item, createdAt: .now, updatedAt: .now))
             } catch let failure as DecodeFailure {
                 diagnostics.append(failure.diagnostic(at: record.location))
@@ -1114,8 +1189,22 @@ private struct AuthoredDeckCompiler {
 
     private func compileTemplate(
         _ record: TemplateRecord,
-        fields: [String: FieldDef]
+        fields: [String: FieldDef],
+        lists: [String: UUID] = [:]
     ) throws -> Template {
+        let creation = try record.creation.map { source in
+            try CardCreation(
+                listIDs: source.lists.map { key in
+                    guard let id = lists[key] else { throw DecodeFailure("AD215", "Unknown card creation list.") }
+                    return id
+                },
+                startSuspended: source.startSuspended,
+                checkedFieldIDs: source.checked.map { key in
+                    guard let id = fields[key]?.id else { throw DecodeFailure("AD215", "Unknown checkbox filter.") }
+                    return id
+                }
+            )
+        }
         let prompt = Side(slots: try record.prompt.map { try compileSlot($0, fields: fields) })
         let answer = Side(slots: try record.answer.map { try compileSlot($0, fields: fields) })
         let condition = try record.condition.map { try compileCondition($0, fields: fields) }
@@ -1135,7 +1224,9 @@ private struct AuthoredDeckCompiler {
                 interaction: record.interaction,
                 skill: record.skill,
                 generateWhen: condition,
-                fitStudyArea: record.fitStudyArea
+                fitStudyArea: record.fitStudyArea,
+                cardCreation: creation,
+                responseOverride: record.response
             )
         }
         guard record.layout == nil, record.components == nil else {
@@ -1154,8 +1245,32 @@ private struct AuthoredDeckCompiler {
             interaction: record.interaction,
             skill: record.skill,
             generateWhen: condition,
-            fitStudyArea: record.fitStudyArea
+            fitStudyArea: record.fitStudyArea,
+                cardCreation: creation,
+                responseOverride: record.response
         )
+    }
+
+    private func compileRows(_ rows: [[String: Any]], columns: [String: FieldDef]) throws -> [ItemListRow] {
+        guard rows.count <= 4096 else { throw DecodeFailure("AD225", "Too many list rows.") }
+        return try rows.map { row in
+            try exactKeys(row, required: ["fields"], optional: ["id"])
+            let identity = try optionalString(row, "id").map { raw in
+                guard let id = UUID(uuidString: raw) else { throw DecodeFailure("AD225", "List row ID must be a UUID.") }
+                return id
+            } ?? UUID()
+            var media: [String: PortableDeckMediaRecord] = [:]
+            var mediaBytes: Int64 = 0
+            let fields = try requiredObject(row, "fields").map { key, raw in
+                guard let column = columns[key], [.text, .richText, .number, .checkbox, .cloze].contains(column.type) else {
+                    throw DecodeFailure("AD225", "Unknown or invalid list column.")
+                }
+                return try FieldValue(fieldID: column.id, value: compileValue(
+                    raw, definition: column, mediaByHash: &media, totalMediaBytes: &mediaBytes
+                ))
+            }
+            return ItemListRow(id: identity, values: fields)
+        }
     }
 
     private func compileSlot(_ record: SlotRecord, fields: [String: FieldDef]) throws -> Slot {
@@ -1276,6 +1391,12 @@ private struct AuthoredDeckCompiler {
                     link: link
                 )
             })
+        case .checkbox:
+            try exactKeys(object, required: ["checkbox"])
+            guard let value = object["checkbox"] as? NSNumber, String(cString: value.objCType) == "c" else {
+                throw DecodeFailure("AD244", "Checkbox field must contain a JSON boolean.")
+            }
+            return .checkbox(value.boolValue)
         case .number:
             try exactKeys(object, required: ["number"])
             guard let number = object["number"] as? NSNumber,
@@ -2063,6 +2184,11 @@ public extension AuthoredDeck {
             var sizes: [String: Int] = [:]
             var total = 0
             var digest = SHA256()
+            let sourceVersion = draft.sourceVersion
+            let root = URL(fileURLWithPath: "/")
+            let decoder = AuthoredDeckLoader(bundleURL: root, limits: limits)
+            var modernType: TypeRecord?
+            var modernItems: [ItemRecord] = []
             try draft.writeRecords { file, number, data in
                 guard data.count - 1 <= limits.maximumLineBytes else {
                     throw AuthoredDeckDiagnostic(file: file, line: number, code: "AD013", message: "Record exceeds the configured line limit.")
@@ -2076,6 +2202,14 @@ public extension AuthoredDeck {
                     throw DecodeFailure("AD018", "Authored deck source exceeds the configured total byte limit.")
                 }
                 digest.update(data: data)
+                if sourceVersion >= 7, file != manifestName || number == 2 {
+                    let location = SourceLocation(file: file, line: number)
+                    guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                        throw AuthoredDeckDiagnostic(file: file, line: number, code: "AD010", message: "Invalid authored record.")
+                    }
+                    if file == manifestName { modernType = try decoder.decodeType(object, location: location) }
+                    else { modernItems.append(try decoder.decodeItem(object, location: location)) }
+                }
             }
             let fields = try draft.definition.fields.map { field -> FieldRecord in
                 _ = try identifier(["id": field.id], "id")
@@ -2096,14 +2230,14 @@ public extension AuthoredDeck {
                     interaction: template.interaction, skill: template.skill, condition: nil,
                     fitStudyArea: template.fitStudyArea)
             }
-            let compiler = AuthoredDeckCompiler(root: URL(fileURLWithPath: "/"),
-                manifest: ManifestRecord(version: 5, root: draft.key, parts: [draft.partName], location: manifestLocation),
-                types: [TypeRecord(key: draft.definition.id, name: draft.definition.name, fields: fields,
-                                   templates: templates, location: .init(file: manifestName, line: 2))],
+            let compiler = AuthoredDeckCompiler(root: root,
+                manifest: ManifestRecord(version: sourceVersion, root: draft.key, parts: [draft.partName], location: manifestLocation),
+                types: [modernType ?? TypeRecord(key: draft.definition.id, name: draft.definition.name, fields: fields,
+                                                 templates: templates, location: .init(file: manifestName, line: 2))],
                 decks: [DeckRecord(key: draft.key, name: draft.title, parent: nil,
                                    itemTypes: [draft.definition.id], defaultType: draft.definition.id,
                                    location: .init(file: manifestName, line: 3))],
-                items: draft.items.enumerated().map { index, item in
+                items: sourceVersion >= 7 ? modernItems : draft.items.enumerated().map { index, item in
                     ItemRecord(type: draft.definition.id, deck: draft.key,
                                fields: item.fields.mapValues { ["text": $0] }, tags: item.tags,
                                location: .init(file: draft.partName, line: index + 1))

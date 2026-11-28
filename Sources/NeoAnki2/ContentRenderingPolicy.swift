@@ -63,7 +63,9 @@ enum ContentRenderingPolicy {
             case .gif: "Animation"
             case .video: "Video"
             }
-        case .empty:
+        case .checkbox:
+            "Checkbox"
+        case .rows, .empty:
             "Content"
         }
     }

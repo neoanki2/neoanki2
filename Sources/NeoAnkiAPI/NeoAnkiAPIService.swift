@@ -1977,9 +1977,13 @@ public actor NeoAnkiAPIService {
         var allowed: Set<String> = ["itemTypeId", "deckId", "fields", "tags"]
         if allowsID { allowed.insert("id") }
         try rejectUnknownMembers(object, allowed: allowed, pointer: pointer)
-        guard let fields = object["fields"] as? [Any] else { return }
+        try validateFieldObjectShapes(object["fields"], pointer: pointer + "/fields", acceptsRows: true)
+    }
+
+    private func validateFieldObjectShapes(_ value: Any?, pointer: String, acceptsRows: Bool) throws {
+        guard let fields = value as? [Any] else { return }
         for (index, value) in fields.enumerated() {
-            let fieldPointer = pointer + "/fields/\(index)"
+            let fieldPointer = pointer + "/\(index)"
             guard let field = value as? [String: Any] else {
                 throw APIServiceError.validation("Expected a JSON object.", pointer: fieldPointer)
             }
@@ -2004,9 +2008,16 @@ public actor NeoAnkiAPIService {
             case "studyExercise": allowedContent = common.union(["exercise"])
             case "cloze": allowedContent = common.union(["text", "blanks"])
             case "number": allowedContent = common.union(["number"])
+            case "checkbox": allowedContent = common.union(["checked"])
+            case "rows":
+                guard acceptsRows else {
+                    throw APIServiceError.validation("A list cell cannot contain rows.", pointer: contentPointer)
+                }
+                allowedContent = common.union(["rows"])
             default: allowedContent = common
             }
             try rejectUnknownMembers(content, allowed: allowedContent, pointer: contentPointer)
+            try validateListRows(content["rows"], pointer: contentPointer + "/rows")
             if let spans = content["spans"] as? [Any] {
                 for (spanIndex, spanValue) in spans.enumerated() {
                     guard let span = spanValue as? [String: Any] else { continue }
@@ -2093,6 +2104,15 @@ public actor NeoAnkiAPIService {
         }
     }
 
+    private func validateListRows(_ value: Any?, pointer: String) throws {
+        guard let rows = value as? [[String: Any]] else { return }
+        for (index, row) in rows.enumerated() {
+            let rowPointer = pointer + "/\(index)"
+            try rejectUnknownMembers(row, allowed: ["id", "values"], pointer: rowPointer)
+            try validateFieldObjectShapes(row["values"], pointer: rowPointer + "/values", acceptsRows: false)
+        }
+    }
+
     private func validateItemTypeInputShape(_ body: Data) throws {
         guard let object = try JSONSerialization.jsonObject(with: body) as? [String: Any] else {
             throw APIServiceError.validation("The request body must be a JSON object.")
@@ -2107,6 +2127,19 @@ public actor NeoAnkiAPIService {
                 )
             }
         }
+        if let lists = object["lists"] as? [[String: Any]] {
+            for (index, list) in lists.enumerated() {
+                let pointer = "/lists/\(index)"
+                try rejectUnknownMembers(list, allowed: ["id", "name", "columns", "sharedRows"], pointer: pointer)
+                if let columns = list["columns"] as? [[String: Any]] {
+                    for (column, definition) in columns.enumerated() {
+                        try rejectUnknownMembers(definition, allowed: ["id", "name", "type", "isRequired"],
+                                                 pointer: pointer + "/columns/\(column)")
+                    }
+                }
+                try validateListRows(list["sharedRows"], pointer: pointer + "/sharedRows")
+            }
+        }
         if let templates = object["templates"] as? [Any] {
             for (index, value) in templates.enumerated() {
                 let pointer = "/templates/\(index)"
@@ -2115,10 +2148,14 @@ public actor NeoAnkiAPIService {
                     template,
                     allowed: [
                         "id", "name", "prompt", "answer", "interaction", "skill",
-                        "generateWhen", "layout", "components", "fitStudyArea",
+                        "generateWhen", "layout", "components", "fitStudyArea", "cardCreation", "responseOverride",
                     ],
                     pointer: pointer
                 )
+                if let creation = template["cardCreation"] as? [String: Any] {
+                    try rejectUnknownMembers(creation, allowed: ["listIds", "startSuspended", "checkedFieldIds"],
+                                             pointer: pointer + "/cardCreation")
+                }
                 try validateSlots(template["prompt"], pointer: pointer + "/prompt")
                 try validateSlots(template["answer"], pointer: pointer + "/answer")
                 if let components = template["components"] as? [Any] {
@@ -3362,7 +3399,7 @@ public actor NeoAnkiAPIService {
         return try APIJSON.decodeStrict(
             ItemTypeInput.self,
             from: body,
-            allowedKeys: ["id", "name", "fields", "templates", "deckId", "availableEverywhere"]
+            allowedKeys: ["id", "name", "fields", "templates", "deckId", "availableEverywhere", "lists"]
         )
     }
 
@@ -3375,6 +3412,9 @@ public actor NeoAnkiAPIService {
             },
             templates: try input.templates.enumerated().map {
                 try $0.element.domain(parseUUID: parseUUID, pointer: "/templates/\($0.offset)")
+            },
+            lists: try (input.lists ?? []).enumerated().map {
+                try $0.element.domain(parseUUID: parseUUID, pointer: "/lists/\($0.offset)")
             }
         )
     }

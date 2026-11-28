@@ -24,6 +24,8 @@ import Testing
     #expect(try indexExists("idx_cards_active_deck_learned_due", at: url))
     #expect(try columnExists("new_cards_per_day", in: "decks", at: url))
     #expect(try columnExists("sort_position", in: "decks", at: url))
+    #expect(try columnExists("include_in_all_decks_study", in: "decks", at: url))
+    #expect(try indexExists("idx_decks_excluded_from_all_study", at: url))
     #expect(try tableExists("library_item_types", at: url))
     #expect(try tableExists("deck_included_item_types", at: url))
     #expect(try tableExists("deck_item_type_policy_entries", at: url))
@@ -40,6 +42,30 @@ import Testing
     let firstLibraryID = try await database.getOrCreateLibraryID()
     let secondLibraryID = try await database.getOrCreateLibraryID()
     #expect(firstLibraryID == secondLibraryID)
+}
+
+@Test func versionThirtyFiveMigrationIncludesExistingDecksInAllDecksStudy() async throws {
+    let url = migrationDatabaseURL()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (35);
+        CREATE TABLE decks (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            parent_id TEXT REFERENCES decks(id),
+            new_cards_per_day INTEGER,
+            sort_position INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO decks (id, name) VALUES ('\(UUID().uuidString)', 'Existing');
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try await database.fetchAllDecks().first?.includeInAllDecksStudy == true)
 }
 
 @Test func versionTwentyFiveMigrationAddsDeckSortPositionWithoutChangingDecks() async throws {

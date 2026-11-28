@@ -709,3 +709,37 @@ private let authoredV3RootDeck =
     #expect(try await store.listDecks().isEmpty)
     #expect(try await store.listItems().isEmpty)
 }
+
+@Test func authoredListsResolveLocalColumnIDsInTypedClozeCards() async throws {
+    let directory = try authoredTestDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let manifest = #"{"kind":"neoanki","version":7,"root":"root","parts":["items/items.jsonl"]}"#
+    let type = """
+    {"kind":"type","id":"Study","name":"Context cards",
+     "fields":[{"id":"meaning","name":"Meaning","type":"text"}],
+     "lists":[{"id":"examples","name":"Examples","columns":[
+        {"id":"sentence","name":"Sentence","type":"cloze"},{"id":"active","name":"Active","type":"checkbox"}]}],
+     "templates":[{"name":"Recall","interaction":"cloze","response":"type",
+        "prompt":[{"field":"sentence"}],"answer":[{"field":"sentence","reveal":"hiddenUntilAnswer"}],
+        "skill":{"input":"text","output":"text","operation":"recall"},
+        "createCardsFrom":{"lists":["examples"],"checked":["active"]}}]}
+    """.replacingOccurrences(of: "\n", with: " ")
+    let entry = """
+    {"kind":"item","type":"Study","deck":"root","fields":{"meaning":{"text":"lake"}},
+     "lists":{"examples":[
+        {"fields":{"sentence":{"cloze":"Un {{c1::lago}} azzurro."},"active":{"checkbox":true}}},
+        {"fields":{"sentence":{"cloze":"Un altro {{c1::lago}}."},"active":{"checkbox":false}}}]}}
+    """.replacingOccurrences(of: "\n", with: " ")
+    let bundle = try authoredBundle(in: directory, manifestRecords: [manifest, authoredV3RootDeck, type], itemRecords: [entry])
+    #expect(AuthoredDeck.validate(at: bundle).isEmpty)
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"), starterItemTypes: [])
+    try await store.bootstrap()
+    let report = try await AuthoredDeck.importDeck(from: bundle, into: store)
+    #expect(report.itemCount == 1)
+    let due = try await store.fetchDueCards(asOf: .now.addingTimeInterval(1))
+    #expect(due.count == 1)
+    let card = try #require(due.first)
+    #expect(card.response == .type)
+    #expect(card.card.rowSelections.count == 1)
+    #expect(StudyResponseEvaluator.evaluate("lago", for: card) == .correct)
+}

@@ -48,7 +48,7 @@ extension SQLiteDatabase {
     }
 
     private static let maturityCardSQL = """
-        SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group, occlusion_group,
+        SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group, occlusion_group, row_selections,
                memory_model_version, memory_parameter_set_id, scheduling_history_origin FROM cards
         """
 

@@ -26,6 +26,12 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
     /// For cloze interactions, identifies the one blank group this card tests.
     /// Nil for non-cloze cards.
     public var clozeGroup: Int?
+    private var selectedRows: [CardRowSelection]?
+
+    public var rowSelections: [CardRowSelection] {
+        get { selectedRows ?? [] }
+        set { selectedRows = newValue.isEmpty ? nil : newValue }
+    }
 
     public init(
         id: UUID = UUID(),
@@ -39,7 +45,8 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
         isSuspended: Bool = false,
         deckID: UUID? = nil,
         occlusionGroup: Int? = nil,
-        clozeGroup: Int? = nil
+        clozeGroup: Int? = nil,
+        rowSelections: [CardRowSelection] = []
     ) {
         self.id = id
         self.itemID = itemID
@@ -53,6 +60,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
         self.deckID = deckID
         self.occlusionGroup = occlusionGroup
         self.clozeGroup = clozeGroup
+        selectedRows = rowSelections.isEmpty ? nil : rowSelections
     }
 
     public func isDue(asOf now: Date = .now) -> Bool {
@@ -62,7 +70,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, itemID, templateID, skill, memory
         case memoryModelVersion, memoryParameterSetID, schedulingHistoryOrigin
-        case isSuspended, deckID, clozeGroup, occlusionGroup
+        case isSuspended, deckID, clozeGroup, occlusionGroup, selectedRows
     }
 
     public init(from decoder: Decoder) throws {
@@ -79,7 +87,8 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
             isSuspended: try values.decode(Bool.self, forKey: .isSuspended),
             deckID: try values.decodeIfPresent(UUID.self, forKey: .deckID),
             occlusionGroup: try values.decodeIfPresent(Int.self, forKey: .occlusionGroup),
-            clozeGroup: try values.decodeIfPresent(Int.self, forKey: .clozeGroup)
+            clozeGroup: try values.decodeIfPresent(Int.self, forKey: .clozeGroup),
+            rowSelections: try values.decodeIfPresent([CardRowSelection].self, forKey: .selectedRows) ?? []
         )
     }
 }

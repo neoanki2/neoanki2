@@ -515,11 +515,13 @@ public final class LibraryFeatureModel {
         didMutate()
     }
 
-    public func updateDeck(id: UUID, name: String, parentID: UUID?, newCardsPerDay: Int?) async throws {
+    public func updateDeck(id: UUID, name: String, parentID: UUID?, newCardsPerDay: Int?,
+                           includeInAllDecksStudy: Bool? = nil) async throws {
         var deck = try await library.deck(id: id)
         deck.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         deck.parentID = parentID
         deck.newCardsPerDay = newCardsPerDay
+        if let includeInAllDecksStudy { deck.includeInAllDecksStudy = includeInAllDecksStudy }
         _ = try await command("update-deck", input: try JSONEncoder().encode(deck)) { try await library.updateDeck(deck) }
         didMutate()
     }
@@ -545,7 +547,8 @@ public final class LibraryFeatureModel {
     public func createItem(itemType: ItemType, deckID: UUID?, values: [UUID: ContentValue]) async throws {
         let item = Item(
             itemTypeID: itemType.id,
-            fields: itemType.fields.map { FieldValue(fieldID: $0.id, value: values[$0.id] ?? .empty) },
+            fields: itemType.fields.map { FieldValue(fieldID: $0.id, value: values[$0.id] ?? .empty) }
+                + itemType.lists.compactMap { list in values[list.id].map { FieldValue(fieldID: list.id, value: $0) } },
             deckID: deckID
         )
         _ = try await command("create-item", input: try JSONEncoder().encode(item)) { try await library.createItem(item, asOf: .now) }

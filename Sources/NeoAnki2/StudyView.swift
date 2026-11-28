@@ -117,7 +117,7 @@ struct StudyView: View {
         .editingShortcut("r", modifiers: .command, isEnabled: canUseRecordingShortcut) {
             if recording.state == .recording { recording.stop() }
             else {
-                Task { await recording.start(persistentSubmission: model.currentCard?.template.interaction == .audioSubmission) }
+                Task { await recording.start(persistentSubmission: model.currentCard?.response == .audioSubmission) }
             }
         }
         .editingUndoContext(EditingUndoContext(canUndo: model.canUndoLastGrade && !model.isGrading && !isEditingCard) {
@@ -156,7 +156,7 @@ struct StudyView: View {
     }
 
     private var primaryActionHandler: StudyPrimaryActionHandler {
-        let interaction = model.currentCard?.template.interaction
+        let interaction = model.currentCard?.response
         let recordingIsReady = interaction != .record || recording.isReadyForComparison
         return StudyPrimaryActionHandler(
             action: {
@@ -174,7 +174,7 @@ struct StudyView: View {
     // Menu contents mount lazily; recording shortcuts belong to the study
     // surface so they remain available while the actions menu is closed.
     private var canUseRecordingShortcut: Bool {
-        let interaction = model.currentCard?.template.interaction
+        let interaction = model.currentCard?.response
         return (interaction == .record || interaction == .audioSubmission)
             && !model.isAnswerRevealed && !isEditingCard
             && !model.isCompletingSubmission && !model.isPreparingQueue
@@ -429,7 +429,7 @@ struct StudyView: View {
         StudyStageContent(spacing: DesignSystem.Spacing.md) {
             StudyCompositionView(
                 template: card.template,
-                item: card.item,
+                item: card.studyItem,
                 isAnswerRevealed: model.isAnswerRevealed,
                 mediaStore: mediaStore,
                 occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
@@ -475,7 +475,7 @@ struct StudyView: View {
             if model.isAnswerRevealed {
                 if model.reviewResponse == nil || model.answerEvaluation == .unavailable { evaluationFeedback }
 
-                if card.template.interaction == .record, recording.hasRecording {
+                if card.response == .record, recording.hasRecording {
                     revealedRecordingPlayback
                 }
             }
@@ -484,12 +484,10 @@ struct StudyView: View {
 
     @ViewBuilder
     private func interactionResponse(for card: DueCard) -> some View {
-        switch card.template.interaction {
-        case .cloze where !VocabularySet.supportsTypedResponse(card):
+        switch card.response {
+        case .onYourOwn:
             EmptyView()
-        case .reveal, .imageOcclusion:
-            EmptyView()
-        case .type, .cloze:
+        case .type:
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 Text("Your answer")
                     .font(DesignSystem.Typography.uiCaption)
@@ -684,14 +682,14 @@ struct StudyView: View {
     @ViewBuilder
     private func studyFooter(for card: DueCard) -> some View {
         HStack {
-            if card.template.interaction == .audioSubmission {
+            if card.response == .audioSubmission {
                 audioSubmissionFooter(for: card)
             } else if model.isAnswerRevealed {
                 gradeButtons
-            } else if card.template.interaction == .record {
+            } else if card.response == .record {
                 recordingStudyFooter
             } else if card.studyExercise == nil {
-                Button(primaryActionTitle(for: card.template.interaction)) {
+                Button(primaryActionTitle(for: card.response)) {
                     StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
                         model.performPrimaryAction()
                     }
@@ -923,11 +921,9 @@ struct StudyView: View {
         Task { await model.skipCurrentCard() }
     }
 
-    private func primaryActionTitle(for interaction: Interaction) -> String {
+    private func primaryActionTitle(for interaction: ResponseMode) -> String {
         switch interaction {
-        case .cloze where model.currentCard.map(VocabularySet.supportsTypedResponse) == true
-            && !model.typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty: "Check Answer"
-        case .reveal, .cloze, .imageOcclusion: "Show Answer"
+        case .onYourOwn: "Show Answer"
         case .type: "Check Answer"
         case .choose: "Check Choice"
         case .record: "Reveal & Compare"

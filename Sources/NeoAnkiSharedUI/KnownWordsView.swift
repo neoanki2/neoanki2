@@ -626,6 +626,10 @@ public struct VocabularyComposerView: View {
     @State private var error: String?
     @State private var saveID = UUID()
     @State private var showsCustomCapture = false
+    @State private var addRecognition = true
+    @State private var addCloze = true
+    @State private var matchingSets: [VocabularySetMatch] = []
+    @State private var matchingSetID: UUID?
 
     public init(vocabulary: any PersonalVocabulary, decks: any LibraryDeckManaging, language: String = "",
                 preset: VocabularySetDraft? = nil, startsCreating: Bool = false, deckID: UUID? = nil,
@@ -697,9 +701,20 @@ public struct VocabularyComposerView: View {
                             Text("Unassigned").tag(UUID?.none)
                             ForEach(deckOptions) { deck in Text(deck.name).tag(Optional(deck.id)) }
                         }
-                        if let preview {
+                        Toggle("Recognition card", isOn: $addRecognition)
+                        Toggle("Cloze card", isOn: $addCloze)
+                        if !matchingSets.isEmpty {
+                            Picker("Vocabulary set", selection: $matchingSetID) {
+                                Text("Create a new set").tag(UUID?.none)
+                                ForEach(matchingSets) { set in
+                                    Text(set.firstExample.isEmpty ? "\(set.exampleCount) examples" : set.firstExample)
+                                        .tag(Optional(set.id))
+                                }
+                            }
+                        }
+                        if let preview, addCloze {
                             LabeledContent("Cloze", value: preview)
-                        } else if !draft.sentence.isEmpty {
+                        } else if preview == nil, !draft.sentence.isEmpty {
                             Text("Use a sentence containing the target form once.").font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -728,7 +743,7 @@ public struct VocabularyComposerView: View {
                     Button(makingCards ? "Add Cards" : "I Know This") { Task { await save() } }
                         .accessibilityIdentifier("vocabulary-set-save")
                         .disabled(busy || word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                  || language.isEmpty || (makingCards && (preview == nil || draft.meaning.isEmpty || draft.sentence.isEmpty)))
+                                  || language.isEmpty || (makingCards && ((!addRecognition && !addCloze) || preview == nil || draft.meaning.isEmpty || draft.sentence.isEmpty)))
                 }
 #if os(iOS)
                 ToolbarItemGroup(placement: .keyboard) {
@@ -785,6 +800,15 @@ public struct VocabularyComposerView: View {
                    previous.isEmpty || draft.meaningLanguage == previous {
                     draft.meaningLanguage = next
                 }
+            }
+            .task(id: matchingInput) {
+                matchingSets = []
+                matchingSetID = nil
+                guard let candidate = matchingInput else { return }
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                    matchingSets = try await vocabulary.matchingVocabularySets(candidate)
+                } catch {}
             }
             .onChange(of: draft.meaningLanguage) { _, _ in resetLookup() }
             .onChange(of: makingCards) { _, value in if !value { resetLookup() } }
@@ -1043,6 +1067,16 @@ public struct VocabularyComposerView: View {
             length: sentence.distance(from: span.lowerBound, to: span.upperBound))], revealed: false)
     }
 
+    private var matchingInput: VocabularySetDraft? {
+        guard makingCards, preview != nil, !draft.meaning.isEmpty else { return nil }
+        var candidate = draft
+        candidate.term = term
+        candidate.productionSentence = nil
+        candidate.productionForm = nil
+        candidate.productionOccurrence = nil
+        return candidate
+    }
+
     private func save() async {
         busy = true
         defer { busy = false }
@@ -1053,7 +1087,13 @@ public struct VocabularyComposerView: View {
                 submitted.productionSentence = nil
                 submitted.productionForm = nil
                 submitted.productionOccurrence = nil
-                _ = try await vocabulary.createVocabularySet(submitted, id: saveID)
+                if let matchingSetID {
+                    try await vocabulary.appendVocabularyExample(submitted, to: matchingSetID, exampleID: saveID,
+                                                                 recognition: addRecognition, cloze: addCloze)
+                } else {
+                    _ = try await vocabulary.createVocabularyExample(submitted, id: saveID,
+                                                                     recognition: addRecognition, cloze: addCloze)
+                }
                 preferredMeaningLanguage = draft.meaningLanguage
                 if let recoveredDraftID {
                     UserDefaults.standard.set(true, forKey: "recovered-context-draft-\(recoveredDraftID)")

@@ -1,3 +1,4 @@
+import CoreFoundation
 import CryptoKit
 import Foundation
 import SQLite3
@@ -177,7 +178,7 @@ struct PortableDeckTypeMapping: Sendable {
 public enum PortableDeck {
     public static let fileExtension = "neodeck"
     public static let applicationID: Int32 = 0x4E44454B // "NDEK"
-    public static let version = 8
+    public static let version = 9
     fileprivate static let supportedVersions = 1...version
 
     public static func export(
@@ -369,14 +370,15 @@ private final class PortableDeckDatabase {
             for record in package.types {
                 try execute(
                     """
-                    INSERT INTO item_types(id, name, origin_library_id, origin_type_id, schema_digest)
-                    VALUES (?, ?, ?, ?, ?);
+                    INSERT INTO item_types(id, name, origin_library_id, origin_type_id, schema_digest, lists_json)
+                    VALUES (?, ?, ?, ?, ?, ?);
                     """,
                     [
                         .text(record.itemType.id.uuidString.lowercased()), .text(record.itemType.name),
                         .text(record.originLibraryID.uuidString.lowercased()),
                         .text(record.originTypeID.uuidString.lowercased()),
                         .blob(Data(hex: record.digest)),
+                        record.itemType.lists.isEmpty ? .null : .text(try portableEncode(record.itemType.lists)),
                     ]
                 )
                 for (index, field) in record.itemType.fields.enumerated() {
@@ -395,14 +397,14 @@ private final class PortableDeckDatabase {
                 }
                 for (index, template) in record.itemType.templates.enumerated() {
                     let ordinals = Dictionary(uniqueKeysWithValues:
-                        record.itemType.fields.enumerated().map { ($0.element.id, $0.offset) }
+                        (record.itemType.fields + record.itemType.lists.flatMap(\.columns)).enumerated().map { ($0.element.id, $0.offset) }
                     )
                     try execute(
                         """
                         INSERT INTO templates(id, item_type_id, ordinal, name, prompt_json,
                             answer_json, layout, components_json, interaction, skill_json,
-                            generate_when_json, fit_study_area)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                            generate_when_json, fit_study_area, card_creation_json, response_override)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                         """,
                         [
                             .text(template.id.uuidString.lowercased()),
@@ -418,6 +420,8 @@ private final class PortableDeckDatabase {
                                 .text(try PortableJSON.encodeCondition($0, ordinals: ordinals))
                             } ?? .null,
                             .integer(template.fitStudyArea ? 1 : 0),
+                            try template.cardCreation.map { .text(try portableEncode($0)) } ?? .null,
+                            template.responseOverride.map { .text($0.rawValue) } ?? .null,
                         ]
                     )
                 }
@@ -441,28 +445,29 @@ private final class PortableDeckDatabase {
                 try execute("INSERT INTO deck_type_settings(deck_id, definition) VALUES (?, ?);", [.text(settings.deckID.uuidString.lowercased()), .text(json)])
             }
             for record in package.items {
+                guard let itemType = typesByID[record.item.itemTypeID] else {
+                    throw PortableDeckError.invalidPackage("An exported item type is missing.")
+                }
                 let itemID = record.item.id.uuidString.lowercased()
                 try execute(
                     """
-                    INSERT INTO items(id, item_type_id, deck_id, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?);
+                    INSERT INTO items(id, item_type_id, deck_id, created_at, updated_at, lists_json)
+                    VALUES (?, ?, ?, ?, ?, ?);
                     """,
                     [
                         .text(itemID), .text(record.item.itemTypeID.uuidString.lowercased()),
                         record.item.deckID.map { .text($0.uuidString.lowercased()) } ?? .null,
                         .text(Self.timestamp(record.createdAt)),
                         .text(Self.timestamp(record.updatedAt)),
+                        itemType.lists.isEmpty ? .null : .text(try portableEncode(record.item.fields.filter { field in itemType.lists.contains { $0.id == field.fieldID } })),
                     ]
                 )
-                guard let itemType = typesByID[record.item.itemTypeID] else {
-                    throw PortableDeckError.invalidPackage("An exported item type is missing.")
-                }
                 let valuesByField = Dictionary(
                     grouping: record.item.fields,
                     by: \.fieldID
                 )
                 guard valuesByField.values.allSatisfy({ $0.count == 1 }),
-                      Set(valuesByField.keys).isSubset(of: Set(itemType.fields.map(\.id)))
+                      Set(valuesByField.keys).isSubset(of: Set(itemType.fields.map(\.id) + itemType.lists.map(\.id)))
                 else {
                     throw PortableDeckError.invalidPackage("An exported item has invalid fields.")
                 }
@@ -611,6 +616,11 @@ private final class PortableDeckDatabase {
                 "layout", "components_json", "interaction", "skill_json", "generate_when_json",
                 "fit_study_area",
             ]
+        }
+        if formatVersion >= 9 {
+            expected["item_types"]?.append("lists_json")
+            expected["items"]?.append("lists_json")
+            expected["templates"]?.append(contentsOf: ["card_creation_json", "response_override"])
         }
         for (table, columns) in expected {
             // Table identifiers are compile-time constants above.
@@ -806,6 +816,7 @@ private final class PortableDeckDatabase {
             SELECT item_type_id, id, ordinal, name, prompt_json, answer_json, layout,
                 components_json, interaction, skill_json, generate_when_json
                 \(formatVersion >= 8 ? ", fit_study_area" : "")
+                \(formatVersion >= 9 ? ", card_creation_json, response_override" : "")
             FROM templates ORDER BY item_type_id, ordinal;
             """ :
             """
@@ -817,7 +828,7 @@ private final class PortableDeckDatabase {
         let templatesByType = Dictionary(grouping: allTemplateRows) { $0.text(0) ?? "" }
         var types: [PortableDeckTypeRecord] = []
         for row in try query(
-            "SELECT id, origin_library_id, origin_type_id, schema_digest, name FROM item_types ORDER BY id;"
+            "SELECT id, origin_library_id, origin_type_id, schema_digest, name \(formatVersion >= 9 ? ", lists_json" : "") FROM item_types ORDER BY id;"
         ) {
             let digest = row.blob(3).hex
             guard let id = row.uuid(0), let originLibraryID = row.uuid(1),
@@ -842,6 +853,11 @@ private final class PortableDeckDatabase {
                 guard formatVersion >= 6 || kind != .imageOcclusion else { throw PortableDeckError.invalidPackage("Image occlusion requires version 6.") }
                 return FieldDef(id: fieldID, name: fieldName, type: kind, isRequired: required == 1)
             }
+            let lists: [ItemList] = try (formatVersion >= 9 ? row.text(5) : nil).map { try portableDecode($0) } ?? []
+            guard decodedFields.count + lists.flatMap(\.columns).count <= limits.maximumFieldsPerType else {
+                throw PortableDeckError.limitExceeded("An item type has too many list columns.")
+            }
+            let sourceFields = decodedFields + lists.flatMap(\.columns)
             let decodedTemplates = try templates.enumerated().map { index, templateRow -> Template in
                 guard let templateID = templateRow.uuid(1), let ordinal = templateRow.integer(2),
                       ordinal == Int64(index), Int(ordinal) < limits.maximumTemplatesPerType,
@@ -853,7 +869,7 @@ private final class PortableDeckDatabase {
                 else { throw PortableDeckError.invalidPackage("Template row is invalid.") }
                 guard formatVersion >= 6 || interaction != .imageOcclusion else { throw PortableDeckError.invalidPackage("Image occlusion requires version 6.") }
                 let condition: SlotCondition? = try templateRow.text(formatVersion >= 5 ? 10 : 8).map {
-                    try PortableJSON.decodeCondition($0, fields: decodedFields)
+                    try PortableJSON.decodeCondition($0, fields: sourceFields)
                 }
                 if formatVersion >= 5 {
                     guard let layoutText = templateRow.text(6),
@@ -866,12 +882,19 @@ private final class PortableDeckDatabase {
                         layout: layout,
                         components: try PortableJSON.decodeComponents(
                             componentsJSON,
-                            fields: decodedFields
+                            fields: sourceFields
                         ),
                         interaction: interaction,
                         skill: try PortableJSON.decodeSkill(skill),
                         generateWhen: condition,
-                        fitStudyArea: formatVersion >= 8 && templateRow.integer(11) == 1
+                        fitStudyArea: formatVersion >= 8 && templateRow.integer(11) == 1,
+                        cardCreation: try (formatVersion >= 9 ? templateRow.text(12) : nil).map { try portableDecode($0) },
+                        responseOverride: try (formatVersion >= 9 ? templateRow.text(13) : nil).map { raw in
+                            guard let response = ResponseMode(rawValue: raw) else {
+                                throw PortableDeckError.invalidPackage("Unknown response mode.")
+                            }
+                            return response
+                        }
                     )
                 }
                 let promptSide = try PortableJSON.decodeSide(prompt, fields: decodedFields)
@@ -896,7 +919,8 @@ private final class PortableDeckDatabase {
                 id: id,
                 name: name,
                 fields: decodedFields,
-                templates: decodedTemplates
+                templates: decodedTemplates,
+                lists: lists
             )
             try ItemTypeValidation.validate(type)
             types.append(.init(
@@ -981,7 +1005,7 @@ private final class PortableDeckDatabase {
         })
         var items: [PortableDeckPersistedItem] = []
         try forEachRow(
-            "SELECT id, item_type_id, deck_id, created_at, updated_at FROM items ORDER BY rowid;"
+            "SELECT id, item_type_id, deck_id, created_at, updated_at \(formatVersion >= 9 ? ", lists_json" : "") FROM items ORDER BY rowid;"
         ) { row in
             guard let id = row.uuid(0), let typeID = row.uuid(1), typeIDs.contains(typeID),
                   let deckID = row.uuid(2), deckIDs.contains(deckID),
@@ -1010,6 +1034,14 @@ private final class PortableDeckDatabase {
                     value: try PortableJSON.decodeContent(json, formatVersion: formatVersion)
                 )
             }
+            let listValues: [FieldValue] = try (formatVersion >= 9 ? row.text(5) : nil).map { try portableDecode($0) } ?? []
+            let validLists = Set(itemType.lists.filter { $0.sharedRows == nil }.map(\.id))
+            guard Set(listValues.map(\.fieldID)).count == listValues.count,
+                  listValues.allSatisfy({ field in
+                      guard validLists.contains(field.fieldID), case let .rows(rows) = field.value else { return false }
+                      return rows.count <= 4096
+                  })
+            else { throw PortableDeckError.invalidPackage("Item list values are invalid.") }
             let tagRows = tagsByItem.removeValue(forKey: itemKey) ?? []
             guard tagRows.count <= limits.maximumTagsPerItem else {
                 throw PortableDeckError.limitExceeded("An item has too many tags.")
@@ -1024,7 +1056,7 @@ private final class PortableDeckDatabase {
                 return tag
             }
             items.append(.init(
-                item: Item(id: id, itemTypeID: typeID, fields: fields, tags: tags, deckID: deckID),
+                item: Item(id: id, itemTypeID: typeID, fields: fields + listValues, tags: tags, deckID: deckID),
                 createdAt: created,
                 updatedAt: updated
             ))
@@ -1519,6 +1551,10 @@ enum PortableJSON {
         case let .studyExercise(exercise):
             try exercise.validate()
             value = ["type": "studyExercise", "exercise": try JSONSerialization.jsonObject(with: JSONEncoder().encode(exercise))]
+        case let .checkbox(checked):
+            value = ["type": "checkbox", "value": checked]
+        case let .rows(rows):
+            value = ["type": "rows", "rows": try JSONSerialization.jsonObject(with: JSONEncoder().encode(rows))]
         case let .number(number):
             guard number.isFinite else { throw invalid() }
             value = ["type": "number", "value": number]
@@ -1635,6 +1671,15 @@ enum PortableJSON {
                     link: link
                 )
             })
+        case "checkbox":
+            guard formatVersion >= 9, Set(value.keys) == ["type", "value"],
+                  let bool = value["value"] as? NSNumber, CFGetTypeID(bool) == CFBooleanGetTypeID()
+            else { throw invalid() }
+            return .checkbox(bool.boolValue)
+        case "rows":
+            guard formatVersion >= 9, Set(value.keys) == ["type", "rows"], let rows = value["rows"] as? [Any],
+                  rows.count <= 4096 else { throw invalid() }
+            return .rows(try JSONDecoder().decode([ItemListRow].self, from: JSONSerialization.data(withJSONObject: rows)))
         case "number":
             guard Set(value.keys) == ["type", "value"],
                   let number = value["value"] as? NSNumber,
@@ -1814,7 +1859,7 @@ private let schema = [
     CREATE TABLE manifest (
         singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
         format_name TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-        format_version INTEGER NOT NULL CHECK (format_version = 8),
+        format_version INTEGER NOT NULL CHECK (format_version = 9),
         created_at TEXT NOT NULL, exporter TEXT NOT NULL,
         source_library_id TEXT NOT NULL, root_deck_id TEXT REFERENCES decks(id) ON DELETE RESTRICT,
         content_only INTEGER NOT NULL CHECK (content_only = 1),
@@ -1834,7 +1879,7 @@ private let schema = [
         id TEXT PRIMARY KEY NOT NULL CHECK(length(id) = 36), name TEXT NOT NULL,
         origin_library_id TEXT NOT NULL CHECK(length(origin_library_id) = 36),
         origin_type_id TEXT NOT NULL CHECK(length(origin_type_id) = 36),
-        schema_digest BLOB NOT NULL CHECK(length(schema_digest) = 32),
+        schema_digest BLOB NOT NULL CHECK(length(schema_digest) = 32), lists_json TEXT,
         UNIQUE(origin_library_id, origin_type_id)
     );
     """,
@@ -1853,7 +1898,7 @@ private let schema = [
         id TEXT PRIMARY KEY NOT NULL CHECK(length(id) = 36),
         item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
         ordinal INTEGER NOT NULL CHECK(ordinal >= 0), name TEXT NOT NULL,
-        kind TEXT NOT NULL CHECK(kind IN ('text','richText','audio','image','gif','video','number','cloze','imageOcclusion')),
+        kind TEXT NOT NULL CHECK(kind IN ('text','richText','audio','image','gif','video','number','checkbox','cloze','imageOcclusion','studyExercise')),
         is_required INTEGER NOT NULL CHECK(is_required IN (0,1)),
         UNIQUE(item_type_id, ordinal), UNIQUE(item_type_id, id)
     );
@@ -1869,6 +1914,7 @@ private let schema = [
         interaction TEXT NOT NULL CHECK(interaction IN ('reveal','type','choose','record','audioSubmission','cloze','imageOcclusion','arrange')),
         skill_json TEXT NOT NULL, generate_when_json TEXT,
         fit_study_area INTEGER NOT NULL CHECK(fit_study_area IN (0,1)),
+        card_creation_json TEXT, response_override TEXT,
         UNIQUE(item_type_id, ordinal), UNIQUE(item_type_id, id)
     );
     """,
@@ -1877,7 +1923,7 @@ private let schema = [
         id TEXT PRIMARY KEY NOT NULL CHECK(length(id) = 36),
         item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE RESTRICT,
         deck_id TEXT REFERENCES decks(id) ON DELETE RESTRICT,
-        created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(id, item_type_id)
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL, lists_json TEXT, UNIQUE(id, item_type_id)
     );
     """,
     """
@@ -1920,3 +1966,13 @@ private let schema = [
 ]
 
 private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+private func portableEncode<Value: Encodable>(_ value: Value) throws -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return String(decoding: try encoder.encode(value), as: UTF8.self)
+}
+
+private func portableDecode<Value: Decodable>(_ json: String) throws -> Value {
+    try JSONDecoder().decode(Value.self, from: Data(json.utf8))
+}

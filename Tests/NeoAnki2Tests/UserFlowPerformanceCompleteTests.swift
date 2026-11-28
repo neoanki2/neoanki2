@@ -339,7 +339,7 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
         let created = await model.createDeck(name: "Perf CRUD")
         #expect(created != nil)
         #expect(await model.renameDeck(id: created!.id, name: "Renamed CRUD"))
-        #expect(await model.updateNewCardsPerDay(id: created!.id, limit: 15))
+        #expect(await model.updateStudySettings(id: created!.id, limit: 15))
         #expect(await model.deleteDeck(id: created!.id))
         return ["operations": "create-rename-limit-delete-reload"]
     }

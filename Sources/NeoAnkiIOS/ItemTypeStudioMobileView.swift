@@ -490,6 +490,7 @@ struct ItemTypeStudioMobileView: View {
                 }
                 .neoAnkiTouchTarget()
                 .accessibilityIdentifier("item-type-studio.add-field")
+                DisclosureGroup("Lists") { ItemListsEditor(lists: draftBinding.lists) }
             }
         } header: {
             Text("Fields")
@@ -839,6 +840,9 @@ struct ItemTypeStudioMobileView: View {
 
     private func saveImpactMessage(_ impact: ItemTypeStudioSaveImpact) -> String {
         var parts: [String] = []
+        if let preview = impact.cardCreationPreview {
+            parts.append(CardCreationSummary.message(for: preview))
+        }
         if !impact.removedFields.isEmpty {
             parts.append("Removes fields: \(impact.removedFields.map(\.name).joined(separator: ", ")).")
         }
@@ -848,7 +852,7 @@ struct ItemTypeStudioMobileView: View {
         if !impact.removedCardSetups.isEmpty {
             parts.append("Removes Card setups: \(impact.removedCardSetups.map(\.name).joined(separator: ", ")).")
         }
-        if impact.generatedCardRetirementCount > 0 {
+        if impact.cardCreationPreview == nil, impact.generatedCardRetirementCount > 0 {
             let count = impact.generatedCardRetirementCount
             parts.append("Retires \(count) generated card\(count == 1 ? "" : "s").")
         }
@@ -978,6 +982,7 @@ struct ItemTypeStudioMobileView: View {
         case .text: "Text"
         case .richText: "Rich text"
         case .number: "Number"
+        case .checkbox: "Checkbox"
         case .studyExercise: "Study exercise"
         case .audio: "Audio"
         case .image: "Image"

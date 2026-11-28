@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://neoanki.app/schemas/authored-type-v6.json",
+  "$id": "https://neoanki.app/schemas/authored-type-v7.json",
   "title": "NeoAnki authored item-type record",
   "type": "object",
   "additionalProperties": false,
@@ -14,6 +14,20 @@
       "minItems": 1,
       "maxItems": 256,
       "items": {"$ref": "#/$defs/field"}
+    },
+    "lists": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "columns"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "name": {"type": "string", "minLength": 1},
+          "columns": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/field"}},
+          "sharedRows": {"type": "array", "maxItems": 4096, "items": {"$ref": "authored-item.schema.json#/$defs/row"}}
+        }
+      }
     },
     "templates": {
       "type": "array",
@@ -31,10 +45,8 @@
       "properties": {
         "id": {"$ref": "#/$defs/id"},
         "name": {"type": "string", "minLength": 1},
-        "layout": {"enum": ["focus", "split", "mediaAside", "mediaHero", "actionStage"]},
-        "components": {"type": "array", "maxItems": 512, "items": {"$ref": "#/$defs/component"}},
         "type": {
-          "enum": ["text", "richText", "audio", "image", "gif", "video", "number", "cloze", "imageOcclusion", "studyExercise"]
+          "enum": ["text", "richText", "audio", "image", "gif", "video", "number", "checkbox", "cloze", "imageOcclusion", "studyExercise"]
         },
         "required": {"type": "boolean"}
       }
@@ -49,6 +61,20 @@
         "answer": {"type": "array", "maxItems": 512, "items": {"$ref": "#/$defs/slot"}},
         "interaction": {"enum": ["reveal", "type", "choose", "record", "audioSubmission", "cloze", "arrange", "imageOcclusion"]},
         "skill": {"$ref": "#/$defs/skill"},
+        "layout": {"enum": ["focus", "split", "mediaAside", "mediaHero", "actionStage"]},
+        "components": {"type": "array", "maxItems": 512, "items": {"$ref": "#/$defs/component"}},
+        "fitStudyArea": {"type": "boolean"},
+        "response": {"enum": ["onYourOwn", "type", "choose", "arrange", "record", "audioSubmission"]},
+        "createCardsFrom": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lists"],
+          "properties": {
+            "lists": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+            "checked": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+            "startSuspended": {"type": "boolean"}
+          }
+        },
         "generateWhen": {"$ref": "#/$defs/condition"}
       }
     },

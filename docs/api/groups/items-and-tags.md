@@ -2,7 +2,7 @@
 title: Items and tags
 description: Generated NeoAnki local API operations for items and tags.
 audience: api
-contract_digest: sha256:e90cdd87822e8ffb97df2e72eb528fa6c1a929e9e82143a9b932ae5979bbd8b4
+contract_digest: sha256:c114fc88950349745721ed5dde845a5cbfabaac69eb2ab4e486831899501bc97
 parent: Local API reference
 permalink: /api/items-and-tags/
 ---
@@ -45,7 +45,7 @@ curl --request GET \
 ```
 ## `POST /v1/items`
 
-Create item through the loopback-only NeoAnki API. Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card.
+Create item through the loopback-only NeoAnki API. Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card. Use type rows for a list defined on the item type.
 
 - **Operation ID:** `createItem`
 - **Authorization:** Bearer token with `items.write`
@@ -93,7 +93,7 @@ curl --request POST \
 ```
 ## `POST /v1/items/validate`
 
-Validate item through the loopback-only NeoAnki API. Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card.
+Validate item through the loopback-only NeoAnki API. Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card. Use type rows for a list defined on the item type.
 
 - **Operation ID:** `validateItem`
 - **Authorization:** Bearer token with `items.write`
@@ -163,7 +163,7 @@ curl --request GET \
 ```
 ## `PUT /v1/items/{id}`
 
-Replace item through the loopback-only NeoAnki API. Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card.
+Replace item through the loopback-only NeoAnki API. Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card. Use type rows for a list defined on the item type.
 
 - **Operation ID:** `replaceItem`
 - **Authorization:** Bearer token with `items.write`
@@ -285,6 +285,6 @@ curl --request DELETE \
   --header 'Authorization: Bearer <token>'
 ```
 
-Contract digest: `sha256:e90cdd87822e8ffb97df2e72eb528fa6c1a929e9e82143a9b932ae5979bbd8b4`.
+Contract digest: `sha256:c114fc88950349745721ed5dde845a5cbfabaac69eb2ab4e486831899501bc97`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

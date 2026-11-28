@@ -83,8 +83,8 @@ public final class StudyFeatureModel: Identifiable {
         if currentCard?.studyExercise?.mode == .target, !exerciseTargets.isEmpty {
             return exerciseTargets.sorted { $0.key < $1.key }.map { $0.value.isEmpty ? "No word" : $0.value }.joined(separator: " / ")
         }
-        switch currentCard?.template.interaction {
-        case .type, .cloze:
+        switch currentCard?.response {
+        case .type:
             return typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : typedAnswer
         case .choose:
             return selectedChoice
@@ -168,7 +168,7 @@ public final class StudyFeatureModel: Identifiable {
         return !coursePath.isNewVocabulary(card)
     }
     public var supportsRevealWithoutChecking: Bool {
-        switch currentCard?.template.interaction {
+        switch currentCard?.response {
         case .type, .choose, .arrange, .record: true
         default: false
         }
@@ -486,10 +486,8 @@ public final class StudyFeatureModel: Identifiable {
             return
         }
         guard let card = currentCard, !isAnswerRevealed,
-              card.template.interaction == .type || VocabularySet.supportsTypedResponse(card) else { return }
-        let evaluation = VocabularySet.supportsTypedResponse(card)
-            ? VocabularySet.check(typedAnswer, for: card)
-            : StudyResponseEvaluator.evaluate(typedAnswer, for: card)
+              card.response == .type else { return }
+        let evaluation = StudyResponseEvaluator.evaluate(typedAnswer, for: card)
         if evaluation == .unavailable {
             recoverFromMissingAnswer()
             return
@@ -510,7 +508,7 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func submitChoice() {
-        guard let card = currentCard, card.template.interaction == .choose else { return }
+        guard let card = currentCard, card.response == .choose else { return }
         guard !choiceOptions.isEmpty else {
             recoverFromMissingAnswer()
             return
@@ -544,7 +542,7 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func submitArrangement() {
-        guard let card = currentCard, card.template.interaction == .arrange else { return }
+        guard let card = currentCard, card.response == .arrange else { return }
         guard !arrangedItems.isEmpty else {
             recoverFromMissingAnswer()
             return
@@ -554,7 +552,7 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func completeRecording() {
-        guard let card = currentCard, card.template.interaction == .record else { return }
+        guard let card = currentCard, card.response == .record else { return }
         interactionMessage = if StudyResponseEvaluator.hasReferenceAudio(for: card) {
             "Replay your recording, then play the reference audio below."
         } else {
@@ -565,11 +563,12 @@ public final class StudyFeatureModel: Identifiable {
 
     public func performPrimaryAction() {
         learningTime.interaction()
-        guard let interaction = currentCard?.template.interaction else { return }
-        switch interaction {
-        case .cloze where currentCard.map(VocabularySet.supportsTypedResponse) == true && !typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
-            submitTypedAnswer()
-        case .reveal, .cloze, .imageOcclusion:
+        guard let card = currentCard else { return }
+        switch card.response {
+        case .type where VocabularySet.supportsTypedResponse(card) &&
+            typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && card.template.responseOverride == nil:
+            revealAnswer()
+        case .onYourOwn:
             revealAnswer()
         case .type:
             submitTypedAnswer()
@@ -588,7 +587,7 @@ public final class StudyFeatureModel: Identifiable {
         guard !isCompletingSubmission, !isGrading, !isLoading, !isPreparingQueue,
               let card = currentCard,
               card.id == draft.cardID,
-              card.template.interaction == .audioSubmission
+              card.response == .audioSubmission
         else { return false }
         isCompletingSubmission = true
         defer { isCompletingSubmission = false }
@@ -704,7 +703,7 @@ public final class StudyFeatureModel: Identifiable {
 
     public var promptRefreshRevision: UInt64? {
         guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission, !isAnswerRevealed,
-              let interaction = currentCard?.template.interaction else { return nil }
+              let interaction = currentCard?.response else { return nil }
         switch interaction {
         case .record, .audioSubmission, .arrange: return nil
         default: return attemptRevision
@@ -763,7 +762,7 @@ public final class StudyFeatureModel: Identifiable {
                 guard snapshot.itemType.templates.contains(where: { $0.id == live.templateID }) else { return }
                 if snapshot.item == current.item, snapshot.itemType == current.itemType,
                    live.templateID == current.template.id, live.clozeGroup == current.card.clozeGroup,
-                   live.occlusionGroup == current.card.occlusionGroup {
+                   live.occlusionGroup == current.card.occlusionGroup, live.rowSelections == current.card.rowSelections {
                     return
                 }
             }
@@ -831,15 +830,15 @@ public final class StudyFeatureModel: Identifiable {
             arrangedItems = []
             return
         }
-        choiceOptions = card.template.interaction == .choose && card.studyExercise == nil
+        choiceOptions = card.response == .choose && card.studyExercise == nil
             ? StudyResponseEvaluator.choiceOptions(for: card)
             : []
-        arrangedItems = card.template.interaction == .arrange
+        arrangedItems = card.response == .arrange
             ? StudyResponseEvaluator.arrangement(for: card)?.initial ?? []
             : []
-        if card.template.interaction == .choose, card.studyExercise == nil, choiceOptions.isEmpty {
+        if card.response == .choose, card.studyExercise == nil, choiceOptions.isEmpty {
             interactionMessage = "This card has no usable answer options. Reveal it to self-grade."
-        } else if card.template.interaction == .arrange, arrangedItems.isEmpty {
+        } else if card.response == .arrange, arrangedItems.isEmpty {
             interactionMessage = "This card has nothing to arrange. Reveal it to self-grade."
         }
     }

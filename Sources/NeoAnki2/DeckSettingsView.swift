@@ -18,6 +18,7 @@ struct DeckSettingsView: View {
     @State private var dismissal = DraftDismissal()
     @State private var isLimited: Bool
     @State private var newCardsPerDay: Int
+    @State private var includeInAllDecksStudy: Bool
     @State private var isSaving = false
     @State private var isResetting = false
     @State private var showResetConfirmation = false
@@ -35,6 +36,7 @@ struct DeckSettingsView: View {
         self.onProgressReset = onProgressReset
         _isLimited = State(initialValue: deck.newCardsPerDay != nil)
         _newCardsPerDay = State(initialValue: deck.newCardsPerDay ?? 20)
+        _includeInAllDecksStudy = State(initialValue: deck.includeInAllDecksStudy)
     }
 
     var body: some View {
@@ -67,6 +69,14 @@ struct DeckSettingsView: View {
                         }
                     }
                 }
+                Section {
+                    Toggle("Include in All Decks study", isOn: $includeInAllDecksStudy)
+                } header: {
+                    Text("Study")
+                } footer: {
+                    Text("Turn off to keep this deck and its subdecks out of All Decks study. You can still open and study them directly.")
+                }
+
                 Section {
                     Toggle("Limit new cards per day", isOn: $isLimited)
 
@@ -121,7 +131,7 @@ struct DeckSettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismissal.request(isDirty: pendingLimit != deck.newCardsPerDay, isBusy: isSaving || isResetting) { dismiss() }
+                        dismissal.request(isDirty: isDirty, isBusy: isSaving || isResetting) { dismiss() }
                     }
                         .disabled(isSaving || isResetting)
                         .keyboardShortcut(.cancelAction)
@@ -136,7 +146,7 @@ struct DeckSettingsView: View {
                 }
             }
         }
-        .protectDraft(isDirty: pendingLimit != deck.newCardsPerDay, isBusy: isSaving || isResetting, dismissal: dismissal)
+        .protectDraft(isDirty: isDirty, isBusy: isSaving || isResetting, dismissal: dismissal)
         .confirmationDialog(
             "Reset all progress for \"\(deck.name)\"?",
             isPresented: $showResetConfirmation,
@@ -155,14 +165,18 @@ struct DeckSettingsView: View {
     }
 
     private var pendingLimit: Int? { isLimited ? newCardsPerDay : nil }
+    private var isDirty: Bool {
+        pendingLimit != deck.newCardsPerDay || includeInAllDecksStudy != deck.includeInAllDecksStudy
+    }
 
     private func save() {
         guard !isSaving, !isResetting else { return }
         isSaving = true
         Task {
-            let saved = await decksModel.updateNewCardsPerDay(
+            let saved = await decksModel.updateStudySettings(
                 id: deck.id,
-                limit: isLimited ? newCardsPerDay : nil
+                limit: pendingLimit,
+                includeInAllDecksStudy: includeInAllDecksStudy
             )
             if saved {
                 await onSaved()

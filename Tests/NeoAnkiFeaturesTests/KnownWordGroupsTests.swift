@@ -46,8 +46,9 @@ struct KnownWordGroupsTests {
                                        sentence: "Дорога вела до пагорків.")
         let item = try VocabularySet.makeItem(draft, id: UUID())
         #expect(VocabularySet.term(in: item) == term)
-        let production = try #require(VocabularySet.itemType.fields.first { $0.name == "Production sentence" })
-        guard case let .cloze(sentence, blanks) = item.value(for: production.id) else {
+        let examples = try #require(VocabularySet.itemType.lists.first)
+        let production = try #require(examples.columns.first { $0.name == "Production sentence" })
+        guard case let .cloze(sentence, blanks) = examples.rows(in: item).first?.values.first(where: { $0.fieldID == production.id })?.value else {
             Issue.record("Expected a Cloze field")
             return
         }

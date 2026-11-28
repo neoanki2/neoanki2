@@ -90,6 +90,7 @@ public struct ItemTypeStudioSaveImpact: Sendable, Equatable {
     /// authorization and are never exposed to Studio views.
     public let generatedCardRetirementCount: Int
     public let persistentSpokenResponseCount: Int
+    public let cardCreationPreview: CardCreationPreview?
 
     public init(
         removedFields: [FieldDef],
@@ -98,9 +99,11 @@ public struct ItemTypeStudioSaveImpact: Sendable, Equatable {
         removedCardSetups: [ItemTypeStudioCardSetupRemoval],
         generatedCardRetirementCount: Int,
         persistentSpokenResponseCount: Int,
-        linkedDeckPaths: [String] = []
+        linkedDeckPaths: [String] = [],
+        cardCreationPreview: CardCreationPreview? = nil
     ) {
         self.linkedDeckPaths = linkedDeckPaths
+        self.cardCreationPreview = cardCreationPreview
         self.removedFields = removedFields
         self.changedFields = changedFields
         self.schemaChange = schemaChange
@@ -123,7 +126,8 @@ public struct ItemTypeStudioSaveImpact: Sendable, Equatable {
     }
 
     public var requiresConfirmation: Bool {
-        linkedDeckPaths.count > 1
+        cardCreationPreview.map { $0.added > 0 || $0.retired > 0 } == true
+            || linkedDeckPaths.count > 1
             || schemaChange.requiresConfirmation
             || !removedCardSetups.isEmpty
             || generatedCardRetirementCount > 0
@@ -327,7 +331,8 @@ public final class ItemTypesFeatureModel {
                 removedCardSetups: removedCardSetups,
                 generatedCardRetirementCount: authorization.expectedGeneratedCardRetirementCount,
                 persistentSpokenResponseCount: authorization.expectedStudyResponseDeletionCount,
-                linkedDeckPaths: linkedPaths
+                linkedDeckPaths: linkedPaths,
+                cardCreationPreview: authorization.cardCreationPreview
             ),
             updateAuthorization: authorization
         )

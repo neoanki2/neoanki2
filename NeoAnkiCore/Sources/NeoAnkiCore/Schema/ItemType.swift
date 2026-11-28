@@ -8,17 +8,25 @@ public struct ItemType: Codable, Equatable, Sendable, Identifiable {
     public var name: String
     public var fields: [FieldDef]
     public var templates: [Template]
+    private var listDefinitions: [ItemList]?
+
+    public var lists: [ItemList] {
+        get { listDefinitions ?? [] }
+        set { listDefinitions = newValue.isEmpty ? nil : newValue }
+    }
 
     public init(
         id: UUID = UUID(),
         name: String,
         fields: [FieldDef],
-        templates: [Template]
+        templates: [Template],
+        lists: [ItemList] = []
     ) {
         self.id = id
         self.name = name
         self.fields = fields
         self.templates = templates
+        listDefinitions = lists.isEmpty ? nil : lists
     }
 
     public func field(_ id: UUID) -> FieldDef? {
@@ -27,5 +35,9 @@ public struct ItemType: Codable, Equatable, Sendable, Identifiable {
 
     public func field(named name: String) -> FieldDef? {
         fields.first { $0.name == name }
+    }
+
+    public func sourceField(_ id: UUID) -> FieldDef? {
+        field(id) ?? lists.lazy.flatMap(\.columns).first { $0.id == id }
     }
 }

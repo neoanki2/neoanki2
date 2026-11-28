@@ -67,6 +67,8 @@ public enum ItemDraftValidation {
             case .text, .richText, .number, .cloze, .studyExercise:
                 hasValue = !draft.text[field.id, default: ""]
                     .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            case .checkbox:
+                hasValue = true
             case .imageOcclusion:
                 hasValue = draft.occlusions[field.id] != nil
             case .audio, .image, .gif, .video:

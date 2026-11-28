@@ -250,7 +250,7 @@ final class DecksModel {
         }
     }
 
-    func updateNewCardsPerDay(id: UUID, limit: Int?) async -> Bool {
+    func updateStudySettings(id: UUID, limit: Int?, includeInAllDecksStudy: Bool? = nil) async -> Bool {
         errorMessage = nil
         if let limit, limit < 0 {
             errorMessage = "New cards per day cannot be negative."
@@ -260,9 +260,8 @@ final class DecksModel {
         do {
             var deck = try await library.deck(id: id)
             deck.newCardsPerDay = limit
+            if let includeInAllDecksStudy { deck.includeInAllDecksStudy = includeInAllDecksStudy }
             _ = try await command("update-deck") { try await library.updateDeck(deck) }
-            // The tree is unchanged; only the limit and the due counts it gates
-            // moved, so there is nothing here worth a reload.
             await refreshCounts()
             return true
         } catch {

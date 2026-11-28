@@ -6,7 +6,7 @@ public extension ItemStore {
     func studyAvailability(scope: DeckScope = .allDecks, asOf now: Date = .now) async throws -> StudyAvailability {
         let resolved: CardScope
         switch scope {
-        case .allDecks: resolved = .all
+        case .allDecks: resolved = .allDecksStudy
         case .unassigned: resolved = .unassigned
         case let .deck(id, includeDescendants):
             if includeDescendants {

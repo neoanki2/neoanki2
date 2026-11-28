@@ -41,7 +41,7 @@ extension SQLiteDatabase {
         switch scope {
         case .allDecks:
             scopeSQL = ""
-            filter = ""
+            filter = "AND \(scopeClause(try allDecksStudyScope(), column: "lesson.deck_id").sql)"
         case .unassigned:
             return []
         case let .deck(id, includeDescendants):

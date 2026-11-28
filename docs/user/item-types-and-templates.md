@@ -97,11 +97,12 @@ The Prose Deck builder includes a **Prose Unit** type with one Reveal card per
 unit. Its stored order and separators reconstruct the passage in the whole-text
 editor; changing a unit's cue or answer retires that card and creates a new one.
 
-Creating a **Vocabulary Set** adds an item with two Card setups, one for
-recognition in context and one for Cloze production. The Cloze field stores
-the selected span from your example sentence and uses it to generate the
-production answer. Deleting a Vocabulary Set whose meaning card is mature
-keeps that word in Known Words, marked **Kept from deleted cards**.
+**Add Word** can create a Vocabulary Set or add an example to a matching set in
+the same deck. Choose recognition, Cloze, or both for each example. Edit the
+item’s **Examples** list to change sentences, sources, or which cards an
+example creates. The selected Cloze blank is the production answer. Deleting a
+set whose recognition card is mature keeps the word in Known Words, marked
+**Kept from deleted cards**.
 
 ## Edit fields and Card setups together
 
@@ -145,9 +146,15 @@ identity and prefilled setup; edited definitions ask when they have unsaved work
 
 ## Fill a static layout
 
-Every Card setup begins with the compact recipe:
+Choose **Prompt** for the format the learner sees. **Standard** displays the
+mapped content. **Cloze** hides the selected group of blanks. **Image Occlusion**
+covers the selected masks.
 
-**Question → Answer method → Answer**
+Choose **Response** for what the learner does. **On your own** uses **Show
+Answer** and self-grading. **Type an answer** checks the mapped answer, the
+selected Cloze blank, or the answer text attached to the selected image masks.
+Standard prompts can also use **Choose**, **Arrange**, **Record**, or **Audio
+Submission**.
 
 Choose fields for Question and Answer in the Inspector, then fill any empty
 named hole directly on the canvas: **Instruction**, **Question**, **Media**,
@@ -162,7 +169,7 @@ Choose one of five code-owned layouts:
 - **Split** gives question and answer comparable space.
 - **Media Aside** places visual media beside supporting text.
 - **Media Hero** gives an image, GIF, or video the dominant region.
-- **Action Stage** gives an interactive Answer method room to work.
+- **Action Stage** gives an interactive response room to work.
 
 The initial recommendation is visible, but choosing another layout is sticky.
 Later Question or Answer changes may produce a new recommendation; they never
@@ -373,3 +380,36 @@ The shared editor offers Layout, Answer method, Availability, and Learning
 route screens. A Media Aside layout requires a Media component; select a
 compatible layout before saving if the setup contains only text. Scroll a
 control fully into view before activating it, especially with large text.
+
+
+## Create cards from lists
+
+In Item Type Studio, open **Lists** and choose **Add List**. Name the list,
+choose its column types, and decide whether the rows are shared across the item
+type. Add shared rows in Studio. Add item-specific rows in **Add Item** or
+**Edit Item**.
+
+In Card Setup, use **Create cards from** to select one or more lists. With no
+lists selected, the setup creates cards from the item. One list creates a card
+per row. Several lists combine one row from each list. Map item fields and
+columns from selected lists into the prompt or answer. Use **Filters** to
+require checked columns, and use **Availability** to require other mapped
+content. The card changes preview shows what will be kept, added, or retired.
+**Start new cards suspended** applies to cards created after the setting changes.
+
+### Practice the 12 major scales
+
+1. Create an item type with a **Scale** text field for the prompt and a
+   **Practice notes** text field for what to check after playing.
+2. Add four shared lists with one column each. For **Tempos**, use numbers
+   60, 72, 84, 96, and 108. For **Hands**, use Left, Right, and Both. For
+   **Dynamics**, use Piano, Mezzo forte, and Forte. For **Rhythms**, use Even,
+   Long–short, and Short–long.
+3. Set one Card Setup to **Standard** and **On your own**. Select the four lists
+   under **Create cards from**. Map **Scale** as the prompt, the selected
+   columns as supporting content, and **Practice notes** as the answer.
+4. Create one item for each major key. Each item produces 135 combinations,
+   for 1,620 cards across 12 keys. Start new cards suspended if you want to
+   introduce only a few tempos at a time.
+5. Play what the prompt asks for, use **Show Answer** to check your practice
+   notes, and grade the attempt. Each combination has its own FSRS schedule.

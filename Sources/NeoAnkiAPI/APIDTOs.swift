@@ -262,6 +262,16 @@ public struct APIResolvedComponent: Codable, Sendable, Equatable {
     }
 }
 
+public struct APICardRowSelection: Codable, Sendable, Equatable {
+    public let listId: String
+    public let rowId: String
+
+    init(_ selection: CardRowSelection) {
+        listId = selection.listID.uuidString.lowercased()
+        rowId = selection.rowID.uuidString.lowercased()
+    }
+}
+
 public struct APIStudyCard: Codable, Sendable, Equatable, Identifiable {
     public let id: String
     public let revision: Int
@@ -270,7 +280,10 @@ public struct APIStudyCard: Codable, Sendable, Equatable, Identifiable {
     public let deckId: String?
     public let occlusionGroup: Int?
     public let clozeGroup: Int?
+    public let rowSelections: [APICardRowSelection]?
     public let interaction: String
+    public let promptFormat: PromptFormat?
+    public let response: ResponseMode?
     public let layout: String
     public let components: [APIResolvedComponent]
     public let prompt: [APIResolvedSlot]
@@ -285,13 +298,16 @@ public struct APIStudyCard: Codable, Sendable, Equatable, Identifiable {
         deckId = due.card.deckID?.uuidString.lowercased()
         occlusionGroup = due.card.occlusionGroup
         clozeGroup = due.card.clozeGroup
+        rowSelections = due.card.rowSelections.isEmpty ? nil : due.card.rowSelections.map(APICardRowSelection.init)
         interaction = due.template.interaction.rawValue
+        promptFormat = due.template.promptFormat
+        response = due.response
         layout = due.template.layout.rawValue
-        components = SideContent.resolvedComponents(for: due.template, from: due.item)
+        components = due.studyComponents
             .map(APIResolvedComponent.init)
-        prompt = SideContent.resolvedSlots(for: due.template.prompt, from: due.item)
+        prompt = SideContent.resolvedSlots(for: due.template.prompt, from: due.studyItem)
             .map(APIResolvedSlot.init)
-        answer = SideContent.resolvedSlots(for: due.template.answer, from: due.item)
+        answer = SideContent.resolvedSlots(for: due.template.answer, from: due.studyItem)
             .map(APIResolvedSlot.init)
         memory = APIMemory(due.card.memory)
     }
@@ -352,6 +368,8 @@ public struct APIContentValue: Codable, Sendable, Equatable {
     public let blanks: [ClozeSpan]?
     public let number: Double?
     public let exercise: StudyExercise?
+    public let checked: Bool?
+    public let rows: [APIListRow]?
 
     init(_ value: ContentValue) {
         var type = "empty"
@@ -371,9 +389,15 @@ public struct APIContentValue: Codable, Sendable, Equatable {
         var nextGroup: Int?
         var number: Double?
         var exercise: StudyExercise?
+        var checked: Bool?
+        var rows: [APIListRow]?
         switch value {
         case .empty:
             break
+        case let .checkbox(value):
+            type = "checkbox"; checked = value
+        case let .rows(value):
+            type = "rows"; rows = value.map(APIListRow.init)
         case let .text(value, language):
             type = "text"; text = value; lang = language
         case let .rich(value):
@@ -417,12 +441,20 @@ public struct APIContentValue: Codable, Sendable, Equatable {
         self.blanks = blanks
         self.number = number
         self.exercise = exercise
+        self.checked = checked
+        self.rows = rows
     }
 
     package func domain(pointer: String) throws -> ContentValue {
         switch type {
         case "empty":
             return .empty
+        case "checkbox":
+            guard let checked else { throw APIServiceError.validation("A checkbox value is required.", pointer: pointer) }
+            return .checkbox(checked)
+        case "rows":
+            guard let rows else { throw APIServiceError.validation("List rows are required.", pointer: pointer) }
+            return .rows(try rows.map { try $0.domain(pointer: pointer) })
         case "text":
             guard let text else { throw APIServiceError.validation("Text is required.", pointer: pointer + "/text") }
             return .text(text, lang: lang)
@@ -488,6 +520,49 @@ public struct APIFieldValue: Codable, Sendable, Equatable {
     package init(_ field: FieldValue) {
         fieldId = field.fieldID.uuidString.lowercased()
         value = APIContentValue(field.value)
+    }
+}
+
+public struct APIListRow: Codable, Sendable, Equatable {
+    public let id: String
+    public let values: [APIFieldValue]
+
+    init(_ row: ItemListRow) {
+        id = row.id.uuidString.lowercased()
+        values = row.values.map(APIFieldValue.init)
+    }
+
+    func domain(pointer: String) throws -> ItemListRow {
+        guard let rowID = UUID(uuidString: id), rowID.uuidString.lowercased() == id else {
+            throw APIServiceError.validation("Expected a lowercase row UUID.", pointer: pointer + "/id")
+        }
+        return try ItemListRow(id: rowID, values: values.map {
+            guard let field = UUID(uuidString: $0.fieldId), field.uuidString.lowercased() == $0.fieldId,
+                  $0.value.type != "rows" else {
+                throw APIServiceError.validation("Invalid list field.", pointer: pointer + "/values")
+            }
+            return try FieldValue(fieldID: field, value: $0.value.domain(pointer: pointer + "/values"))
+        })
+    }
+}
+
+public struct APIListDefinition: Codable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+    public let columns: [APIFieldDefinition]
+    public let sharedRows: [APIListRow]?
+
+    init(_ list: ItemList) {
+        id = list.id.uuidString.lowercased()
+        name = list.name
+        columns = list.columns.map(APIFieldDefinition.init)
+        sharedRows = list.sharedRows?.map(APIListRow.init)
+    }
+
+    func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> ItemList {
+        try ItemList(id: parseUUID(id, pointer + "/id"), name: name,
+                     columns: columns.map { try $0.domain(parseUUID: parseUUID, pointer: pointer + "/columns") },
+                     sharedRows: sharedRows?.map { try $0.domain(pointer: pointer + "/sharedRows") })
     }
 }
 
@@ -612,6 +687,7 @@ public struct APICard: Codable, Sendable, Equatable, Identifiable {
     public let deckId: String?
     public let occlusionGroup: Int?
     public let clozeGroup: Int?
+    public let rowSelections: [APICardRowSelection]?
     public let skill: Skill
     public let isSuspended: Bool
     public let maturityStatus: String
@@ -625,6 +701,7 @@ public struct APICard: Codable, Sendable, Equatable, Identifiable {
         deckId = card.deckID?.uuidString.lowercased()
         occlusionGroup = card.occlusionGroup
         clozeGroup = card.clozeGroup
+        rowSelections = card.rowSelections.isEmpty ? nil : card.rowSelections.map(APICardRowSelection.init)
         skill = card.skill
         isSuspended = card.isSuspended
         self.maturityStatus = maturityStatus.rawValue
@@ -1020,6 +1097,28 @@ public struct APICondition: Codable, Sendable, Equatable {
     }
 }
 
+public struct APICardCreation: Codable, Sendable, Equatable {
+    public let listIds: [String]
+    public let startSuspended: Bool
+    public let checkedFieldIds: [String]?
+
+    init(_ creation: CardCreation) {
+        listIds = creation.listIDs.map { $0.uuidString.lowercased() }
+        startSuspended = creation.startSuspended
+        checkedFieldIds = creation.checkedFieldIDs?.map { $0.uuidString.lowercased() }
+    }
+
+    func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> CardCreation {
+        try CardCreation(
+            listIDs: listIds.enumerated().map { try parseUUID($0.element, pointer + "/listIds/\($0.offset)") },
+            startSuspended: startSuspended,
+            checkedFieldIDs: (checkedFieldIds ?? []).enumerated().map {
+                try parseUUID($0.element, pointer + "/checkedFieldIds/\($0.offset)")
+            }
+        )
+    }
+}
+
 public struct APITemplateDefinition: Codable, Sendable, Equatable {
     public let id: String
     public let name: String
@@ -1031,6 +1130,8 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
     public let skill: APISkill
     public let generateWhen: APICondition?
     public let fitStudyArea: Bool?
+    public let cardCreation: APICardCreation?
+    public let responseOverride: ResponseMode?
 
     init(_ template: Template) {
         id = template.id.uuidString.lowercased()
@@ -1043,6 +1144,8 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
         skill = APISkill(template.skill)
         generateWhen = template.generateWhen.map(APICondition.init)
         fitStudyArea = template.fitStudyArea
+        cardCreation = template.cardCreation.map(APICardCreation.init)
+        responseOverride = template.responseOverride
     }
 
     package func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> Template {
@@ -1052,6 +1155,7 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
         let templateID = try parseUUID(id, pointer + "/id")
         let resolvedSkill = try skill.domain(pointer: pointer + "/skill")
         let condition = try generateWhen?.domain(parseUUID: parseUUID, pointer: pointer + "/generateWhen")
+        let creation = try cardCreation?.domain(parseUUID: parseUUID, pointer: pointer + "/cardCreation")
         if let layout, let components {
             guard let layout = CardLayoutID(rawValue: layout) else {
                 throw APIServiceError.validation("Unknown layout preset.", pointer: pointer + "/layout")
@@ -1066,7 +1170,7 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
                 interaction: interaction,
                 skill: resolvedSkill,
                 generateWhen: condition,
-                fitStudyArea: fitStudyArea ?? false
+                fitStudyArea: fitStudyArea ?? false, cardCreation: creation, responseOverride: responseOverride
             )
         }
         guard layout == nil, components == nil else {
@@ -1083,7 +1187,7 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
             interaction: interaction,
             skill: resolvedSkill,
             generateWhen: condition,
-            fitStudyArea: fitStudyArea ?? false
+            fitStudyArea: fitStudyArea ?? false, cardCreation: creation, responseOverride: responseOverride
         )
     }
 }
@@ -1096,6 +1200,7 @@ public struct APIItemType: Codable, Sendable, Equatable, Identifiable {
     public let templates: [APITemplateDefinition]
     public let provenance: String
     public let itemCount: Int
+    public let lists: [APIListDefinition]?
 
     package func domain() throws -> ItemType {
         func uuid(_ value: String, _ pointer: String) throws -> UUID {
@@ -1107,7 +1212,8 @@ public struct APIItemType: Codable, Sendable, Equatable, Identifiable {
         return try ItemType(
             id: uuid(id, "/id"), name: name,
             fields: fields.map { try $0.domain(parseUUID: uuid, pointer: "/fields") },
-            templates: templates.map { try $0.domain(parseUUID: uuid, pointer: "/templates") }
+            templates: templates.map { try $0.domain(parseUUID: uuid, pointer: "/templates") },
+            lists: (lists ?? []).map { try $0.domain(parseUUID: uuid, pointer: "/lists") }
         )
     }
 
@@ -1119,6 +1225,7 @@ public struct APIItemType: Codable, Sendable, Equatable, Identifiable {
         templates = itemType.templates.map(APITemplateDefinition.init)
         self.provenance = provenance
         self.itemCount = itemCount
+        lists = itemType.lists.isEmpty ? nil : itemType.lists.map(APIListDefinition.init)
     }
 }
 
@@ -1136,6 +1243,7 @@ struct ItemTypeInput: Decodable {
     let name: String
     let fields: [APIFieldDefinition]
     let templates: [APITemplateDefinition]
+    let lists: [APIListDefinition]?
 }
 
 struct DuplicateItemTypeInput: Decodable {

@@ -139,15 +139,17 @@ public struct ItemTypeCatalog: Sendable, Equatable {
 public extension ItemType {
     /// Creates an independent editable copy while preserving schema behavior.
     func duplicated(name: String? = nil) -> ItemType {
-        let fieldMap = Dictionary(uniqueKeysWithValues: fields.map { ($0.id, UUID()) })
-        let copiedFields = fields.map {
-            FieldDef(
-                id: fieldMap[$0.id]!,
-                name: $0.name,
-                type: $0.type,
-                isRequired: $0.isRequired
-            )
+        let allFields = fields + lists.flatMap(\.columns)
+        let fieldMap = Dictionary(uniqueKeysWithValues: allFields.map { ($0.id, UUID()) })
+        func copyField(_ field: FieldDef) -> FieldDef {
+            FieldDef(id: fieldMap[field.id]!, name: field.name, type: field.type, isRequired: field.isRequired)
         }
+        let copiedFields = fields.map(copyField)
+        let copiedLists = lists.map { list in
+            ItemList(name: list.name, columns: list.columns.map(copyField),
+                     sharedRows: list.sharedRows.map { remapListRows($0, columns: fieldMap) })
+        }
+        let listMap = Dictionary(uniqueKeysWithValues: zip(lists.map(\.id), copiedLists.map(\.id)))
         let copiedTemplates = templates.map { template in
             Template(
                 id: UUID(),
@@ -167,13 +169,19 @@ public extension ItemType {
                 generateWhen: template.generateWhen.map {
                     duplicatedCondition($0, fieldMap: fieldMap)
                 },
-                fitStudyArea: template.fitStudyArea
+                fitStudyArea: template.fitStudyArea,
+                cardCreation: template.cardCreation.map {
+                    CardCreation(listIDs: $0.listIDs.map { listMap[$0] ?? $0 }, startSuspended: $0.startSuspended,
+                                 checkedFieldIDs: ($0.checkedFieldIDs ?? []).map { fieldMap[$0] ?? $0 })
+                },
+                responseOverride: template.responseOverride
             )
         }
         return ItemType(
             name: name ?? "\(self.name) Copy",
             fields: copiedFields,
-            templates: copiedTemplates
+            templates: copiedTemplates,
+            lists: copiedLists
         )
     }
 }
@@ -185,17 +193,12 @@ private func duplicatedSource(_ source: SlotSource, fieldMap: [UUID: UUID]) -> S
     }
 }
 
-private func duplicatedSide(_ side: Side, fieldMap: [UUID: UUID]) -> Side {
-    Side(slots: side.slots.map { slot in
-        let source: SlotSource
-        switch slot.source {
-        case let .field(id):
-            source = .field(fieldMap[id] ?? id)
-        case let .literal(value):
-            source = .literal(value)
-        }
-        return Slot(source: source, presentation: slot.presentation)
-    })
+func remapListRows(_ rows: [ItemListRow], columns: [UUID: UUID]) -> [ItemListRow] {
+    rows.map { row in
+        ItemListRow(id: row.id, values: row.values.map {
+            FieldValue(fieldID: columns[$0.fieldID] ?? $0.fieldID, value: $0.value)
+        })
+    }
 }
 
 private func duplicatedCondition(
@@ -255,5 +258,30 @@ public struct AuthoringItemTypes: Sendable, Equatable {
     }
     public var automaticItemTypeID: UUID? {
         defaultItemTypeID ?? (itemTypes.count == 1 ? itemTypes.first?.id : nil)
+    }
+}
+
+/// Maps content between two structurally matching item types during import.
+struct ItemTypeContentMapping {
+    private let fieldIDs: [UUID: UUID]
+    private let lists: [UUID: (id: UUID, columns: [UUID: UUID])]
+
+    init(source: ItemType, destination: ItemType) {
+        fieldIDs = Dictionary(uniqueKeysWithValues: zip(source.fields.map(\.id), destination.fields.map(\.id)))
+        lists = Dictionary(uniqueKeysWithValues: zip(source.lists, destination.lists).map { source, destination in
+            (source.id, (destination.id, Dictionary(uniqueKeysWithValues: zip(source.columns.map(\.id), destination.columns.map(\.id)))))
+        })
+    }
+
+    func fields(_ fields: [FieldValue]) throws -> [FieldValue] {
+        try fields.map { field in
+            if let id = fieldIDs[field.fieldID] {
+                return FieldValue(fieldID: id, value: field.value)
+            }
+            guard let list = lists[field.fieldID], case let .rows(rows) = field.value else {
+                throw DatabaseError.invalidItem("An imported item field could not be resolved.")
+            }
+            return FieldValue(fieldID: list.id, value: .rows(remapListRows(rows, columns: list.columns)))
+        }
     }
 }

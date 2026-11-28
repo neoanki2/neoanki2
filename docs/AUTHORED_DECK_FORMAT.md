@@ -10,7 +10,7 @@ parent: Reference
 ## 1. Status and purpose
 
 This document is the normative specification for NeoAnki Authored Deck Format
-version 6. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
+version 7. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
 **SHOULD NOT**, and **MAY** are interpreted as in RFC 2119 and RFC 8174.
 
 The format is an import-only, text-based source representation for coding
@@ -334,3 +334,29 @@ media object with `path` and `alt`), `mode`, `masks`, and `nextGroup`. Mask shap
 and validation follow [portable image occlusion](PORTABLE_DECK_FORMAT.md#version-6-image-occlusion).
 The media path remains confined beneath the bundle's `media/` directory.
 Versions 1–5 continue to be accepted for their existing capabilities.
+
+
+## Version 7 lists and responses
+
+An item type may declare `lists`. Each list has an author-defined `id`,
+`name`, and ordered `columns`, using the same field descriptors as item fields.
+Column identifiers must be unique across the item type, including item fields.
+Supported column types are `text`, `richText`, `number`, `checkbox`, and `cloze`.
+A checkbox value is `{"checkbox": true}` or `{"checkbox": false}`.
+
+An optional `sharedRows` array defines rows available to every item of that type.
+Omit it to define rows on individual items. The item's `lists` object maps
+list identifiers to row arrays. Each row contains a `fields` object keyed by
+column ID. An optional UUID `id` identifies the row. NeoAnki generates an ID
+when it is omitted.
+
+A template may specify `"createCardsFrom": {"lists": ["examples"], "checked":
+["recognition"], "startSuspended": true}`. The selected lists produce one card
+per row combination. An empty list selection uses the item directly. All
+`checked` fields must be checked. The existing `generateWhen` expression can
+also reference columns from selected lists.
+
+Template `response` accepts `onYourOwn`, `type`, `choose`, `arrange`,
+`record`, or `audioSubmission`. With a Cloze or Image Occlusion prompt,
+use `onYourOwn` or `type`. The existing `interaction` selects the prompt
+format and supplies the default response when `response` is omitted.

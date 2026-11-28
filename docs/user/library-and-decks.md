@@ -77,9 +77,10 @@ If you choose **Create Cards**, the new set belongs to the deck you select or
 to **Unassigned**.
 
 The app icon's due-count badge always uses **All Decks**, including Unassigned.
-It counts cards available to study, excluding suspended cards and new cards
-deferred by daily limits. Changing a deck's limit updates that total; selecting
-a different scope does not. The badge clears when the library has no due cards.
+It counts cards available to study, excluding branches opted out of All Decks
+study, suspended cards, and new cards deferred by daily limits. Changing a
+deck's settings can update that total. Selecting a different scope leaves it
+unchanged. The badge clears when All Decks has no cards due.
 
 ## Create a top-level deck
 
@@ -124,6 +125,14 @@ subdecks. The order and hierarchy persist after relaunching the app.
 For a non-drag alternative, Control-click a deck and open **Move**. You can move
 it up or down among siblings, out one level, to the top level, or directly into
 another eligible deck. VoiceOver exposes move actions on each deck row as well.
+
+## Study a deck separately
+
+In **Deck Settings**, turn off **Include in All Decks study** and save. The
+deck and its subdecks are left out of the All Decks study queue and due count.
+Open the deck and choose **Study** to review it at its usual due dates. Its
+items still appear when you browse All Decks. This is useful for practice
+that requires an instrument or other equipment.
 
 ## Set a daily new-card limit
 

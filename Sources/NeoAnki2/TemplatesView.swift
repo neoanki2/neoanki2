@@ -524,6 +524,7 @@ extension FieldType {
         case .gif: "GIF"
         case .video: "Video"
         case .number: "Number"
+        case .checkbox: "Checkbox"
         case .studyExercise: "Study exercise"
         case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"

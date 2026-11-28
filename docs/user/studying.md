@@ -54,7 +54,7 @@ visible, and the revealed answer and its supporting text use their normal
 reading size. Existing Card setups keep their current display unless this
 option is enabled.
 
-NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. The home screen shows the number of cards due, or **You’re caught up** when none are due; future cards are not included.
+NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. **All Decks** skips branches whose [Include in All Decks study setting](../library-and-decks/#study-a-deck-separately) is off. The home screen shows the number of cards due, or **You’re caught up** when none are due; future cards are not included.
 
 [![A card prompt before reveal]({{ site.baseurl }}/assets/screenshots/study-prompt.png)]({{ site.baseurl }}/assets/screenshots/study-prompt.png)
 
