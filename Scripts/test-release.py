@@ -640,6 +640,14 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.api.versions[0]['attributes']['versionString'],'1.0.320')
         self.assertEqual(self.api.attached['version']['id'],'binary')
         self.assertEqual(self.receipt['status'],'submitted')
+    def test_cancelled_submission_can_disappear_before_the_replacement_is_submitted(self):
+        self.api.prior_review()
+        with self.assertRaises(Pending):self.publisher.submit()
+        self.api.versions[0]['attributes']['appStoreState']='DEVELOPER_REJECTED'
+        self.api.subs.clear()
+        self.publisher.submit()
+        self.assertEqual(self.api.versions[0]['attributes']['versionString'],'1.0.320')
+        self.assertEqual(self.receipt['status'],'submitted')
     def test_cancel_does_not_remove_other_review_items(self):
         self.api.prior_review();self.api.children['prior'].append({'attributes':{'state':'IN_REVIEW'},'relationships':{'appStoreVersion':{'data':{'id':'another'}}}})
         with self.assertRaisesRegex(ValueError,'other items'):self.publisher.submit()
