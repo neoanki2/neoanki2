@@ -17,9 +17,10 @@ public enum ContextExamplePreset {
     public static let metadata = FieldDef(id: id("8109"), name: "Context provenance", type: .text)
     public static let group = FieldDef(id: id("8110"), name: "Context set", type: .text)
     public static func authoringFields(in type: ItemType) -> [FieldDef] {
-        guard type.id == typeID || (type.fields.contains { $0.name == metadata.name } && type.fields.contains { $0.name == group.name }) else { return VocabularySet.authoringFields(in: type) }
+        let fields = VocabularySet.authoringFields(in: type)
+        guard type.id == typeID || (type.fields.contains { $0.name == metadata.name } && type.fields.contains { $0.name == group.name }) else { return fields }
         let internalNames = Set([metadata.name, group.name, listening.name])
-        return type.fields.filter { !internalNames.contains($0.name) && ![metadata.id, group.id, listening.id].contains($0.id) }
+        return fields.filter { !internalNames.contains($0.name) && ![metadata.id, group.id, listening.id].contains($0.id) }
     }
     public static var itemType: ItemType {
         let answer: [TemplateComponent] = [
@@ -77,9 +78,7 @@ public enum ContextDerivedContent {
               case let .text(json, _)? = original.value(for: metadataField.id),
               var metadata = try? JSONDecoder().decode(SavedContextMetadata.self, from: Data(json.utf8)),
               metadata.format == "neoanki-context-example",
-              let contextField = type.fields.first(where: { $0.id == ContextExamplePreset.context.id || $0.name == ContextExamplePreset.context.name }) else { return candidate }
-        let previousSentence = text(in: original.value(for: contextField.id))
-        let sentence = text(in: candidate.value(for: contextField.id))
+              let (previousSentence, sentence) = sentences(original: original, candidate: candidate, type: type) else { return candidate }
         guard sentence != previousSentence else { return candidate }
         let mediaFields = type.fields.filter {
             $0.id == ContextExamplePreset.audio.id || $0.name == ContextExamplePreset.audio.name
@@ -105,6 +104,26 @@ public enum ContextDerivedContent {
         }
         return updated
     }
+
+    private static func sentences(original: Item, candidate: Item, type: ItemType) -> (String, String)? {
+        func isContext(_ field: FieldDef) -> Bool {
+            field.id == ContextExamplePreset.context.id || field.name == ContextExamplePreset.context.name
+        }
+        if let field = type.fields.first(where: isContext) {
+            return (text(in: original.value(for: field.id)), text(in: candidate.value(for: field.id)))
+        }
+        for list in type.lists {
+            guard let field = list.columns.first(where: isContext),
+                  let row = list.rows(in: original).first(where: { row in
+                      row.values.contains { $0.fieldID == field.id && !$0.value.isEmpty }
+                  }) else { continue }
+            let changed = list.rows(in: candidate).first { $0.id == row.id }
+            return (text(in: row.values.first { $0.fieldID == field.id }?.value),
+                    text(in: changed?.values.first { $0.fieldID == field.id }?.value))
+        }
+        return nil
+    }
+
     private static func text(in value: ContentValue?) -> String {
         switch value {
         case let .text(value, _), let .cloze(value, _): value

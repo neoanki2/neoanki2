@@ -1,7 +1,7 @@
-import AVFoundation
 import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiFeatures
+import NeoAnkiSharedUI
 import SwiftUI
 
 struct SavedResponsesView: View {
@@ -104,7 +104,9 @@ struct SavedResponsesView: View {
             Button {
                 play(response)
             } label: {
-                Image(systemName: player.playingID == response.id ? "stop.fill" : "play.fill")
+                AudioPlaybackLabel(isPlaying: player.playingID == response.id, activeAction: .stop,
+                                   playTitle: "Play Recording", activeTitle: "Stop Recording")
+                    .labelStyle(.iconOnly)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -155,46 +157,11 @@ struct SavedResponsesView: View {
     }
 
     private func play(_ response: StudyResponse) {
-        Task {
-            do {
-                let data = try await model.audioData(for: response)
-                try player.toggle(response: response, data: data)
-            } catch {
-                player.errorMessage = error.localizedDescription
-            }
-        }
+        Task { await player.toggle(id: response.id) { try await model.audioData(for: response) } }
     }
 
     private func duration(_ milliseconds: Int) -> String {
         let seconds = milliseconds / 1_000
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
-    }
-}
-
-@MainActor @Observable
-private final class SavedResponsePlayer: NSObject, AVAudioPlayerDelegate {
-    var playingID: UUID?
-    var errorMessage: String?
-    private var audioPlayer: AVAudioPlayer?
-
-    func toggle(response: StudyResponse, data: Data) throws {
-        if playingID == response.id { stop(); return }
-        stop()
-        let player = try AVAudioPlayer(data: data)
-        player.delegate = self
-        player.prepareToPlay()
-        guard player.play() else { throw CocoaError(.fileReadUnknown) }
-        audioPlayer = player
-        playingID = response.id
-    }
-
-    func stop() {
-        audioPlayer?.stop()
-        audioPlayer = nil
-        playingID = nil
-    }
-
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in self.stop() }
     }
 }

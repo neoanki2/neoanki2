@@ -69,50 +69,6 @@ private struct ReviewMediaConfiguration: Equatable {
     let reduceMotion: Bool
 }
 
-struct AudioPlayerView: View {
-    let url: URL
-    let behavior: MediaBehavior
-    let altText: String?
-    let reduceMotion: Bool
-
-    @State private var playback = ReviewMediaPlayer()
-
-    var body: some View {
-        VStack(spacing: DesignSystem.Spacing.xs) {
-            if let player = playback.player {
-                if behavior == .playOnTap {
-                    Button {
-                        playback.replay()
-                    } label: {
-                        Label("Play Audio", systemImage: "play.fill")
-                            .frame(maxWidth: .infinity, minHeight: 32)
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityLabel(playButtonAccessibilityLabel)
-                } else {
-                    MacMediaPlayerView(player: player)
-                        .frame(height: 44)
-                        .accessibilityLabel(altText ?? "Audio")
-                }
-            } else {
-                ProgressView()
-                    .frame(height: 44)
-                    .accessibilityLabel("Loading audio")
-            }
-        }
-        .trackingLearningTimePlayback(playback.player)
-        .task(id: ReviewMediaConfiguration(url: url, behavior: behavior, reduceMotion: reduceMotion)) {
-            playback.configure(url: url, kind: .audio, behavior: behavior, reduceMotion: reduceMotion)
-        }
-        .onDisappear { playback.reset() }
-    }
-
-    private var playButtonAccessibilityLabel: String {
-        guard let altText, !altText.isEmpty, altText != "Audio" else { return "Play audio" }
-        return "Play audio, \(altText)"
-    }
-}
-
 struct ImageMediaView: View {
     let url: URL
     let kind: MediaKind
@@ -285,7 +241,6 @@ struct ResolvedMediaView: View {
     let store: MediaStore?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.academyCardAudioReplay) private var academyCardAudioReplay
     @State private var resolvedURL: URL?
     @State private var resolutionError: String?
 
@@ -337,11 +292,7 @@ struct ResolvedMediaView: View {
         switch ref.kind {
         case .audio:
             let description = ReviewMediaAccessibility.description(for: ref, isAnswerRevealed: isAnswerRevealed)
-            if let academyCardAudioReplay, presentation.media != .loop {
-                CardAudioButton(description: description) { try academyCardAudioReplay(url) }
-            } else {
-                AudioPlayerView(url: url, behavior: presentation.media, altText: description, reduceMotion: reduceMotion)
-            }
+            AudioClipView(url: url, behavior: presentation.media, description: description)
         case .image, .gif:
             ImageMediaView(
                 url: url,

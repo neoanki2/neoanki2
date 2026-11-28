@@ -218,13 +218,11 @@ extension ItemStore {
                 reusedCount += 1
                 continue
             }
-            // The extended preset adds only optional fields and one setup that
-            // requires a course sentence. Neither schema changes existing cards.
+            // Extra setups require their own row fields, so optional additions
+            // can share the standard Vocabulary Set without changing the existing cards.
             let source = record.itemType
             if let existing = existingTypes.first(where: { $0.id == source.id }),
-               VocabularySet.supportsDefinition(existing), VocabularySet.supportsDefinition(source),
-               existing != source, existing == VocabularySet.itemType || source == VocabularySet.itemType {
-                let expanded = source == VocabularySet.itemType ? existing : source
+               existing != source, let expanded = VocabularySet.extending(existing, with: source) {
                 if expanded != existing { expandedVocabularyPreset = expanded }
                 expectedVocabularyPreset = existing
                 typeMap[source.id] = expanded

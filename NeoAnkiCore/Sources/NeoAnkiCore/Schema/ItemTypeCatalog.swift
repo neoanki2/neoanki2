@@ -267,6 +267,14 @@ struct ItemTypeContentMapping {
     private let lists: [UUID: (id: UUID, columns: [UUID: UUID])]
 
     init(source: ItemType, destination: ItemType) {
+        if source.id == destination.id, VocabularySet.supportsDefinition(source), VocabularySet.supportsDefinition(destination),
+           (source.fields + source.lists.flatMap(\.columns)).allSatisfy({ destination.sourceField($0.id) == $0 }) {
+            fieldIDs = Dictionary(uniqueKeysWithValues: source.fields.map { ($0.id, $0.id) })
+            lists = Dictionary(uniqueKeysWithValues: source.lists.map { list in
+                (list.id, (list.id, Dictionary(uniqueKeysWithValues: list.columns.map { ($0.id, $0.id) })))
+            })
+            return
+        }
         fieldIDs = Dictionary(uniqueKeysWithValues: zip(source.fields.map(\.id), destination.fields.map(\.id)))
         lists = Dictionary(uniqueKeysWithValues: zip(source.lists, destination.lists).map { source, destination in
             (source.id, (destination.id, Dictionary(uniqueKeysWithValues: zip(source.columns.map(\.id), destination.columns.map(\.id)))))

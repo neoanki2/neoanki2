@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import NeoAnkiCore
+import NeoAnkiSharedUI
 
 @MainActor
 protocol RecordingPermissionProviding {
@@ -74,27 +75,7 @@ private final class AVRecorderBox: AudioRecording {
     }
 }
 
-@MainActor
-private final class AVPlayerBox: NSObject, AudioPlayback, AVAudioPlayerDelegate {
-    private let player: AVAudioPlayer
-    private let onFinish: (Bool) -> Void
-
-    init(url: URL, onFinish: @escaping (Bool) -> Void) throws {
-        player = try AVAudioPlayer(contentsOf: url)
-        self.onFinish = onFinish
-        super.init()
-        player.delegate = self
-    }
-
-    func play() -> Bool { player.play() }
-    func stop() { player.stop() }
-
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor [weak self] in
-            self?.onFinish(flag)
-        }
-    }
-}
+extension RecordedAudioPlayback: AudioPlayback {}
 
 @MainActor
 struct SystemStudyAudioFactory: StudyAudioFactory {
@@ -107,7 +88,7 @@ struct SystemStudyAudioFactory: StudyAudioFactory {
     }
 
     func makePlayer(url: URL, onFinish: @escaping (Bool) -> Void) throws -> any AudioPlayback {
-        try AVPlayerBox(url: url, onFinish: onFinish)
+        try RecordedAudioPlayback(url: url, onFinish: onFinish)
     }
 }
 

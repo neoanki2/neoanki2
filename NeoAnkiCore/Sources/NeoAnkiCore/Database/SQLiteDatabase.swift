@@ -2640,7 +2640,8 @@ actor SQLiteDatabase {
                 try insertItemType(itemType)
             }
             if let expanded = expandedVocabularyPreset {
-                guard try fetchValidatedItemType(id: expanded.id) == VocabularySet.itemType else {
+                guard let current = try fetchValidatedItemType(id: expanded.id),
+                      VocabularySet.extending(current, with: expanded) == expanded else {
                     throw DatabaseError.invalidItemType("The Vocabulary Set changed during import. Try again.")
                 }
                 try updateItemType(expanded)

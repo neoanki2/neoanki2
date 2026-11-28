@@ -272,10 +272,11 @@ answer, blurred, played on tap, autoplayed, or looped:
 
 - Images scale to the reading column and can be hidden or blurred.
 - GIFs can remain still, play on tap, autoplay, or loop.
-- Audio uses native playback controls or a Play Audio button.
+- Audio uses the same **Play Audio** and **Pause Audio** controls on Mac,
+  iPhone, and iPad. Clips with a playback position slider can be scrubbed.
 - Video uses the native video player.
 
-Autoplay and GIF animation are suppressed when macOS Reduce Motion is enabled.
+Audio autoplay and GIF animation are suppressed when Reduce Motion is enabled.
 These behaviors come from the item type's Card setup; they are not selected in
 the item editor.
 

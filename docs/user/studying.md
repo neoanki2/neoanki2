@@ -310,6 +310,8 @@ for confirmation. A save error keeps the draft available for retry. Retrying
 the same save safely reuses the completed response if the first confirmation
 was interrupted, rather than creating a duplicate. Recordings stop automatically
 at 30 minutes and remain subject to the 20 MB audio limit.
+Use **Play Recording** to listen to a saved response and **Stop Recording**
+to end playback. Card audio uses **Play Audio** and **Pause Audio**.
 
 ### Cloze
 

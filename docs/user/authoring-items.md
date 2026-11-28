@@ -126,8 +126,10 @@ sentence, **Generate Example** uses Apple Intelligence on supported devices and
 languages. Generated examples are labeled in the preview. The selected source
 is saved with the item.
 
-Existing **Context Example** items remain editable and studyable, with their
-audio and review history. They follow the [related-card scheduling rules](../studying/#study-queue-order).
+Existing **Context Example** items remain editable and studyable. In a
+Vocabulary Set, edit the source text in **Examples**. Its recording and
+provenance stay with the item, and its cards continue to follow the
+[related-card scheduling rules](../studying/#study-queue-order).
 
 ## Create image occlusion items
 
