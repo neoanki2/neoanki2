@@ -1,7 +1,12 @@
 import Foundation
 
 enum Schema {
-    static let version = 35
+    static let version = 37
+
+    static let allDecksStudyExclusionIndex = """
+        CREATE INDEX IF NOT EXISTS idx_decks_excluded_from_all_study
+        ON decks(include_in_all_decks_study) WHERE include_in_all_decks_study = 0;
+        """
 
     static let vocabularyStatements = [
         """
@@ -149,6 +154,7 @@ enum Schema {
             deck_id TEXT,
             cloze_group INTEGER,
             occlusion_group INTEGER,
+            row_selections BLOB,
             memory_model_version TEXT,
             memory_parameter_set_id TEXT,
             scheduling_history_origin REAL
@@ -202,9 +208,11 @@ enum Schema {
             name TEXT NOT NULL,
             parent_id TEXT REFERENCES decks(id),
             new_cards_per_day INTEGER CHECK(new_cards_per_day >= 0),
-            sort_position INTEGER NOT NULL DEFAULT 0
+            sort_position INTEGER NOT NULL DEFAULT 0,
+            include_in_all_decks_study INTEGER NOT NULL DEFAULT 1 CHECK(include_in_all_decks_study IN (0, 1))
         );
         """,
+        allDecksStudyExclusionIndex,
         """
         CREATE TABLE IF NOT EXISTS new_card_introductions (
             review_log_id TEXT PRIMARY KEY NOT NULL REFERENCES review_logs(id),

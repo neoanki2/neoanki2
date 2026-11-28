@@ -743,6 +743,7 @@ private struct DeckSettingsMobileView: View {
     @State private var parentID: UUID?
     @State private var limitEnabled = false
     @State private var newCardLimit = 20
+    @State private var includeInAllDecksStudy = true
     @State private var errorMessage: String?
     @State private var typesRevision = 0
     @State private var typeStudio: ItemTypesFeatureModel?
@@ -765,6 +766,13 @@ private struct DeckSettingsMobileView: View {
                             Task { typeStudio = await model.features.openItemType(id: type.id, deckID: deckID) }
                         })
                     }
+                }
+                Section {
+                    Toggle("Include in All Decks study", isOn: $includeInAllDecksStudy)
+                } header: {
+                    Text("Study")
+                } footer: {
+                    Text("Turn off to keep this deck and its subdecks out of All Decks study. You can still open and study them directly.")
                 }
                 Section("Daily New Cards") {
                     Toggle("Limit new cards", isOn: $limitEnabled)
@@ -797,8 +805,25 @@ private struct DeckSettingsMobileView: View {
             .alert("Could Not Update Deck", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
         }
     }
-    private func load() async { if let deck = try? await model.deck(id: deckID) { name = deck.name; parentID = deck.parentID; limitEnabled = deck.newCardsPerDay != nil; newCardLimit = deck.newCardsPerDay ?? 20 } }
-    private func save() async { do { try await model.updateDeck(id: deckID, name: name, parentID: parentID, newCardsPerDay: limitEnabled ? newCardLimit : nil); dismiss() } catch { errorMessage = MobileAppModel.message(for: error) } }
+    private func load() async {
+        guard let deck = try? await model.deck(id: deckID) else { return }
+        name = deck.name
+        parentID = deck.parentID
+        limitEnabled = deck.newCardsPerDay != nil
+        newCardLimit = deck.newCardsPerDay ?? 20
+        includeInAllDecksStudy = deck.includeInAllDecksStudy
+    }
+
+    private func save() async {
+        do {
+            try await model.updateDeck(id: deckID, name: name, parentID: parentID,
+                                       newCardsPerDay: limitEnabled ? newCardLimit : nil,
+                                       includeInAllDecksStudy: includeInAllDecksStudy)
+            dismiss()
+        } catch {
+            errorMessage = MobileAppModel.message(for: error)
+        }
+    }
     private func deleteDeck() async {
         do {
             try await model.deleteDeck(id: deckID, policy: .unassignItems)

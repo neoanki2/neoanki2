@@ -11,6 +11,7 @@ struct AddItemView: View {
     let editingItemType: ItemType?
     var onDismiss: () -> Void = {}
 
+    @State private var confirmsCardRetirement = false
     @State private var snapshot = ItemEditorState.empty(for: nil)
     @State private var occlusionDraftReferences: [MediaRef] = []
     @State private var actionError: String?
@@ -74,6 +75,14 @@ struct AddItemView: View {
                         fieldEditor(for: field)
                     }
                 }
+                listSections(itemType)
+            }
+
+            if let candidate = cardPreviewCandidate, let itemType {
+                Section("Card changes") {
+                    Text(CardCreationSummary.message(for: CardCreationSummary.preview(candidate, type: itemType, original: editingItem)))
+                    ItemGeneratedCardPreview(item: candidate, type: itemType, mediaStore: model.mediaStore)
+                }
             }
 
             if let errorMessage = actionError ?? saveOperation.error?.message ?? model.errorMessage {
@@ -98,7 +107,8 @@ struct AddItemView: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
-                    Task { await save() }
+                    if (cardPreview?.retired ?? 0) > 0 { confirmsCardRetirement = true }
+                    else { Task { await save() } }
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
@@ -125,6 +135,12 @@ struct AddItemView: View {
                 await model.configureAddItem(for: selectedDeckID, resolveSelection: false)
                 addItemTypeBinding.wrappedValue = type.id
             }
+        }
+        .confirmationDialog("Save card changes?", isPresented: $confirmsCardRetirement, titleVisibility: .visible) {
+            Button("Save Changes", role: .destructive) { Task { await save() } }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            if let cardPreview { Text(CardCreationSummary.message(for: cardPreview)) }
         }
         .confirmationDialog("Use this type in the new deck?", isPresented: $showDeckChangeConfirmation, titleVisibility: .visible) {
             if pendingDeckID != nil {
@@ -178,6 +194,18 @@ struct AddItemView: View {
         }
     }
 
+    private func listSections(_ type: ItemType) -> some View {
+        ForEach(type.lists.filter { $0.sharedRows == nil }) { list in
+            Section(list.name) {
+                ItemListRowsEditor(list: VocabularySet.authoringList(list, in: type), rows: listRowsBinding(list.id))
+            }
+        }
+    }
+
+    private func listRowsBinding(_ id: UUID) -> Binding<[ItemListRow]> {
+        Binding(get: { snapshot.listRows[id] ?? [] }, set: { snapshot.listRows[id] = $0 })
+    }
+
     @ViewBuilder
     private func fieldEditor(for field: FieldDef) -> some View {
         switch field.type {
@@ -191,6 +219,11 @@ struct AddItemView: View {
         case .studyExercise:
             StudyExerciseFieldEditor(label: fieldLabel(field), text: textBinding(for: field.id),
                                      defaultMode: itemType?.preferredStudyExerciseMode ?? .target)
+        case .checkbox:
+            Toggle(fieldLabel(field), isOn: Binding(
+                get: { snapshot.fieldText[field.id] == "true" },
+                set: { snapshot.fieldText[field.id] = String($0) }
+            ))
         case .number:
             TextField(fieldLabel(field), text: textBinding(for: field.id))
                 .focused($focusedFieldID, equals: field.id)
@@ -268,6 +301,7 @@ struct AddItemView: View {
             || snapshot.fieldText.values.contains {
                 !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             }
+            || snapshot.listRows.values.contains { !$0.isEmpty }
             || !snapshot.fieldOcclusions.isEmpty
             || !snapshot.fieldMedia.isEmpty
             || snapshot.fieldMediaAltText.values.contains {
@@ -387,6 +421,18 @@ struct AddItemView: View {
         }
     }
 
+    private var cardPreview: CardCreationPreview? {
+        guard let itemType, let candidate = cardPreviewCandidate else { return nil }
+        return CardCreationSummary.preview(candidate, type: itemType, original: editingItem)
+    }
+
+    private var cardPreviewCandidate: Item? {
+        guard let itemType, itemType.templates.contains(where: { $0.cardCreation != nil }),
+              let fields = try? ItemEditorState.fields(from: snapshot, itemType: itemType, preserving: editingItem)
+        else { return nil }
+        return Item(id: editingItem?.id ?? itemType.id, itemTypeID: itemType.id, fields: fields, deckID: selectedDeckID)
+    }
+
     private func save() async {
         guard !isSaving, processingAttachments == 0 else { return }
         let didSave: Bool? = await saveOperation.perform {
@@ -399,7 +445,8 @@ struct AddItemView: View {
                     fieldMedia: snapshot.fieldMedia,
                     fieldMediaAltText: snapshot.fieldMediaAltText,
                     fieldClozeBlanks: snapshot.fieldClozeBlanks,
-                    fieldOcclusions: snapshot.fieldOcclusions
+                    fieldOcclusions: snapshot.fieldOcclusions,
+                    listRows: snapshot.listRows
                 )
             } else {
                 result = await model.addItem(
@@ -409,6 +456,7 @@ struct AddItemView: View {
                     fieldMediaAltText: snapshot.fieldMediaAltText,
                     fieldClozeBlanks: snapshot.fieldClozeBlanks,
                     fieldOcclusions: snapshot.fieldOcclusions,
+                    listRows: snapshot.listRows,
                     deckID: selectedDeckID
                 )
             }

@@ -17,7 +17,7 @@ public struct StudyExerciseCard: View {
     }
 
     private var content: StudyAnswerReviewProjection {
-        StudyAnswerReviewProjection(components: SideContent.resolvedComponents(for: card.template, from: card.item))
+        StudyAnswerReviewProjection(components: card.studyComponents)
     }
 
     public var body: some View {

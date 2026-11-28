@@ -979,3 +979,29 @@ func synchronizedImagesSurviveExpiryAndUnrelatedDeletion(mediaArrivesLater: Bool
     #expect(try await destination.repository.reviewLog(id: review.reviewLogID).rating == .good)
     #expect(try await destination.repository.item(id: item.id)?.item.value(for: field.id) == .studyExercise(exercise))
 }
+
+@Test func initialSyncPreservesListRowsGeneratedCardsAndTypedResponse() async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+
+    let draft = VocabularySetDraft(term: .init(language: "it", expression: "fiume"),
+                                   meaning: "river", meaningLanguage: "en", sentence: "Il fiume scorre veloce.")
+    let itemID = try await source.repository.createVocabularySet(draft, id: UUID())
+    let sourceCards = try await source.repository.cards().filter { $0.itemID == itemID }
+    let snapshot = try await SQLiteLibrarySyncAdapter(repository: source.repository).initialMerge(remote: [], deviceID: "source")
+    _ = try await SQLiteLibrarySyncAdapter(repository: destination.repository).initialMerge(remote: snapshot, deviceID: "destination")
+
+    let imported = try #require(try await destination.repository.item(id: itemID))
+    #expect(imported.itemType == VocabularySet.itemType)
+    #expect(imported.itemType.lists.first?.rows(in: imported.item).count == 1)
+    let importedCards = try await destination.repository.cards().filter { $0.itemID == itemID }
+    #expect(importedCards == sourceCards)
+    let production = try #require(importedCards.first { $0.templateID == VocabularySet.productionID })
+    let template = try #require(imported.itemType.templates.first { $0.id == production.templateID })
+    let due = DueCard(card: production, item: imported.item, itemType: imported.itemType, template: template)
+    #expect(due.response == .type)
+    #expect(StudyResponseEvaluator.evaluate("fiume", for: due) == .correct)
+}

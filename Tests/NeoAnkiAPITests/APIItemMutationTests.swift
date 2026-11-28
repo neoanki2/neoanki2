@@ -750,3 +750,54 @@ import Testing
     #expect(empty.status == 200)
     #expect(try await store.authoringItemTypes(for: deck.id).usesSharedFallback)
 }
+
+@Test func itemTypeAndItemAPIRoundTripGeneratedRowCards() async throws {
+    let (api, store) = try await makeAPIAndStore()
+    let token = try await pair(api, scopes: ["library.read", "items.write", "schemas.write", "study.review"])
+    let auth = ["Authorization": "Bearer \(token)"]
+    let type = UUID().uuidString.lowercased()
+    let prompt = UUID().uuidString.lowercased()
+    let list = UUID().uuidString.lowercased()
+    let column = UUID().uuidString.lowercased()
+    let flag = UUID().uuidString.lowercased()
+    let row = UUID().uuidString.lowercased()
+    let template = UUID().uuidString.lowercased()
+    let typeInput = """
+    {"id":"\(type)","name":"List API test",
+     "fields":[{"id":"\(prompt)","name":"Prompt","type":"text","isRequired":true}],
+     "lists":[{"id":"\(list)","name":"Pitches","columns":[
+        {"id":"\(column)","name":"Pitch","type":"text","isRequired":true},
+        {"id":"\(flag)","name":"Make card","type":"checkbox","isRequired":true}]}],
+     "templates":[{"id":"\(template)","name":"Pitch","interaction":"reveal","responseOverride":"type",
+        "prompt":[{"source":{"kind":"field","fieldId":"\(prompt)"},"presentation":{"reveal":"always","media":"default"}}],
+        "answer":[{"source":{"kind":"field","fieldId":"\(column)"},"presentation":{"reveal":"hiddenUntilAnswer","media":"default"}}],
+        "skill":{"input":"text","output":"text","operation":"recall"},
+        "cardCreation":{"listIds":["\(list)"],"checkedFieldIds":["\(flag)"],"startSuspended":false}}]}
+    """
+    func post(_ path: String, body: String, key: String) async -> APIResponse {
+        await api.handle(request(.post, path, headers: auth.merging(["Idempotency-Key": key]) { _, new in new }, body: body))
+    }
+    let createdType = await post("/v1/item-types", body: typeInput, key: "row-card-type")
+    #expect(createdType.status == 201, "\(String(decoding: createdType.body, as: UTF8.self))")
+    let representation = try jsonObject(createdType)
+    let savedTemplates = try #require(representation["templates"] as? [[String: Any]])
+    let creation = try #require(savedTemplates.first?["cardCreation"] as? [String: Any])
+    #expect(creation["listIds"] as? [String] == [list])
+    let itemInput = """
+    {"itemTypeId":"\(type)","tags":[],"fields":[
+        {"fieldId":"\(prompt)","value":{"type":"text","text":"Name the pitch."}},
+        {"fieldId":"\(list)","value":{"type":"rows","rows":[{"id":"\(row)","values":[
+            {"fieldId":"\(column)","value":{"type":"text","text":"C"}},
+            {"fieldId":"\(flag)","value":{"type":"checkbox","checked":true}}]}]}}]}
+    """
+    let createdItem = await post("/v1/items", body: itemInput, key: "row-card-item")
+    #expect(createdItem.status == 201, "\(String(decoding: createdItem.body, as: UTF8.self))")
+    let payload = try jsonObject(createdItem)
+    let itemId = try #require((payload["id"] as? String).flatMap(UUID.init(uuidString:)))
+    let saved = try #require(try await store.fetchItem(id: itemId))
+    let due = try #require(try await store.fetchDueCards().first { $0.item.id == itemId })
+    #expect(due.response == .type)
+    #expect(due.card.rowSelections.first?.rowID.uuidString.lowercased() == row)
+    #expect(StudyResponseEvaluator.evaluate("C", for: due) == .correct)
+    #expect(saved.itemType.lists.first?.rows(in: saved.item).count == 1)
+}

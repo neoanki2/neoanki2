@@ -56,6 +56,57 @@ import Testing
         try await parity(StudyDay.nextRollover(after: now, rolloverMinutes: 240))
     }
 
+    @Test func excludesBranchFromAllDecksStudyWithoutHidingItsItemsOrDirectStudy() async throws {
+        let (store, root) = try await fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let parent = try await store.createDeck(Deck(name: "Music", newCardsPerDay: 1))
+        var practice = try await store.createDeck(Deck(name: "Piano Practice", parentID: parent.id))
+        let scales = try await store.createDeck(Deck(name: "Scales", parentID: practice.id))
+        let older = now.addingTimeInterval(-60)
+        let unrelated = try await store.createItem(item("Unassigned"), now: now)
+        let theory = try await store.createItem(item("Theory", deck: parent.id), now: now)
+        let exercise = try await store.createItem(item("Scale", deck: scales.id), now: older)
+        _ = try await store.createItem(item("Future scale", deck: scales.id), now: now.addingTimeInterval(30))
+        #expect(try await store.fetchDueCards(asOf: now).contains { $0.item.id == exercise.id })
+        _ = try await store.dueSnapshot(activeScope: .allDecks, asOf: now)
+
+        practice.includeInAllDecksStudy = false
+        _ = try await store.updateDeck(practice)
+
+        let all = try await store.fetchDueCards(asOf: now)
+        #expect(Set(all.map(\.item.id)) == Set([unrelated.id, theory.id]))
+        #expect(try await store.dueCount(asOf: now) == 2)
+        #expect(try await store.scopeSummary(asOf: now).dueNow == 2)
+        #expect(try await store.scopeSummary(asOf: now).itemCount == 4)
+        #expect(try await store.listItems().contains { $0.id == exercise.id })
+        let snapshot = try await store.dueSnapshot(activeScope: .allDecks, asOf: now)
+        #expect(snapshot.total == 2)
+        #expect(snapshot.activeScopeCount == 2)
+        #expect(snapshot.decks[scales.id] == 1)
+        #expect(snapshot.nextStudyAt == nil)
+        #expect(snapshot.validUntil == now.addingTimeInterval(30))
+        #expect(try await store.studyAvailability(asOf: now).nextStudyAt == nil)
+
+        let direct = try #require(try await store.fetchDueCards(scope: .deck(practice.id), asOf: now).first)
+        #expect(direct.item.id == exercise.id)
+        #expect(try await store.isNewStudyCardEligible(cardID: direct.id, scope: .deck(practice.id), asOf: now))
+        #expect(try await !store.isNewStudyCardEligible(cardID: direct.id, scope: .allDecks, asOf: now))
+        #expect(try await store.dueSnapshot(activeScope: .deck(practice.id), asOf: now).activeScopeCount == 1)
+
+        practice.includeInAllDecksStudy = true
+        try await store.applySynchronizedBatch([.deck(practice)])
+        #expect(try await store.fetchDueCards(asOf: now).contains { $0.id == direct.id })
+        #expect(try await store.deck(id: practice.id).includeInAllDecksStudy)
+    }
+
+    @Test func legacyDeckPayloadDefaultsToInclusion() throws {
+        let legacy = Data(#"{"id":"DA7888B6-2389-4D9A-B2E6-D9FDD7A164C8","name":"Legacy"}"#.utf8)
+        var deck = try JSONDecoder().decode(Deck.self, from: legacy)
+        #expect(deck.includeInAllDecksStudy)
+        deck.includeInAllDecksStudy = false
+        #expect(try JSONDecoder().decode(Deck.self, from: JSONEncoder().encode(deck)) == deck)
+    }
+
     @Test func cachesUntilExactDueBoundaryAndRejectsBackwardClock() async throws {
         let (store, root) = try await fixture()
         defer { try? FileManager.default.removeItem(at: root) }

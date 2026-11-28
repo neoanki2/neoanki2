@@ -38,6 +38,7 @@ extension SQLiteDatabase {
             let day = StudyDay.key(for: now, rolloverMinutes: rollover)
             let deckRecords = try fetchAllDecks()
             let parents = Dictionary(uniqueKeysWithValues: deckRecords.map { ($0.id, $0.parentID) })
+            let studyScope: CardScope = deckRecords.contains { !$0.includeInAllDecksStudy } ? .allDecksStudy : .all
             let eligible = try eligibleDueCardsCTE(scope: .all, asOf: now, studyDay: day, countsOnly: true)
             let rows = try query(eligible.sql + " SELECT deck_id, COUNT(*) AS count, SUM(phase = 'new') AS available_new FROM eligible_due GROUP BY deck_id;",
                                  bindings: eligible.bindings)
@@ -54,6 +55,13 @@ extension SQLiteDatabase {
                     counts[id, default: 0] += count
                     deckID = parents[id] ?? nil
                 }
+            }
+            if studyScope == .allDecksStudy {
+                let study = try eligibleDueCardsCTE(scope: studyScope, asOf: now, studyDay: day, countsOnly: true)
+                let row = try query(study.sql + " SELECT COUNT(*) AS count, SUM(phase = 'new') AS available_new FROM eligible_due;",
+                                    bindings: study.bindings).first
+                total = Int(row?["count"] as? Int64 ?? 0)
+                availableNew = Int(row?["available_new"] as? Int64 ?? 0)
             }
             func scopedCount(_ scope: CardScope) throws -> Int {
                 let eligible = try eligibleDueCardsCTE(scope: scope, asOf: now, studyDay: day, countsOnly: true)
@@ -79,11 +87,13 @@ extension SQLiteDatabase {
             }
             let rolloverAt = StudyDay.nextRollover(after: now, rolloverMinutes: rollover)
             let nextDue = try nextUnsuspendedCardDue(after: now)
+            let nextStudyDue = studyScope == .all ? nextDue : try nextUnsuspendedCardDue(after: now, scope: studyScope)
+            let studyFilter = scopeClause(studyScope, column: "deck_id")
             let dueNew = Int(try query("""
                 SELECT COUNT(*) AS count FROM cards INDEXED BY idx_cards_active_new_due
-                WHERE is_suspended = 0 AND phase = 'new' AND due_at <= ?;
-                """, bindings: [.double(now.timeIntervalSince1970)]).first?["count"] as? Int64 ?? 0)
-            let nextStudy = [nextDue, dueNew > availableNew ? rolloverAt : nil].compactMap { $0 }.min()
+                WHERE is_suspended = 0 AND phase = 'new' AND due_at <= ? AND \(studyFilter.sql);
+                """, bindings: [.double(now.timeIntervalSince1970)] + studyFilter.bindings).first?["count"] as? Int64 ?? 0)
+            let nextStudy = [nextStudyDue, dueNew > availableNew ? rolloverAt : nil].compactMap { $0 }.min()
             return try LibraryDueSnapshot(total: total, unassigned: unassigned, decks: counts,
                 activeScope: activeScope, activeScopeCount: selected, sourceRevision: currentChangeCursor(),
                 calculatedAt: now, validUntil: nextDue.map { min($0, rolloverAt) } ?? rolloverAt,

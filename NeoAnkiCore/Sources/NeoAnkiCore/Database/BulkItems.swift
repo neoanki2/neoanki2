@@ -68,12 +68,6 @@ enum ItemBulkDatabaseMutation: Sendable {
     case delete(id: UUID, deletedAt: Date)
 }
 
-private struct BulkCardIdentity: Hashable {
-    let templateID: UUID
-    let occlusionGroup: Int?
-    let clozeGroup: Int?
-}
-
 public extension ItemStore {
     /// Native selection deletes have no HTTP batch limit and never split a
     /// selection into separately committed chunks.
@@ -209,13 +203,13 @@ public extension ItemStore {
             let existing = try await database.fetchCards(for: source.id)
             let existingByIdentity = Dictionary(
                 existing.map {
-                    (BulkCardIdentity(templateID: $0.templateID, occlusionGroup: $0.occlusionGroup, clozeGroup: $0.clozeGroup), $0)
+                    (CardGenerationKey($0), $0)
                 },
                 uniquingKeysWith: { first, _ in first }
             )
             let finalCardIDs = planned.cards.map { card in
                 existingByIdentity[
-                    BulkCardIdentity(templateID: card.templateID, occlusionGroup: card.occlusionGroup, clozeGroup: card.clozeGroup)
+                    CardGenerationKey(card)
                 ]?.id ?? card.id
             }
             mutations.append(.replace(
@@ -348,13 +342,13 @@ public extension ItemStore {
                     let existing = try await database.fetchCards(for: source.id)
                     let existingByIdentity = Dictionary(
                         existing.map {
-                            (BulkCardIdentity(templateID: $0.templateID, occlusionGroup: $0.occlusionGroup, clozeGroup: $0.clozeGroup), $0)
+                            (CardGenerationKey($0), $0)
                         },
                         uniquingKeysWith: { first, _ in first }
                     )
                     let finalCardIDs = planned.cards.map { card in
                         existingByIdentity[
-                            BulkCardIdentity(templateID: card.templateID, occlusionGroup: card.occlusionGroup, clozeGroup: card.clozeGroup)
+                            CardGenerationKey(card)
                         ]?.id ?? card.id
                     }
                     mutations.append(.replace(

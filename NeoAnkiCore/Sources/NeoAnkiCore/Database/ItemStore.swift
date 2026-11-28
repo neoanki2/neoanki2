@@ -108,7 +108,7 @@ public struct ReviewSubmission: Sendable, Equatable {
 private extension FieldType {
     var requiresStructuredImportValue: Bool {
         switch self {
-        case .audio, .image, .gif, .video, .cloze, .imageOcclusion:
+        case .audio, .image, .gif, .video, .cloze, .imageOcclusion, .checkbox:
             true
         case .text, .richText, .number, .studyExercise:
             false
@@ -351,6 +351,7 @@ public actor ItemStore {
                 name: deck.name,
                 parentID: deck.parentID,
                 newCardsPerDay: deck.newCardsPerDay,
+                includeInAllDecksStudy: deck.includeInAllDecksStudy,
                 sortPosition: sortPositions[deck.id, default: 0],
                 itemCount: itemCount,
                 dueCount: dueCount,
@@ -386,6 +387,7 @@ public actor ItemStore {
                 name: deck.name,
                 parentID: deck.parentID,
                 newCardsPerDay: deck.newCardsPerDay,
+                includeInAllDecksStudy: deck.includeInAllDecksStudy,
                 sortPosition: sortPositions[deck.id, default: 0],
                 itemCount: 0,
                 dueCount: 0
@@ -732,7 +734,7 @@ public actor ItemStore {
     public func isNewStudyCardEligible(cardID: UUID, scope: DeckScope, asOf now: Date = .now) async throws -> Bool {
         let resolved: CardScope
         switch scope {
-        case .allDecks: resolved = .all
+        case .allDecks: resolved = .allDecksStudy
         case .unassigned: resolved = .unassigned
         case let .deck(id, includeDescendants):
             if includeDescendants {
@@ -756,7 +758,7 @@ public actor ItemStore {
         try await database.isExtraStudyCardEligible(cardID: cardID, scope: scope, asOf: now)
     }
 
-    /// Returns all due cards regardless of deck assignment.
+    /// Returns due cards for the All Decks study queue, including unassigned cards.
     public func fetchDueCards(asOf now: Date = .now, limit: Int? = nil) async throws -> [DueCard] {
         try await fetchDueCards(scope: .allDecks, asOf: now, limit: limit)
     }
@@ -966,7 +968,7 @@ public actor ItemStore {
         let resolved = try await resolveCardScope(scope, asOf: now)
         let studyDay = try await studyDayKey(asOf: now)
         let totals = try await database.cardScheduleTotals(
-            scope: resolved,
+            scope: scope == .allDecks ? .allDecksStudy : resolved,
             asOf: now,
             studyDay: studyDay,
             leechThreshold: ScopeSummary.leechThreshold
@@ -1740,7 +1742,32 @@ public actor ItemStore {
     }
 
     static func validateContent(_ item: Item, against itemType: ItemType) throws {
-        let definitions = Dictionary(uniqueKeysWithValues: itemType.fields.map { ($0.id, $0) })
+        let lists = Dictionary(uniqueKeysWithValues: itemType.lists.map { ($0.id, $0) })
+        var suppliedLists: Set<UUID> = []
+        for field in item.fields where lists[field.fieldID] != nil {
+            guard let list = lists[field.fieldID], list.sharedRows == nil,
+                  suppliedLists.insert(list.id).inserted, case let .rows(rows) = field.value else {
+                throw DatabaseError.invalidItem("The item contains an invalid list value.")
+            }
+            try validateRows(rows, in: list)
+        }
+        var scalarItem = item
+        scalarItem.fields.removeAll { lists[$0.fieldID] != nil }
+        try validateFields(scalarItem, definitions: itemType.fields)
+    }
+
+    static func validateRows(_ rows: [ItemListRow], in list: ItemList) throws {
+        var seen: Set<UUID> = []
+        for row in rows {
+            guard seen.insert(row.id).inserted else {
+                throw DatabaseError.invalidItem("List entries must have distinct IDs.")
+            }
+            try validateFields(Item(itemTypeID: list.id, fields: row.values), definitions: list.columns)
+        }
+    }
+
+    private static func validateFields(_ item: Item, definitions fields: [FieldDef]) throws {
+        let definitions = Dictionary(uniqueKeysWithValues: fields.map { ($0.id, $0) })
         var seen: Set<UUID> = []
         for fieldValue in item.fields {
             guard seen.insert(fieldValue.fieldID).inserted else {
@@ -1778,7 +1805,7 @@ public actor ItemStore {
             }
         }
 
-        for field in itemType.fields {
+        for field in fields {
             let value = item.value(for: field.id)
             if field.isRequired {
                 guard let value, !value.isEmpty else {
@@ -1799,7 +1826,7 @@ public actor ItemStore {
              (.audio, .media),
              (.image, .media), (.gif, .media), (.video, .media),
              (.number, .number), (.cloze, .cloze), (.imageOcclusion, .imageOcclusion),
-             (.studyExercise, .studyExercise):
+             (.studyExercise, .studyExercise), (.checkbox, .checkbox):
             true
         default:
             false

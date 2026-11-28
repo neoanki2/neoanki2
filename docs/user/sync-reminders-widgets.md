@@ -154,6 +154,11 @@ Background refresh updates reminder and widget information when iOS grants
 execution time. If iOS expires that work, it stops safely and can continue on a
 later refresh; opening the app remains the way to request a current summary.
 
+Custom list definitions, example rows, and generated cards sync through iCloud.
+Upgrade every device that syncs the library before creating list-based content.
+The app icon and widget use the All Decks selection when showing its due count.
+Study an excluded deck directly to see its separate queue.
+
 ## What syncs
 
 Choosing **Continue** on a Japanese Academy lesson saves its reading progress

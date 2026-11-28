@@ -381,6 +381,12 @@ public struct VocabularySetDraft: Codable, Equatable, Sendable {
     }
 }
 
+public struct VocabularySetMatch: Equatable, Sendable, Identifiable {
+    public let id: UUID
+    public let exampleCount: Int
+    public let firstExample: String
+}
+
 public enum VocabularySetError: LocalizedError {
     case invalidTerm, missingMeaning, invalidOccurrence, exposedAnswer, changedPreset, idConflict
     case invalidJudgment, batchTooLarge, batchNotFound
@@ -403,9 +409,12 @@ public enum VocabularySet {
     private static func uuid(_ suffix: String) -> UUID {
         UUID(uuidString: "B9573F82-D098-428F-A54F-DAC7A1DE\(suffix)")!
     }
-    public static let typeID = uuid("1000")
-    public static let readingID = uuid("1001")
-    public static let productionID = uuid("1002")
+    public static let legacyTypeID = uuid("1000")
+    static let legacyReadingID = uuid("1001")
+    static let legacyProductionID = uuid("1002")
+    public static let typeID = uuid("1100")
+    public static let readingID = uuid("1101")
+    public static let productionID = uuid("1102")
     private static let target = FieldDef(id: uuid("1010"), name: "Word or phrase", type: .text, isRequired: true)
     private static let reading = FieldDef(id: uuid("1011"), name: "Reading sentence", type: .richText, isRequired: true)
     private static let meaning = FieldDef(id: uuid("1012"), name: "Meaning", type: .text, isRequired: true)
@@ -419,9 +428,9 @@ public enum VocabularySet {
         let acceptedVariants: [String]
     }
 
-    public static let itemType = ItemType(id: typeID, name: "Vocabulary Set",
+    static let legacyItemType = ItemType(id: legacyTypeID, name: "Vocabulary Set",
         fields: [target, reading, meaning, cloze, metadata, source], templates: [
-            .init(id: readingID, name: "Understand in context", layout: .focus, components: [
+            .init(id: legacyReadingID, name: "Understand in context", layout: .focus, components: [
                 .init(id: uuid("1026"), region: .label, purpose: .supporting,
                       source: .literal("What does the highlighted expression mean here?")),
                 .init(id: uuid("1020"), region: .primary, purpose: .question, source: .field(reading.id)),
@@ -430,13 +439,54 @@ public enum VocabularySet {
                 .init(id: uuid("1022"), region: .supporting, purpose: .supporting, source: .field(source.id),
                       presentation: .init(reveal: .hiddenUntilAnswer)),
             ], interaction: .reveal, skill: .init(input: .text, output: .freeResponse, operation: .recall)),
-            .init(id: productionID, name: "Complete the sentence", layout: .focus, components: [
+            .init(id: legacyProductionID, name: "Complete the sentence", layout: .focus, components: [
                 .init(id: uuid("1023"), region: .primary, purpose: .question, source: .field(cloze.id)),
                 .init(id: uuid("1024"), region: .supporting, purpose: .supporting, source: .field(meaning.id)),
                 .init(id: uuid("1025"), region: .secondary, purpose: .expectedAnswer, source: .field(cloze.id),
                       presentation: .init(reveal: .hiddenUntilAnswer)),
             ], interaction: .cloze, skill: .init(input: .text, output: .freeResponse, operation: .recall)),
         ])
+
+    private static let wordField = FieldDef(id: uuid("1110"), name: target.name, type: .text, isRequired: true)
+    private static let meaningField = FieldDef(id: uuid("1112"), name: meaning.name, type: .text, isRequired: true)
+    private static let termField = FieldDef(id: uuid("1114"), name: metadata.name, type: .text, isRequired: true)
+    private static let readingColumn = FieldDef(id: uuid("1111"), name: reading.name, type: .richText)
+    private static let clozeColumn = FieldDef(id: uuid("1113"), name: cloze.name, type: .cloze)
+    private static let sourceColumn = FieldDef(id: uuid("1115"), name: source.name, type: .text)
+    private static let acceptedColumn = FieldDef(id: uuid("1116"), name: "Accepted answers", type: .richText)
+    private static let recognizeColumn = FieldDef(id: uuid("1117"), name: "Recognition", type: .checkbox)
+    private static let produceColumn = FieldDef(id: uuid("1118"), name: "Cloze card", type: .checkbox)
+    private static let originalTermColumn = FieldDef(id: uuid("1119"), name: "Original vocabulary identity", type: .text)
+    static let examples = ItemList(id: uuid("1130"), name: "Examples", columns: [
+        readingColumn, clozeColumn, sourceColumn, acceptedColumn, recognizeColumn, produceColumn, originalTermColumn
+    ])
+
+    public static let itemType = ItemType(id: typeID, name: "Vocabulary Set with Examples",
+        fields: [wordField, meaningField, termField],
+        templates: legacyItemType.templates.map { legacy in
+            let reading = legacy.id == legacyReadingID
+            let fields = [Self.reading.id: readingColumn.id, cloze.id: clozeColumn.id,
+                          meaning.id: meaningField.id, source.id: sourceColumn.id]
+            return Template(
+                id: reading ? readingID : productionID, name: legacy.name, layout: legacy.layout,
+                components: legacy.components.map { component in
+                    var mapped = component
+                    if case let .field(id) = component.source, let replacement = fields[id] {
+                        mapped.source = .field(replacement)
+                    }
+                    return mapped
+                },
+                interaction: legacy.interaction, skill: legacy.skill,
+                generateWhen: .fieldNotEmpty(reading ? readingColumn.id : clozeColumn.id),
+                cardCreation: CardCreation(listIDs: [examples.id],
+                                           checkedFieldIDs: [reading ? recognizeColumn.id : produceColumn.id]),
+                responseOverride: reading ? nil : .type
+            )
+        }, lists: [examples])
+
+    static let supportedItemTypeIDs = [legacyTypeID, typeID]
+    static func isReading(_ templateID: UUID) -> Bool { templateID == readingID || templateID == legacyReadingID }
+    static func isProduction(_ templateID: UUID) -> Bool { templateID == productionID || templateID == legacyProductionID }
 
     /// Match complete tokens as well as selections in scripts that do not separate words with spaces.
     public static func occurrences(of expression: String, in sentence: String, language: String) -> [Range<String.Index>] {
@@ -460,6 +510,16 @@ public enum VocabularySet {
     }
 
     public static func makeItem(_ draft: VocabularySetDraft, id: UUID) throws -> Item {
+        try makeExampleItem(draft, id: id, recognition: true, cloze: true)
+    }
+
+    static func makeExampleItem(_ draft: VocabularySetDraft, id: UUID, recognition: Bool, cloze: Bool) throws -> Item {
+        guard recognition || cloze else { throw VocabularySetError.invalidOccurrence }
+        let legacy = try makeLegacyItem(draft, id: id)
+        return try modernItem(from: legacy, recognition: recognition, production: cloze)
+    }
+
+    static func makeLegacyItem(_ draft: VocabularySetDraft, id: UUID) throws -> Item {
         let term = try draft.term.validated()
         let gloss = draft.meaning.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !gloss.isEmpty, gloss.count <= 1_000,
@@ -489,7 +549,7 @@ public enum VocabularySet {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let identity = String(decoding: try encoder.encode(Identity(version: 1, term: term, acceptedVariants: variants)), as: UTF8.self)
-        return Item(id: id, itemTypeID: typeID, fields: [
+        return Item(id: id, itemTypeID: legacyTypeID, fields: [
             .init(fieldID: target.id, value: .text(term.expression, lang: term.language)),
             .init(fieldID: reading.id, value: .rich([
                 Span(String(sentence[..<match.lowerBound])),
@@ -503,50 +563,101 @@ public enum VocabularySet {
         ], deckID: draft.deckID)
     }
 
+    static func modernItem(from legacy: Item, recognition: Bool = true, production: Bool = true) throws -> Item {
+        guard let identity = identity(in: legacy) else { throw VocabularySetError.invalidTerm }
+        let row = ItemListRow(id: legacy.id, values: [
+            FieldValue(fieldID: readingColumn.id, value: legacy.value(for: reading.id) ?? .empty),
+            FieldValue(fieldID: clozeColumn.id, value: legacy.value(for: cloze.id) ?? .empty),
+            FieldValue(fieldID: sourceColumn.id, value: legacy.value(for: source.id) ?? .empty),
+            FieldValue(fieldID: acceptedColumn.id, value: .rich(identity.acceptedVariants.enumerated().flatMap { index, answer in
+                index == 0 ? [Span(answer, styles: [.code])] : [Span("\n"), Span(answer, styles: [.code])]
+            })),
+            FieldValue(fieldID: originalTermColumn.id, value: .text(try encodedIdentity(Identity(version: 1, term: identity.term, acceptedVariants: [])))),
+            FieldValue(fieldID: recognizeColumn.id, value: .checkbox(recognition)),
+            FieldValue(fieldID: produceColumn.id, value: .checkbox(production))
+        ])
+        return Item(id: legacy.id, itemTypeID: typeID, fields: [
+            FieldValue(fieldID: wordField.id, value: legacy.value(for: target.id) ?? .empty),
+            FieldValue(fieldID: meaningField.id, value: legacy.value(for: meaning.id) ?? .empty),
+            FieldValue(fieldID: termField.id, value: .text(try encodedIdentity(Identity(version: 1, term: identity.term, acceptedVariants: [])))),
+            FieldValue(fieldID: examples.id, value: .rows([row]))
+        ], tags: legacy.tags, deckID: legacy.deckID)
+    }
+
+    static func matches(_ left: Item, _ right: Item) -> Bool {
+        guard let termID = term(in: left)?.id else { return false }
+        return left.deckID == right.deckID && termID == term(in: right)?.id
+            && left.value(for: meaningField.id) == right.value(for: meaningField.id)
+    }
+
+    private static func encodedIdentity(_ identity: Identity) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return String(decoding: try encoder.encode(identity), as: UTF8.self)
+    }
+
+    private static func acceptedAnswers(in item: Item) -> [String] {
+        if item.itemTypeID == legacyTypeID { return identity(in: item)?.acceptedVariants ?? [] }
+        guard let value = item.value(for: acceptedColumn.id) else { return [] }
+        if case let .rich(spans) = value {
+            let originalAnswers = spans.filter { $0.styles == [.code] }.map(\.text)
+            if !originalAnswers.isEmpty { return originalAnswers }
+        }
+        return ItemDisplay.plainText(from: value).components(separatedBy: .newlines).filter { !$0.isEmpty }
+    }
+
     private static func containsContext(in sentence: String, outside span: Range<String.Index>) -> Bool {
         sentence[..<span.lowerBound].contains(where: \.isLetter)
             || sentence[span.upperBound...].contains(where: \.isLetter)
     }
 
     public static func authoringFields(in itemType: ItemType) -> [FieldDef] {
-        guard itemType.id == typeID else { return itemType.fields }
-        return itemType.fields.filter { $0.id != metadata.id }
+        guard supportedItemTypeIDs.contains(itemType.id) else { return itemType.fields }
+        return itemType.fields.filter { $0.id != metadata.id && $0.id != termField.id }
+    }
+
+    public static func authoringList(_ list: ItemList, in itemType: ItemType) -> ItemList {
+        guard itemType.id == typeID, list.id == examples.id else { return list }
+        var visible = list
+        visible.columns.removeAll { $0.id == originalTermColumn.id }
+        return visible
     }
 
     public static func term(in item: Item) -> VocabularyTerm? {
         guard let identity = identity(in: item),
-              case let .text(expression, language)? = item.value(for: target.id),
+              case let .text(expression, language)? = item.value(for: item.itemTypeID == legacyTypeID ? target.id : wordField.id),
               VocabularyTerm.normalized(expression) == VocabularyTerm.normalized(identity.term.expression),
               language == nil || language == identity.term.language else { return nil }
         return try? identity.term.validated()
     }
 
     private static func identity(in item: Item) -> Identity? {
-        guard item.itemTypeID == typeID, case let .text(json, _)? = item.value(for: metadata.id),
+        guard supportedItemTypeIDs.contains(item.itemTypeID),
+              case let .text(json, _)? = item.value(for: item.itemTypeID == legacyTypeID ? metadata.id : termField.id),
               let identity = try? JSONDecoder().decode(Identity.self, from: Data(json.utf8)),
               identity.version == 1 else { return nil }
         return identity
     }
 
     public static func supportsTypedResponse(_ card: DueCard) -> Bool {
-        card.template.interaction == .cloze && card.template.id == productionID && term(in: card.item) != nil
+        card.template.interaction == .cloze && isProduction(card.template.id)
+            && (card.item.itemTypeID == legacyTypeID || card.template.response == .type) && term(in: card.item) != nil
     }
 
     public static func productionAnswer(for card: DueCard) -> String? {
         guard supportsTypedResponse(card) else { return nil }
-        return productionAnswer(in: card.item, group: card.card.clozeGroup)
+        return productionAnswer(in: card.studyItem, group: card.card.clozeGroup)
     }
 
     private static func productionAnswer(in item: Item, group: Int?) -> String? {
-        guard let group, case let .cloze(sentence, blanks)? = item.value(for: cloze.id),
-              blanks.count == 1, let blank = ClozeValidation.sanitize(text: sentence, blanks: blanks).first,
-              blank.group == group else { return nil }
+        guard let group, case let .cloze(sentence, blanks)? = item.value(for: item.itemTypeID == legacyTypeID ? cloze.id : clozeColumn.id),
+              let blank = ClozeValidation.sanitize(text: sentence, blanks: blanks).first(where: { $0.group == group }) else { return nil }
         return String(sentence.dropFirst(blank.start).prefix(blank.length))
     }
 
     public static func studyComponents(for template: Template, from item: Item, clozeGroup: Int?) -> [ResolvedTemplateComponent] {
         var components = SideContent.resolvedComponents(for: template, from: item)
-        if template.id == productionID, let answer = productionAnswer(in: item, group: clozeGroup),
+        if isProduction(template.id), let answer = productionAnswer(in: item, group: clozeGroup),
            let index = components.firstIndex(where: { $0.purpose == .expectedAnswer }) {
             components[index].value = .text(answer, lang: term(in: item)?.language)
         }
@@ -554,27 +665,43 @@ public enum VocabularySet {
     }
 
     public static func check(_ response: String, for card: DueCard) -> AnswerEvaluation {
-        guard let answer = productionAnswer(for: card), let identity = identity(in: card.item) else { return .unavailable }
+        guard let answer = productionAnswer(for: card) else { return .unavailable }
         func compare(_ value: String) -> String {
             value.precomposedStringWithCanonicalMapping.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         }
-        return ([answer] + identity.acceptedVariants).contains { compare($0) == compare(response) } ? .correct : .incorrect
+        return ([answer] + acceptedAnswers(in: card.studyItem)).contains { compare($0) == compare(response) } ? .correct : .incorrect
     }
 
     static func prompt(for card: Card, item: Item, type: ItemType) -> String? {
-        guard let term = term(in: item), let actual = type.templates.first(where: { $0.id == card.templateID }),
-              let expected = itemType.templates.first(where: { $0.id == card.templateID }), actual == expected else { return nil }
-        if card.templateID == productionID, productionAnswer(in: item, group: card.clozeGroup) == nil { return nil }
-        let fieldIDs = card.templateID == readingID ? [reading.id, meaning.id] : [cloze.id, meaning.id, metadata.id]
+        let legacy = item.itemTypeID == legacyTypeID
+        guard let term = term(in: item),
+              let actual = type.templates.first(where: { $0.id == card.templateID }),
+              let expected = (legacy ? legacyItemType : itemType).templates.first(where: { $0.id == card.templateID }),
+              actual == expected,
+              let bound = CardGenerator.boundItem(item, type: type, selections: card.rowSelections) else { return nil }
+        let readingCard = isReading(card.templateID)
+        if !readingCard, productionAnswer(in: bound, group: card.clozeGroup) == nil { return nil }
+        let gloss = bound.value(for: legacy ? meaning.id : meaningField.id)
+        let sentence = bound.value(for: readingCard ? (legacy ? reading.id : readingColumn.id) : (legacy ? cloze.id : clozeColumn.id))
+        let content: [ContentValue?]
+        if readingCard, case let .rich(spans)? = sentence {
+            content = [.rich(spans.map { Span($0.text, styles: $0.styles.contains(.bold) ? [.bold] : []) }), gloss]
+        } else if readingCard {
+            content = [sentence, gloss]
+        } else {
+            let identityValue: ContentValue?
+            if legacy { identityValue = bound.value(for: metadata.id) }
+            else {
+                let originalTerm: VocabularyTerm? = if case let .text(json, _)? = bound.value(for: originalTermColumn.id) {
+                    (try? JSONDecoder().decode(Identity.self, from: Data(json.utf8)))?.term
+                } else { nil }
+                identityValue = (try? encodedIdentity(Identity(version: 1, term: originalTerm ?? term, acceptedVariants: acceptedAnswers(in: bound))))
+                    .map { .text($0) }
+            }
+            content = [sentence, gloss, identityValue]
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let content = fieldIDs.map { fieldID -> ContentValue? in
-            let value = item.value(for: fieldID)
-            if fieldID == reading.id, case let .rich(spans)? = value {
-                return .rich(spans.map { Span($0.text, styles: $0.styles.contains(.bold) ? [.bold] : []) })
-            }
-            return value
-        }
         guard let values = try? encoder.encode(content) else { return nil }
         return SHA256.hash(data: Data(term.id.utf8) + values).map { String(format: "%02x", $0) }.joined()
     }

@@ -14,9 +14,23 @@ public protocol PersonalVocabulary: Sendable {
     /// Undo a bulk change for every term nothing has changed since.
     func undoVocabularyBatch(_ batchID: UUID, undoID: UUID) async throws -> VocabularyBatchReceipt
     func createVocabularySet(_ draft: VocabularySetDraft, id: UUID) async throws -> UUID
+    func matchingVocabularySets(_ draft: VocabularySetDraft) async throws -> [VocabularySetMatch]
+    func createVocabularyExample(_ draft: VocabularySetDraft, id: UUID, recognition: Bool, cloze: Bool) async throws -> UUID
+    func appendVocabularyExample(_ draft: VocabularySetDraft, to itemID: UUID, exampleID: UUID, recognition: Bool, cloze: Bool) async throws
 }
 
 public extension PersonalVocabulary {
+    func matchingVocabularySets(_ draft: VocabularySetDraft) async throws -> [VocabularySetMatch] { [] }
+
+    func createVocabularyExample(_ draft: VocabularySetDraft, id: UUID, recognition: Bool, cloze: Bool) async throws -> UUID {
+        guard recognition && cloze else { throw VocabularySetError.changedPreset }
+        return try await createVocabularySet(draft, id: id)
+    }
+
+    func appendVocabularyExample(_ draft: VocabularySetDraft, to itemID: UUID, exampleID: UUID, recognition: Bool, cloze: Bool) async throws {
+        throw VocabularySetError.changedPreset
+    }
+
     func vocabularyStatuses(language: String?) async throws -> [VocabularyStatus] {
         try await vocabularyStatuses(language: language, expression: nil)
     }
@@ -51,6 +65,18 @@ extension SQLiteLibraryRepository: PersonalVocabulary {
 
     public func createVocabularySet(_ draft: VocabularySetDraft, id: UUID) async throws -> UUID {
         try await store.createVocabularySet(draft, id: id)
+    }
+
+    public func matchingVocabularySets(_ draft: VocabularySetDraft) async throws -> [VocabularySetMatch] {
+        try await store.matchingVocabularySets(draft)
+    }
+
+    public func createVocabularyExample(_ draft: VocabularySetDraft, id: UUID, recognition: Bool, cloze: Bool) async throws -> UUID {
+        try await store.createVocabularyExample(draft, id: id, recognition: recognition, cloze: cloze)
+    }
+
+    public func appendVocabularyExample(_ draft: VocabularySetDraft, to itemID: UUID, exampleID: UUID, recognition: Bool, cloze: Bool) async throws {
+        try await store.appendVocabularyExample(draft, to: itemID, exampleID: exampleID, recognition: recognition, cloze: cloze)
     }
 
     public func mergeVocabularyJudgments(_ changes: [VocabularyJudgmentChange]) async throws {

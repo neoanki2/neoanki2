@@ -19,7 +19,7 @@ struct MaturityTotals: Sendable {
 
     func summary(scope: CardScope) -> MaturitySummary {
         switch scope {
-        case .all: directCounts.values.reduce(.empty) { $0.adding($1) }
+        case .all, .allDecksStudy: directCounts.values.reduce(.empty) { $0.adding($1) }
         case .unassigned: directCounts[nil] ?? .empty
         case let .decks(ids): ids.reduce(.empty) { $0.adding(directCounts[$1] ?? .empty) }
         }

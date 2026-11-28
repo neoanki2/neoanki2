@@ -620,6 +620,8 @@ package enum APIOpenAPI {
                     "type": ["type": "string", "const": "studyExercise"],
                     "exercise": reference("StudyExercise"),
                 ]),
+                object(["type", "checked"], ["type": ["type": "string", "const": "checkbox"], "checked": ["type": "boolean"]]),
+                object(["type", "rows"], ["type": ["type": "string", "const": "rows"], "rows": array(reference("ListRow"))]),
                 object(["type", "number"], [
                     "type": ["type": "string", "const": "number"],
                     "number": ["type": "number"],
@@ -636,6 +638,7 @@ package enum APIOpenAPI {
             "id": uuid, "name": ["type": "string", "minLength": 1],
             "fields": array(reference("FieldDefinition"), min: 1),
             "templates": array(reference("TemplateDefinition"), min: 1),
+            "lists": array(reference("ListDefinition")),
         ]
 
         return [
@@ -869,8 +872,16 @@ package enum APIOpenAPI {
             "FieldDefinition": object(["id", "name", "type", "isRequired"], [
                 "id": uuid, "name": ["type": "string"],
                 "type": ["type": "string", "enum": ["text", "richText", "audio", "image",
-                                                          "gif", "video", "number", "cloze", "imageOcclusion"]],
+                                                          "gif", "video", "number", "checkbox", "cloze", "imageOcclusion", "studyExercise"]],
                 "isRequired": ["type": "boolean"],
+            ]),
+            "ListRow": object(["id", "values"], ["id": uuid, "values": array(reference("FieldValue"))]),
+            "ListDefinition": object(["id", "name", "columns"], [
+                "id": uuid, "name": ["type": "string"], "columns": array(reference("FieldDefinition")),
+                "sharedRows": array(reference("ListRow")),
+            ]),
+            "CardCreation": object(["listIds", "startSuspended"], [
+                "listIds": array(uuid), "startSuspended": ["type": "boolean"], "checkedFieldIds": array(uuid),
             ]),
             "Skill": object(["input", "output", "operation"], [
                 "input": ["type": "string"], "output": ["type": "string"],
@@ -905,7 +916,9 @@ package enum APIOpenAPI {
                  "components": ["oneOf": [array(reference("TemplateComponent")), ["type": "null"]]],
                  "fitStudyArea": ["type": "boolean", "default": false],
                  "interaction": ["type": "string", "enum": ["reveal", "type", "choose", "record", "audioSubmission", "cloze", "imageOcclusion", "arrange"]],
-                 "skill": reference("Skill"), "generateWhen": reference("Condition")]
+                 "skill": reference("Skill"), "generateWhen": reference("Condition"),
+                 "cardCreation": reference("CardCreation"),
+                 "responseOverride": ["type": "string", "enum": ["onYourOwn", "type", "choose", "arrange", "record", "audioSubmission"]]]
             ),
             "ItemTypeInput": object(["name", "fields", "templates"], itemTypeInputProperties.merging(["deckId": nullableUUID, "availableEverywhere": ["type": "boolean"]]) { _, new in new }),
             "DeckItemTypePolicyInput": object(["inherits", "itemTypeIds"], ["inherits": ["type": "boolean"], "itemTypeIds": array(uuid), "defaultItemTypeId": nullableUUID]),
@@ -1015,10 +1028,12 @@ package enum APIOpenAPI {
                  "repetitions": nonnegative, "lapses": nonnegative, "phase": ["type": "string"],
                  "stepIndex": ["type": ["integer", "null"]]]
             ),
+            "CardRowSelection": object(["listId", "rowId"], ["listId": uuid, "rowId": uuid]),
             "Card": object(
                 ["id", "revision", "itemId", "templateId", "skill", "isSuspended", "maturityStatus", "memory"],
                 ["id": uuid, "revision": revision, "itemId": uuid, "templateId": uuid,
                  "deckId": nullableUUID, "clozeGroup": ["type": ["integer", "null"]], "occlusionGroup": ["type": ["integer", "null"]],
+                 "rowSelections": array(reference("CardRowSelection")),
                  "skill": reference("Skill"), "isSuspended": ["type": "boolean"],
                  "maturityStatus": ["type": "string", "enum": ["notStarted", "learning", "maintaining", "inactive"]],
                  "memory": reference("Memory")]
@@ -1036,7 +1051,10 @@ package enum APIOpenAPI {
                 ["id", "revision", "itemId", "templateId", "interaction", "layout", "components", "prompt", "answer", "memory"],
                 ["id": uuid, "revision": revision, "itemId": uuid, "templateId": uuid,
                  "deckId": nullableUUID, "clozeGroup": ["type": ["integer", "null"]], "occlusionGroup": ["type": ["integer", "null"]],
+                 "rowSelections": array(reference("CardRowSelection")),
                  "interaction": ["type": "string"], "layout": ["type": "string"],
+                 "promptFormat": ["type": "string", "enum": ["standard", "cloze", "imageOcclusion"]],
+                 "response": ["type": "string", "enum": ["onYourOwn", "type", "choose", "arrange", "record", "audioSubmission"]],
                  "components": array(reference("ResolvedComponent")), "prompt": array(reference("ResolvedSlot")),
                  "answer": array(reference("ResolvedSlot")), "memory": reference("Memory")]
             ),

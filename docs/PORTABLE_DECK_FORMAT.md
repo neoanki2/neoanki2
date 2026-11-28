@@ -48,7 +48,7 @@ Readers MUST inspect `application_id` and `user_version` before reading
 application data. A reader MUST reject a file with a different
 `application_id`. A version-6 reader MUST reject `user_version > 6`; it MUST
 NOT guess at a newer schema. A reader MAY support older versions through an
-explicit compatibility path. NeoAnki supports versions 1 through 6.
+explicit compatibility path. The schema below describes the version 6 baseline. NeoAnki reads versions 1 through 9 and writes version 9.
 
 The schema uses only portable SQLite storage classes and features available in
 SQLite 3.24 or later. UUIDs and timestamps are text, JSON is UTF-8 text, and
@@ -712,3 +712,25 @@ The exported root materializes inherited settings so importing a subtree does no
 require its original parent. Descendant overrides preserve inheritance choices.
 Global availability is recipient-local and is not granted by an imported package.
 Readers continue accepting supported earlier versions without this table.
+
+
+## Version 8 fit setting
+
+Version 8 adds `templates.fit_study_area` for the Card Setup **Fit Study Area**
+setting.
+
+## Version 9 list-based card creation
+
+Version 9 adds nullable text columns `item_types.lists_json`, `items.lists_json`,
+`templates.card_creation_json`, and `templates.response_override`. Type lists
+carry their identifiers, ordered typed columns, and optional shared rows.
+Item list values reference the list identifier and carry stable row IDs and
+cell values. A template's card-creation settings carry the selected list IDs,
+checked field IDs, and starting suspension flag. Response mode is stored as
+its string identifier.
+
+Template field ordinals enumerate the ordinary item fields, then each list's
+columns in list order. Ordinary item field ordinals continue to refer to the
+`fields` table. Package schema digests include the list and response settings
+when present. The package preserves authored content and regenerates fresh
+cards on import.

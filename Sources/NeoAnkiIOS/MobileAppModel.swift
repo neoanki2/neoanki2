@@ -71,6 +71,7 @@ extension LibraryFeatureModel {
             switch field.type {
             case .text: content[field.id] = .text(input)
             case .richText: content[field.id] = .rich([Span(input)])
+            case .checkbox: content[field.id] = .checkbox(trimmed == "true")
             case .number:
                 guard let number = NumberFormatter.localizedNumber(from: trimmed) else {
                     throw ItemDraftError.invalidNumber(field.name)

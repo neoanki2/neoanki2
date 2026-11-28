@@ -117,6 +117,11 @@ blank's boundary, that blank is removed and the editor asks you to mark it
 again. Overlapping or otherwise invalid ranges are rejected. A required Cloze
 field must have both non-empty text and at least one blank.
 
+List columns support text, rich text, numbers, checkboxes, and Cloze blanks.
+Map a selected column into the prompt or answer in Card Setup. With **Type an
+answer**, a Cloze card checks the selected blank group. An Image Occlusion card
+checks the answer text saved on its selected masks.
+
 ## Image occlusion
 
 Use **Image Occlusion** when you want to recall labels or details in a diagram.

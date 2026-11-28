@@ -29,6 +29,7 @@ public enum FieldType: String, Codable, Sendable, CaseIterable {
     case gif
     case video
     case number
+    case checkbox
     case cloze
     case imageOcclusion
     case studyExercise

@@ -11,6 +11,12 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
     public var interaction: Interaction
     public var skill: Skill
     public var generateWhen: SlotCondition?
+    public var cardCreation: CardCreation?
+    /// Structured prompts retain their original interaction tag for compatibility.
+    public var responseOverride: ResponseMode?
+
+    public var promptFormat: PromptFormat { interaction.promptFormat }
+    public var response: ResponseMode { responseOverride ?? interaction.defaultResponse }
     /// When enabled, a text prompt scales to the study stage's available space.
     /// Missing keys in older library definitions decode to `false`.
     public var fitStudyArea: Bool
@@ -23,7 +29,9 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         interaction: Interaction,
         skill: Skill,
         generateWhen: SlotCondition? = nil,
-        fitStudyArea: Bool = false
+        fitStudyArea: Bool = false,
+        cardCreation: CardCreation? = nil,
+        responseOverride: ResponseMode? = nil
     ) {
         self.id = id
         self.name = name
@@ -33,11 +41,13 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         self.skill = skill
         self.generateWhen = generateWhen
         self.fitStudyArea = fitStudyArea
+        self.cardCreation = cardCreation
+        self.responseOverride = responseOverride
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, layout, components, interaction, skill, generateWhen, fitStudyArea
-        case prompt, answer
+        case prompt, answer, cardCreation, responseOverride
     }
 
     public init(from decoder: Decoder) throws {
@@ -47,6 +57,8 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         interaction = try values.decode(Interaction.self, forKey: .interaction)
         skill = try values.decode(Skill.self, forKey: .skill)
         generateWhen = try values.decodeIfPresent(SlotCondition.self, forKey: .generateWhen)
+        cardCreation = try values.decodeIfPresent(CardCreation.self, forKey: .cardCreation)
+        responseOverride = try values.decodeIfPresent(ResponseMode.self, forKey: .responseOverride)
         fitStudyArea = try values.decodeIfPresent(Bool.self, forKey: .fitStudyArea) ?? false
         if let decodedLayout = try values.decodeIfPresent(CardLayoutID.self, forKey: .layout),
            let decodedComponents = try values.decodeIfPresent([TemplateComponent].self, forKey: .components) {
@@ -72,6 +84,8 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         try values.encode(interaction, forKey: .interaction)
         try values.encode(skill, forKey: .skill)
         try values.encodeIfPresent(generateWhen, forKey: .generateWhen)
+        try values.encodeIfPresent(cardCreation, forKey: .cardCreation)
+        try values.encodeIfPresent(responseOverride, forKey: .responseOverride)
         try values.encode(fitStudyArea, forKey: .fitStudyArea)
     }
 
@@ -85,7 +99,9 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         interaction: Interaction,
         skill: Skill,
         generateWhen: SlotCondition? = nil,
-        fitStudyArea: Bool = false
+        fitStudyArea: Bool = false,
+        cardCreation: CardCreation? = nil,
+        responseOverride: ResponseMode? = nil
     ) {
         let composition = TemplateCompositionMigration.map(
             prompt: prompt,
@@ -101,7 +117,7 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
             interaction: interaction,
             skill: skill,
             generateWhen: generateWhen,
-            fitStudyArea: fitStudyArea
+            fitStudyArea: fitStudyArea, cardCreation: cardCreation, responseOverride: responseOverride
         )
     }
 
@@ -358,6 +374,25 @@ public enum Interaction: String, Codable, CaseIterable, Sendable {
     case cloze
     case imageOcclusion
     case arrange
+
+    public var promptFormat: PromptFormat {
+        switch self {
+        case .cloze: .cloze
+        case .imageOcclusion: .imageOcclusion
+        default: .standard
+        }
+    }
+
+    public var defaultResponse: ResponseMode {
+        switch self {
+        case .reveal, .cloze, .imageOcclusion: .onYourOwn
+        case .type: .type
+        case .choose: .choose
+        case .record: .record
+        case .audioSubmission: .audioSubmission
+        case .arrange: .arrange
+        }
+    }
 }
 
 public indirect enum SlotCondition: Codable, Equatable, Sendable {

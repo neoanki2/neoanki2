@@ -7,11 +7,13 @@ public struct CanonicalItemType: Codable, Equatable, Sendable {
     public let name: String
     public let fields: [CanonicalField]
     public let templates: [CanonicalTemplate]
+    public let lists: [CanonicalList]?
 
-    public init(name: String, fields: [CanonicalField], templates: [CanonicalTemplate]) {
+    public init(name: String, fields: [CanonicalField], templates: [CanonicalTemplate], lists: [CanonicalList]? = nil) {
         self.name = name
         self.fields = fields
         self.templates = templates
+        self.lists = lists
     }
 }
 
@@ -33,6 +35,18 @@ public struct CanonicalField: Codable, Equatable, Sendable {
     }
 }
 
+public struct CanonicalList: Codable, Equatable, Sendable {
+    public let name: String
+    public let columns: [CanonicalField]
+    public let sharedRows: [[String?]]?
+}
+
+public struct CanonicalCardCreation: Codable, Equatable, Sendable {
+    public let lists: [Int]
+    public let checkedColumns: [Int]
+    public let startSuspended: Bool
+}
+
 public struct CanonicalTemplate: Codable, Equatable, Sendable {
     public let name: String
     public let layout: CardLayoutID
@@ -41,6 +55,8 @@ public struct CanonicalTemplate: Codable, Equatable, Sendable {
     public let skill: Skill
     public let generateWhen: CanonicalSlotCondition?
     public let fitStudyArea: Bool
+    public let cardCreation: CanonicalCardCreation?
+    public let responseOverride: ResponseMode?
 
     public init(
         name: String,
@@ -49,7 +65,9 @@ public struct CanonicalTemplate: Codable, Equatable, Sendable {
         interaction: Interaction,
         skill: Skill,
         generateWhen: CanonicalSlotCondition?,
-        fitStudyArea: Bool = false
+        fitStudyArea: Bool = false,
+        cardCreation: CanonicalCardCreation? = nil,
+        responseOverride: ResponseMode? = nil
     ) {
         self.name = name
         self.layout = layout
@@ -58,6 +76,8 @@ public struct CanonicalTemplate: Codable, Equatable, Sendable {
         self.skill = skill
         self.generateWhen = generateWhen
         self.fitStudyArea = fitStudyArea
+        self.cardCreation = cardCreation
+        self.responseOverride = responseOverride
     }
 }
 
@@ -190,12 +210,13 @@ public enum PortableItemTypeIdentity {
         of itemType: ItemType
     ) throws -> CanonicalItemType {
         var ordinals: [UUID: Int] = [:]
-        for (ordinal, field) in itemType.fields.enumerated() {
+        for (ordinal, field) in (itemType.fields + itemType.lists.flatMap(\.columns)).enumerated() {
             guard ordinals.updateValue(ordinal, forKey: field.id) == nil else {
                 throw PortableItemTypeIdentityError.duplicateFieldID(field.id)
             }
         }
 
+        let listOrdinals = Dictionary(uniqueKeysWithValues: itemType.lists.enumerated().map { ($0.element.id, $0.offset) })
         return CanonicalItemType(
             name: normalized(itemType.name),
             fields: itemType.fields.map {
@@ -222,7 +243,26 @@ public enum PortableItemTypeIdentity {
                     generateWhen: try template.generateWhen.map {
                         try canonicalCondition($0, ordinals: ordinals)
                     },
-                    fitStudyArea: template.fitStudyArea
+                    fitStudyArea: template.fitStudyArea,
+                    cardCreation: try template.cardCreation.map { creation in
+                        CanonicalCardCreation(
+                            lists: try creation.listIDs.map { try ordinal(for: $0, in: listOrdinals) },
+                            checkedColumns: try (creation.checkedFieldIDs ?? []).map { try ordinal(for: $0, in: ordinals) }.sorted(),
+                            startSuspended: creation.startSuspended
+                        )
+                    },
+                    responseOverride: template.responseOverride
+                )
+            },
+            lists: itemType.lists.isEmpty ? nil : try itemType.lists.map { list in
+                CanonicalList(
+                    name: normalized(list.name),
+                    columns: list.columns.map { CanonicalField(name: normalized($0.name), type: $0.type, isRequired: $0.isRequired) },
+                    sharedRows: try list.sharedRows?.map { row in
+                        try list.columns.map { column in
+                            try row.values.first { $0.fieldID == column.id }.map { try PortableJSON.encodeContent($0.value) }
+                        }
+                    }
                 )
             }
         )

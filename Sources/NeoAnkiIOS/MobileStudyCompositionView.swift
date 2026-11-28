@@ -29,7 +29,7 @@ struct MobileStudyCompositionView: View {
             response: response,
             evaluation: evaluation,
             mobileReading: true,
-            enabled: [.type, .choose, .arrange].contains(template.interaction) || template.id == VocabularySet.productionID
+            enabled: [.type, .choose, .arrange].contains(template.response) || template.id == VocabularySet.productionID
         ) { component, hole in
             let content = MobileContentValueView(
                 value: component.value,

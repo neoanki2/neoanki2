@@ -6,6 +6,7 @@ public struct DeckSummary: Sendable, Identifiable, Equatable {
     public let name: String
     public let parentID: UUID?
     public let newCardsPerDay: Int?
+    public let includeInAllDecksStudy: Bool
     /// Learner-defined order among decks with the same parent.
     public let sortPosition: Int64
     /// Items in this deck and all descendant decks, matching the scope you get
@@ -20,6 +21,7 @@ public struct DeckSummary: Sendable, Identifiable, Equatable {
         name: String,
         parentID: UUID?,
         newCardsPerDay: Int? = nil,
+        includeInAllDecksStudy: Bool = true,
         sortPosition: Int64 = 0,
         itemCount: Int,
         dueCount: Int,
@@ -29,6 +31,7 @@ public struct DeckSummary: Sendable, Identifiable, Equatable {
         self.name = name
         self.parentID = parentID
         self.newCardsPerDay = newCardsPerDay
+        self.includeInAllDecksStudy = includeInAllDecksStudy
         self.sortPosition = sortPosition
         self.itemCount = itemCount
         self.dueCount = dueCount

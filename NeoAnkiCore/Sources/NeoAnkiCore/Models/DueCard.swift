@@ -9,6 +9,19 @@ public struct DueCard: Sendable, Identifiable, Equatable {
     public var template: Template
     public var studyRelation: StudyCardRelation?
 
+    public var studyItem: Item {
+        CardGenerator.boundItem(item, type: itemType, selections: card.rowSelections) ?? item
+    }
+
+    public var response: ResponseMode {
+        if item.itemTypeID == VocabularySet.legacyTypeID, VocabularySet.supportsTypedResponse(self), template.responseOverride == nil { return .type }
+        return template.response
+    }
+
+    public var studyComponents: [ResolvedTemplateComponent] {
+        VocabularySet.studyComponents(for: template, from: studyItem, clozeGroup: card.clozeGroup)
+    }
+
     public init(card: Card, item: Item, itemType: ItemType, template: Template, studyRelation: StudyCardRelation? = nil) {
         self.card = card
         self.item = item

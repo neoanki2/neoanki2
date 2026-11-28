@@ -5,6 +5,8 @@ import Foundation
 /// once descendants were expanded.
 enum CardScope: Sendable, Equatable {
     case all
+    /// The study queue excludes opted-out deck branches and includes unassigned cards.
+    case allDecksStudy
     case unassigned
     case decks(Set<UUID>)
 }

@@ -263,6 +263,7 @@ public enum SharedStudyContentVisibilityPolicy {
     private static func contentDescription(for value: ContentValue) -> String {
         switch value {
         case .text, .rich: "Text"
+        case .checkbox: "Checkbox"
         case .number: "Number"
         case .studyExercise: "Study exercise"
         case .imageOcclusion: "Image Occlusion"
@@ -274,6 +275,7 @@ public enum SharedStudyContentVisibilityPolicy {
             case .gif: "Animation"
             case .video: "Video"
             }
+        case .rows: "List"
         case .empty: "Content"
         }
     }
@@ -1171,7 +1173,7 @@ public struct CardSetupEditorView: View {
         showsInspectorButton: Bool
     ) -> some View {
         let setup = draft.cardSetups[setupIndex]
-        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -1362,7 +1364,7 @@ public struct CardSetupEditorView: View {
     private func selectedContentSection(_ setupIndex: Int) -> some View {
         let setup = draft.cardSetups[setupIndex]
         let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
-        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
         if let selectedComponentID,
            let componentIndex = setup.components.firstIndex(where: {
                $0.id == selectedComponentID
@@ -1424,7 +1426,7 @@ public struct CardSetupEditorView: View {
         }
 
         let setup = draft.cardSetups[setupIndex]
-        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
         let disclosures = CardSetupEditorFocusPolicy.disclosures(
             for: target,
             cardSetupID: cardSetupID,
@@ -1497,7 +1499,7 @@ public struct CardSetupEditorView: View {
         case .additional:
             let setup = draft.cardSetups[setupIndex]
             let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
-            let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+            let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
             if let componentIndex = setup.components.firstIndex(where: {
                 projection.isAdditional($0.id)
             }) {
@@ -1538,10 +1540,7 @@ public struct CardSetupEditorView: View {
                 NavigationLink {
                     focusedMobileEditor(.layout)
                 } label: { LabeledContent("Layout", value: draft.cardSetups[index].layout.displayName) }
-                Picker("Answer Method", selection: interactionBinding(index)) {
-                    ForEach(Interaction.allCases, id: \.self) { Text($0.editorDisplayName).tag($0) }
-                }.focused($focusedTarget, equals: .answerMethod(cardSetupID: cardSetupID))
-                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.answerMethod)
+                promptAndResponse(index)
             }
             Section("Content") {
                 NavigationLink("Question & Answer") {
@@ -1551,6 +1550,7 @@ public struct CardSetupEditorView: View {
                     focusedMobileEditor(.content)
                 }
             }
+            Section("Create cards from") { cardCreationEditor(index) }
             Section("Rules") {
                 NavigationLink("Availability") {
                     focusedMobileEditor(.availability)
@@ -1595,7 +1595,7 @@ public struct CardSetupEditorView: View {
             ScrollView {
                 let setup = draft.cardSetups[index]
                 let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
-                let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+                let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Legacy placement stays unchanged until you explicitly move it into a named hole.")
                         .font(.subheadline).foregroundStyle(.secondary)
@@ -1612,7 +1612,7 @@ public struct CardSetupEditorView: View {
     private func mobileContentOverview(_ index: Int) -> some View {
         let setup = draft.cardSetups[index]
         let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
-        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
         return List {
             Section("Named Content") {
                 ForEach(descriptor.accessibilityHoles) { hole in
@@ -1665,12 +1665,13 @@ public struct CardSetupEditorView: View {
 
     private func recipeSection(_ index: Int) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recipe")
-                .font(.headline)
+            promptAndResponse(index)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) { recipeContents(index) }
                 VStack(alignment: .leading, spacing: 12) { recipeContents(index) }
             }
+            Text("Create cards from").font(.headline)
+            cardCreationEditor(index)
             validationMessages(for: .recipe(cardSetupID: cardSetupID, purpose: .question))
             validationMessages(for: .answerMethod(cardSetupID: cardSetupID))
             validationMessages(for: .recipe(
@@ -1682,21 +1683,7 @@ public struct CardSetupEditorView: View {
 
     @ViewBuilder
     private func recipeContents(_ index: Int) -> some View {
-        recipeSourceButton(title: "Question", purpose: .question, setupIndex: index)
-        Image(systemName: "arrow.right")
-            .foregroundStyle(.secondary)
-            .accessibilityHidden(true)
-        Picker("Answer method", selection: interactionBinding(index)) {
-            ForEach(Interaction.allCases, id: \.self) { interaction in
-                Text(interaction.editorDisplayName).tag(interaction)
-            }
-        }
-        .focused($focusedTarget, equals: .answerMethod(cardSetupID: cardSetupID))
-        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.answerMethod)
-        .frame(minWidth: 160, minHeight: 44)
-        Image(systemName: "arrow.right")
-            .foregroundStyle(.secondary)
-            .accessibilityHidden(true)
+        recipeSourceButton(title: "Prompt content", purpose: .question, setupIndex: index)
         if draft.cardSetups[index].interaction == .audioSubmission {
             VStack(alignment: .leading, spacing: 2) {
                 Label("Spoken response", systemImage: "waveform")
@@ -1791,7 +1778,7 @@ public struct CardSetupEditorView: View {
 
     private func previewSection(_ index: Int) -> some View {
         let setup = draft.cardSetups[index]
-        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
         return VStack(alignment: .leading, spacing: 12) {
             if previewUsesVerticalHeader {
                 VStack(alignment: .leading, spacing: 8) { Text("Preview").font(.headline); answerVisibilityButton }
@@ -1933,7 +1920,7 @@ public struct CardSetupEditorView: View {
     private func namedContentSection(_ index: Int) -> some View {
         let setup = draft.cardSetups[index]
         let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
-        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
         return VStack(alignment: .leading, spacing: 16) {
             Text("Content").font(.headline)
             ForEach(descriptor.accessibilityHoles) { holeDescriptor in
@@ -1969,7 +1956,7 @@ public struct CardSetupEditorView: View {
     private func namedHoleContent(_ hole: CardWireframeHole, index: Int) -> some View {
         let setup = draft.cardSetups[index]
         let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
-        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.sourceFields(for: setup))
         let indices = setup.components.indices.filter {
             descriptor.hole(for: setup.components[$0].region) == hole && !projection.isAdditional(setup.components[$0].id)
         }
@@ -2281,6 +2268,101 @@ public struct CardSetupEditorView: View {
         }
     }
 
+    @ViewBuilder
+    private func promptAndResponse(_ index: Int) -> some View {
+        let interaction = interactionBinding(index)
+        let override = setupBinding(index, \.responseOverride)
+        Picker("Prompt", selection: Binding(
+            get: { interaction.wrappedValue.promptFormat },
+            set: { format in
+                let mode = override.wrappedValue ?? interaction.wrappedValue.defaultResponse
+                switch format {
+                case .standard:
+                    interaction.wrappedValue = mode.standardInteraction
+                    override.wrappedValue = nil
+                case .cloze, .imageOcclusion:
+                    interaction.wrappedValue = format == .cloze ? .cloze : .imageOcclusion
+                    override.wrappedValue = mode == .type ? .type : nil
+                }
+            }
+        )) {
+            Text("Standard").tag(PromptFormat.standard)
+            Text("Cloze").tag(PromptFormat.cloze)
+            Text("Image Occlusion").tag(PromptFormat.imageOcclusion)
+        }
+        Picker("Response", selection: Binding(
+            get: { override.wrappedValue ?? interaction.wrappedValue.defaultResponse },
+            set: { mode in
+                if interaction.wrappedValue.promptFormat == .standard {
+                    interaction.wrappedValue = mode.standardInteraction
+                    override.wrappedValue = nil
+                } else {
+                    override.wrappedValue = mode == .onYourOwn ? nil : mode
+                }
+            }
+        )) {
+            let modes: [ResponseMode] = interaction.wrappedValue.promptFormat == .standard ? ResponseMode.allCases : [.onYourOwn, .type]
+            ForEach(modes, id: \.self) { mode in Text(mode.editorDisplayName).tag(mode) }
+        }
+        .focused($focusedTarget, equals: .answerMethod(cardSetupID: cardSetupID))
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.answerMethod)
+    }
+
+    @ViewBuilder
+    private func cardCreationEditor(_ index: Int) -> some View {
+        let binding = setupBinding(index, \.cardCreation)
+        let creation = binding.wrappedValue ?? CardCreation()
+        let setup = draft.cardSetups[index]
+        LabeledContent("Source", value: creation.listIDs.isEmpty ? "Item" : creation.listIDs.count == 1 ? "One card per row" : "One card per combination")
+        Menu("Select Lists") {
+            Button("Item") { var next = creation; next.listIDs = []; next.checkedFieldIDs = nil; binding.wrappedValue = next }
+            ForEach(draft.lists) { list in
+                Toggle(list.name, isOn: Binding(
+                    get: { binding.wrappedValue?.listIDs.contains(list.id) == true },
+                    set: { selected in
+                        var next = binding.wrappedValue ?? CardCreation()
+                        if selected { next.listIDs.append(list.id) }
+                        else {
+                            next.listIDs.removeAll { $0 == list.id }
+                            next.checkedFieldIDs?.removeAll { id in list.columns.contains { $0.id == id } }
+                        }
+                        binding.wrappedValue = next
+                    }
+                ))
+            }
+        }
+        .disabled(draft.lists.isEmpty)
+        if !creation.listIDs.isEmpty {
+            Text(draft.lists.filter { creation.listIDs.contains($0.id) }.map(\.name).joined(separator: ", "))
+                .foregroundStyle(.secondary)
+        }
+        let checkboxes = draft.sourceFields(for: setup).filter { $0.type == .checkbox }
+        if !checkboxes.isEmpty {
+            Menu("Filters") {
+                ForEach(checkboxes) { field in
+                    Toggle(field.name, isOn: Binding(
+                        get: { binding.wrappedValue?.checkedFieldIDs?.contains(field.id) == true },
+                        set: { selected in
+                            var next = binding.wrappedValue ?? CardCreation()
+                            var ids = next.checkedFieldIDs ?? []
+                            if selected { ids.append(field.id) } else { ids.removeAll { $0 == field.id } }
+                            next.checkedFieldIDs = ids.isEmpty ? nil : ids
+                            binding.wrappedValue = next
+                        }
+                    ))
+                }
+            }
+        }
+        Toggle("Start new cards suspended", isOn: Binding(
+            get: { binding.wrappedValue?.startSuspended ?? false },
+            set: { suspended in
+                var next = binding.wrappedValue ?? CardCreation()
+                next.startSuspended = suspended
+                binding.wrappedValue = next
+            }
+        ))
+    }
+
     private func availabilityEditor(_ index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Toggle("Availability rule", isOn: availabilityEnabledBinding(index))
@@ -2293,7 +2375,7 @@ public struct CardSetupEditorView: View {
             if draft.cardSetups[index].availability != nil {
                 AvailabilityRuleEditor(
                     rule: availabilityBinding(index),
-                    fields: draft.fields,
+                    fields: draft.sourceFields(for: draft.cardSetups[index]),
                     depth: 0
                 )
                 validationMessages(for: .availability(cardSetupID: cardSetupID))
@@ -2572,10 +2654,15 @@ public struct CardSetupEditorView: View {
         CardSetupEditorReducer.apply(action, to: &draft, cardSetupID: cardSetupID)
     }
 
+    private var currentSourceFields: [ItemTypeFieldDraft] {
+        guard let setupIndex else { return draft.fields }
+        return draft.sourceFields(for: draft.cardSetups[setupIndex])
+    }
+
     private func sourceLabel(_ source: CardSetupComponentSourceDraft) -> String {
         switch source {
         case let .field(id):
-            return id.flatMap { selected in draft.fields.first(where: { $0.id == selected })?.name }
+            return id.flatMap { selected in currentSourceFields.first(where: { $0.id == selected })?.name }
                 ?? "Choose content"
         case let .fixedText(text):
             return text.isEmpty ? "Fixed text" : text
@@ -2583,18 +2670,18 @@ public struct CardSetupEditorView: View {
     }
 
     private func sourceFields(for request: CardSetupSourceRequest) -> [ItemTypeFieldDraft] {
-        guard request.hole == .media else { return draft.fields }
-        return draft.fields.filter { [.image, .imageOcclusion, .gif, .video].contains($0.type) }
+        guard request.hole == .media else { return currentSourceFields }
+        return currentSourceFields.filter { [.image, .imageOcclusion, .gif, .video].contains($0.type) }
     }
 
     private func mediaKind(for source: CardSetupComponentSourceDraft) -> MediaKind? {
         guard let id = source.fieldID else { return nil }
-        return draft.fields.first(where: { $0.id == id })?.type.mediaKind
+        return currentSourceFields.first(where: { $0.id == id })?.type.mediaKind
     }
 
     private func fieldType(for source: CardSetupComponentSourceDraft) -> FieldType? {
         guard let id = source.fieldID else { return nil }
-        return draft.fields.first(where: { $0.id == id })?.type
+        return currentSourceFields.first(where: { $0.id == id })?.type
     }
 
     private func previewSymbol(for componentID: UUID, setupIndex: Int) -> String {
@@ -3116,6 +3203,8 @@ private extension ContentValue {
         case let .cloze(text, _): text
         case let .number(value): value.formatted()
         case let .studyExercise(exercise): exercise.stimulus
+        case let .checkbox(checked): checked ? "Checked" : "Unchecked"
+        case .rows: "List"
         case .empty: "Choose content"
         }
     }
@@ -3130,6 +3219,7 @@ private extension FieldType {
         case .image: "Image"
         case .gif: "GIF"
         case .video: "Video"
+        case .checkbox: "Checkbox"
         case .number: "Number"
         case .studyExercise: "Study exercise"
         case .imageOcclusion: "Image Occlusion"
@@ -3206,4 +3296,29 @@ private extension Modality {
 
 private extension NeoAnkiCore.Operation {
     var editorDisplayName: String { rawValue.capitalized }
+}
+
+
+private extension ResponseMode {
+    var standardInteraction: Interaction {
+        switch self {
+        case .onYourOwn: .reveal
+        case .type: .type
+        case .choose: .choose
+        case .arrange: .arrange
+        case .record: .record
+        case .audioSubmission: .audioSubmission
+        }
+    }
+
+    var editorDisplayName: String {
+        switch self {
+        case .onYourOwn: "On your own"
+        case .type: "Type an answer"
+        case .choose: "Choose"
+        case .arrange: "Arrange"
+        case .record: "Record"
+        case .audioSubmission: "Audio Submission"
+        }
+    }
 }

@@ -83,7 +83,9 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
     package var additionalDescription: String? {
         switch self {
         case .createItem, .replaceItem, .validateItem:
-            "Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card."
+            "Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card. Use type rows for a list defined on the item type."
+        case .createItemType, .validateItemType, .replaceItemType:
+            "Lists declare typed columns and optional shared rows. Templates select lists, checkbox filters, starting suspension, and a response override. Item rows use the list ID as their field ID."
         case .nextStudyCard:
             "Reserves an eligible card using family-aware daily introductions and related-review spacing. Poetry/prose builder cards retain eligibility and scheduling; included parts appear in source order across New/Review phases. Skipped and repair cards return on later passes. Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal."
         case .reviewPreview, .schedulingExplanation:

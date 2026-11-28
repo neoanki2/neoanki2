@@ -11,6 +11,7 @@ public struct ItemTypeUpdateAuthorization: Sendable, Equatable {
     public let expectedStudyResponseDeletionIDs: Set<UUID>
     public let expectedSchemaImpactState: ItemTypeSchemaImpactState
     public let schemaChangeImpact: ItemTypeSchemaChangeImpact
+    public let cardCreationPreview: CardCreationPreview?
 
     public var expectedStudyResponseDeletionCount: Int {
         expectedStudyResponseDeletionIDs.count
@@ -25,13 +26,15 @@ public struct ItemTypeUpdateAuthorization: Sendable, Equatable {
         expectedGeneratedCardRetirementIDs: Set<UUID> = [],
         expectedStudyResponseDeletionIDs: Set<UUID>,
         expectedSchemaImpactState: ItemTypeSchemaImpactState = .none,
-        schemaChangeImpact: ItemTypeSchemaChangeImpact = .none
+        schemaChangeImpact: ItemTypeSchemaChangeImpact = .none,
+        cardCreationPreview: CardCreationPreview? = nil
     ) {
         self.expectedOriginal = expectedOriginal
         self.expectedGeneratedCardRetirementIDs = expectedGeneratedCardRetirementIDs
         self.expectedStudyResponseDeletionIDs = expectedStudyResponseDeletionIDs
         self.expectedSchemaImpactState = expectedSchemaImpactState
         self.schemaChangeImpact = schemaChangeImpact
+        self.cardCreationPreview = cardCreationPreview
     }
 }
 
@@ -64,6 +67,7 @@ public enum ItemTypeUpdateError: LocalizedError, Sendable, Equatable {
     case staleDefinition(UUID)
     case generatedCardRetirementImpactChanged(expected: Int, actual: Int)
     case studyResponseImpactChanged(expected: Int, actual: Int)
+    case cardCreationPreviewChanged
     case schemaImpactChanged(expected: Int, actual: Int)
 
     public var errorDescription: String? {
@@ -76,6 +80,8 @@ public enum ItemTypeUpdateError: LocalizedError, Sendable, Equatable {
         case let .studyResponseImpactChanged(_, actual):
             let noun = actual == 1 ? "response" : "responses"
             return "Private spoken responses changed after confirmation. Saving would now remove \(actual) \(noun). Review the impact again."
+        case .cardCreationPreviewChanged:
+            return "The number of cards to keep, add, or retire changed. Review the preview again."
         case let .schemaImpactChanged(_, actual):
             let noun = actual == 1 ? "item" : "items"
             return "Item field contents changed after confirmation. Saving could now affect \(actual) \(noun). Review the impact again."

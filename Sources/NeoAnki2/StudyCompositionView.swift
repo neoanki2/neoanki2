@@ -54,7 +54,7 @@ struct StudyCompositionView: View {
             isAnswerRevealed: isAnswerRevealed,
             response: response,
             evaluation: evaluation,
-            enabled: [.type, .choose, .arrange].contains(template.interaction) || template.id == VocabularySet.productionID
+            enabled: [.type, .choose, .arrange].contains(template.response) || template.id == VocabularySet.productionID
         ) { component, hole in
             let content = ContentValueView(
                 value: component.value,

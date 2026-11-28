@@ -2,7 +2,7 @@
 title: Item types
 description: Generated NeoAnki local API operations for item types.
 audience: api
-contract_digest: sha256:e90cdd87822e8ffb97df2e72eb528fa6c1a929e9e82143a9b932ae5979bbd8b4
+contract_digest: sha256:c114fc88950349745721ed5dde845a5cbfabaac69eb2ab4e486831899501bc97
 parent: Local API reference
 permalink: /api/item-types/
 ---
@@ -38,7 +38,7 @@ curl --request GET \
 ```
 ## `POST /v1/item-types`
 
-Create item type through the loopback-only NeoAnki API.
+Create item type through the loopback-only NeoAnki API. Lists declare typed columns and optional shared rows. Templates select lists, checkbox filters, starting suspension, and a response override. Item rows use the list ID as their field ID.
 
 - **Operation ID:** `createItemType`
 - **Authorization:** Bearer token with `schemas.write`
@@ -62,7 +62,7 @@ curl --request POST \
 ```
 ## `POST /v1/item-types/validate`
 
-Validate item type through the loopback-only NeoAnki API.
+Validate item type through the loopback-only NeoAnki API. Lists declare typed columns and optional shared rows. Templates select lists, checkbox filters, starting suspension, and a response override. Item rows use the list ID as their field ID.
 
 - **Operation ID:** `validateItemType`
 - **Authorization:** Bearer token with `schemas.write`
@@ -132,7 +132,7 @@ curl --request GET \
 ```
 ## `PUT /v1/item-types/{id}`
 
-Replace item type through the loopback-only NeoAnki API.
+Replace item type through the loopback-only NeoAnki API. Lists declare typed columns and optional shared rows. Templates select lists, checkbox filters, starting suspension, and a response override. Item rows use the list ID as their field ID.
 
 - **Operation ID:** `replaceItemType`
 - **Authorization:** Bearer token with `schemas.write`
@@ -209,6 +209,6 @@ curl --request POST \
   --data '<request-json>'
 ```
 
-Contract digest: `sha256:e90cdd87822e8ffb97df2e72eb528fa6c1a929e9e82143a9b932ae5979bbd8b4`.
+Contract digest: `sha256:c114fc88950349745721ed5dde845a5cbfabaac69eb2ab4e486831899501bc97`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

@@ -9,7 +9,22 @@ public enum ItemTypeValidation {
             throw DatabaseError.invalidItemType("An item type must have at least one template.")
         }
 
-        let fieldIDs = Set(itemType.fields.map(\.id))
+        var ids = Set(itemType.fields.map(\.id))
+        var listNames: Set<String> = []
+        for list in itemType.lists {
+            let name = list.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, listNames.insert(name.lowercased()).inserted, ids.insert(list.id).inserted else {
+                throw DatabaseError.invalidItemType("Lists need unique names and IDs.")
+            }
+            try validateFields(list.columns)
+            for column in list.columns {
+                guard ids.insert(column.id).inserted,
+                      [.text, .richText, .number, .checkbox, .cloze].contains(column.type) else {
+                    throw DatabaseError.invalidItemType("List columns need unique IDs and a supported field type.")
+                }
+            }
+            if let rows = list.sharedRows { try ItemStore.validateRows(rows, in: list) }
+        }
 
         for template in itemType.templates {
             let trimmedName = template.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -17,21 +32,34 @@ public enum ItemTypeValidation {
                 throw DatabaseError.invalidItemType("Every template needs a name.")
             }
 
+            let listIDs = template.cardCreation?.listIDs ?? []
+            let selected = itemType.lists.filter { listIDs.contains($0.id) }
+            guard selected.count == listIDs.count, Set(listIDs).count == listIDs.count else {
+                throw DatabaseError.invalidItemType("Card creation needs distinct lists from this item type.")
+            }
+            let fieldIDs = Set(itemType.fields.map(\.id) + selected.flatMap { $0.columns.map(\.id) })
+            for id in template.cardCreation?.checkedFieldIDs ?? []
+                where !fieldIDs.contains(id) || itemType.sourceField(id)?.type != .checkbox {
+                throw DatabaseError.invalidItemType("Checked filters need a checkbox from the item or a selected list.")
+            }
             for fieldID in fieldIDsReferenced(by: template) where !fieldIDs.contains(fieldID) {
                 throw DatabaseError.invalidItemType(
                     "Template \"\(template.name)\" references an unknown field."
                 )
             }
+            if template.promptFormat != .standard, ![.onYourOwn, .type].contains(template.response) {
+                throw DatabaseError.invalidItemType("A Cloze or Image Occlusion prompt can use On your own or Type an answer.")
+            }
             try validateComposition(template, in: itemType)
             try validateMediaBehaviors(template, in: itemType)
 
-            if template.interaction == .audioSubmission {
+            if template.response == .audioSubmission {
                 try validateAudioSubmissionTemplate(template)
             }
 
             if template.interaction == .imageOcclusion {
                 let fields = Set(template.components.filter { $0.purpose == .question }.compactMap { component -> UUID? in
-                    guard case let .field(id) = component.source, itemType.field(id)?.type == .imageOcclusion else { return nil }
+                    guard case let .field(id) = component.source, itemType.sourceField(id)?.type == .imageOcclusion else { return nil }
                     return id
                 })
                 guard fields.count == 1 else { throw DatabaseError.invalidItemType("Image Occlusion needs exactly one occlusion question field.") }
@@ -65,7 +93,7 @@ public enum ItemTypeValidation {
             let kind: MediaKind?
             switch component.source {
             case let .field(id):
-                kind = itemType.field(id)?.type.mediaKind
+                kind = itemType.sourceField(id)?.type.mediaKind
             case .literal:
                 kind = nil
             }
@@ -87,7 +115,8 @@ public enum ItemTypeValidation {
         guard template.components.contains(where: { $0.purpose == .question }) else {
             throw DatabaseError.invalidItemType("Every template needs a question component.")
         }
-        if template.interaction != .audioSubmission, template.interaction != .imageOcclusion,
+        if template.response != .audioSubmission, template.interaction != .imageOcclusion,
+           !(template.promptFormat == .cloze && template.response == .type),
            !template.components.contains(where: { $0.purpose == .expectedAnswer }) {
             throw DatabaseError.invalidItemType("Every graded template needs an expected answer component.")
         }
@@ -115,7 +144,7 @@ public enum ItemTypeValidation {
 
     private static func isVisual(_ component: TemplateComponent, in itemType: ItemType) -> Bool {
         guard case let .field(id) = component.source,
-              let kind = itemType.field(id)?.type.mediaKind else { return false }
+              let kind = itemType.sourceField(id)?.type.mediaKind else { return false }
         return kind == .image || kind == .gif || kind == .video
     }
 
@@ -124,7 +153,7 @@ public enum ItemTypeValidation {
             guard component.purpose == .question,
                   case let .field(id) = component.source else { return nil }
             return id
-        }).compactMap(itemType.field).filter { $0.type == .cloze }
+        }).compactMap(itemType.sourceField).filter { $0.type == .cloze }
         guard clozeFields.count == 1 else {
             throw DatabaseError.invalidItemType(
                 "Cloze templates must use exactly one cloze question component."
@@ -244,7 +273,7 @@ public enum TemplateBuilder {
 
     private static func modality(for fieldType: FieldType) -> Modality {
         switch fieldType {
-        case .text, .richText, .number, .cloze, .studyExercise:
+        case .text, .richText, .number, .cloze, .studyExercise, .checkbox:
             return .text
         case .audio:
             return .audio

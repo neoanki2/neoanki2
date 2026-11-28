@@ -68,7 +68,9 @@ struct ContentValueView: View {
                     isAnswerRevealed: isAnswerRevealed,
                     group: clozeGroup
                 )
-            case .empty:
+            case let .checkbox(checked):
+                Text(checked ? "Checked" : "Unchecked")
+            case .rows, .empty:
                 EmptyView()
             }
         }

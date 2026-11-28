@@ -21,11 +21,25 @@ public struct Arrangement: Sendable, Equatable {
 /// Platform-neutral study rules shared by macOS, iPhone, and iPad.
 public enum StudyResponseEvaluator {
     public static func acceptedAnswers(for card: DueCard) -> [String] {
-        let values = SideContent.values(
-            for: .expectedAnswer,
-            in: card.template,
-            from: card.item
-        )
+        if card.template.responseOverride == .type {
+            for component in card.studyComponents where component.purpose == .question {
+                switch component.value {
+                case let .cloze(text, blanks):
+                    guard let group = card.card.clozeGroup else { continue }
+                    let answers = ClozeValidation.sanitize(text: text, blanks: blanks)
+                        .filter { $0.group == group }
+                        .map { String(text.dropFirst($0.start).prefix($0.length)) }
+                    if !answers.isEmpty { return [answers.joined(separator: " ")] }
+                case let .imageOcclusion(content):
+                    if let group = card.card.occlusionGroup {
+                        let answer = content.revealedAnswerText(group: group, revealed: true)
+                        if !answer.isEmpty { return [answer] }
+                    }
+                default: break
+                }
+            }
+        }
+        let values = card.studyComponents.filter { $0.purpose == .expectedAnswer }.map(\.value)
         let answers = values.flatMap(textRepresentations)
             .map(trimmed)
             .filter { !$0.isEmpty }
@@ -34,6 +48,7 @@ public enum StudyResponseEvaluator {
     }
 
     public static func evaluate(_ response: String, for card: DueCard) -> AnswerEvaluation {
+        if VocabularySet.supportsTypedResponse(card) { return VocabularySet.check(response, for: card) }
         let answers = acceptedAnswers(for: card)
         guard !answers.isEmpty else { return .unavailable }
         let normalizedResponse = normalized(response)
@@ -42,7 +57,7 @@ public enum StudyResponseEvaluator {
     }
 
     public static func hasReferenceAudio(for card: DueCard) -> Bool {
-        SideContent.values(for: .expectedAnswer, in: card.template, from: card.item).contains { value in
+        SideContent.values(for: .expectedAnswer, in: card.template, from: card.studyItem).contains { value in
             guard case let .media(reference) = value else { return false }
             return reference.kind == .audio
         }
@@ -50,8 +65,8 @@ public enum StudyResponseEvaluator {
 
     public static func choiceOptions(for card: DueCard, maximum: Int = 4) -> [String] {
         guard let correct = acceptedAnswers(for: card).first else { return [] }
-        let available = card.item.fields.flatMap { textRepresentations($0.value) }
-            + SideContent.values(for: .question, in: card.template, from: card.item)
+        let available = card.studyItem.fields.flatMap { textRepresentations($0.value) }
+            + SideContent.values(for: .question, in: card.template, from: card.studyItem)
                 .flatMap(textRepresentations)
         var options = unique([correct] + available.map(trimmed).filter {
             !$0.isEmpty && normalized($0) != normalized(correct)
@@ -100,7 +115,8 @@ public enum StudyResponseEvaluator {
         case let .studyExercise(exercise): [exercise.stimulus]
         case let .number(number): [number.formatted(.number.grouping(.never))]
         case let .media(reference): reference.altText.map { [$0] } ?? []
-        case .empty: []
+        case let .checkbox(value): [value ? "Yes" : "No"]
+        case .empty, .rows: []
         }
     }
 

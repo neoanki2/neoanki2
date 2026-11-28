@@ -41,6 +41,7 @@ import Testing
             case .text: value = .text("Який міст?", lang: "uk")
             case .richText: value = .rich([Span("міст Метро", styles: [.bold], textSize: .small), Span(" Source", link: "https://example.com")])
             case .number: value = .number(42.5)
+            case .checkbox: value = .checkbox(true)
             case .cloze: value = .cloze("Alpha Beta", blanks: [.init(group: 4, start: 6, length: 4, hint: "Answer")])
             case .imageOcclusion: value = .imageOcclusion(.init(image: imageRef, masks: [.init(group: 1, rect: .init(x: 0.1, y: 0.1, width: 0.2, height: 0.2), answerText: "Bridge")], nextGroup: 2))
             case .studyExercise:
@@ -71,6 +72,9 @@ import Testing
                 let spans = [Span("Corrected", styles: [.italic], textColor: .blue)]
                 snapshot.fieldSpans[field.id] = spans
                 expected.fields[index].value = .rich(spans)
+            case .checkbox:
+                snapshot.fieldText[field.id] = "false"
+                expected.fields[index].value = .checkbox(false)
             case .number:
                 snapshot.fieldText[field.id] = "-7.5"
                 expected.fields[index].value = .number(-7.5)

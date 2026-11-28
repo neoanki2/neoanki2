@@ -41,7 +41,7 @@ legacy style pairs are normalized during import.
 For a Study Exercise field, provide a `studyExercise` object. The validator
 checks that the exercise has valid prompts, answers, and options for its kind.
 
-For new bundles, use manifest version 6. The root deck must provide a
+For new bundles, use manifest version 7. The root deck must provide a
 non-empty `itemTypes` array; add `defaultType` when one choice should be
 recommended. Descendants inherit the nearest declaration unless they provide
 their own non-empty array.

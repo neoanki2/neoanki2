@@ -74,6 +74,11 @@ file with a header row can also set `judgment`, `sense`, and `lemma` columns.
 After importing, choose **Undo** to reverse the whole import. **Export Word
 List…** saves the selected language as a CSV file you can import again.
 
+For Vocabulary Sets with examples, **Add Word** can create a set or append to
+a matching set in the same deck. Choose Recognition, Cloze, or both for the
+example. Edit its **Examples** list to update the sentence or its card choices.
+Each generated card retains its schedule when its row and blank group are kept.
+
 ## Add an item
 
 1. Select the destination deck if you want the new item preassigned there.
