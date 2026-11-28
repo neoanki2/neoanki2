@@ -73,6 +73,8 @@ Select text and use the formatting toolbar:
 - **Add Link** and **Remove Link**
 - **Clear Formatting**
 
+Formatting travels with rich text when you sync or export a deck.
+
 Clicking an active style removes it. Highlight and Code are mutually exclusive
 when applied through the toolbar, as are Superscript and Subscript. Colors are
 derived from the adaptive macOS system palette and contrast-adjusted for

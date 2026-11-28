@@ -29,6 +29,9 @@ app's interface.
 
 **Add Word → Create Cards** makes one Vocabulary Set item with a meaning-recall
 card and a Cloze card. Existing Context Example items are editable in the item editor.
+Japanese Academy recognition cards in Vocabulary Sets keep their course prompts,
+audio, and illustrations. They contribute to Japanese Known Words through the
+same review rules as other recognition cards.
 
 Open **Item Types** on Mac, or **Create → Item Types & Card Setups** on iPhone
 and iPad. The Item Type Studio edits fields and Card setups together and saves

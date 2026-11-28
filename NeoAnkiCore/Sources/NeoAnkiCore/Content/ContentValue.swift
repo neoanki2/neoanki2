@@ -92,7 +92,7 @@ public struct Span: Codable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(text, forKey: .text)
-        try container.encode(Self.normalized(styles), forKey: .styles)
+        try container.encode(Self.normalized(styles).sorted { $0.rawValue < $1.rawValue }, forKey: .styles)
         try container.encodeIfPresent(textColor, forKey: .textColor)
         try container.encodeIfPresent(textSize, forKey: .textSize)
         try container.encodeIfPresent(link, forKey: .link)

@@ -13,6 +13,9 @@ public struct StudyCardRelation: Equatable, Sendable {
     }
 
     public static func family(for item: Item) -> String {
+        // Course entries belong to their individual lesson track, even when the
+        // same word appears in several lessons and contributes one Known Words term.
+        if VocabularySet.hasCourseExample(in: item) { return "item:\(item.id.uuidString)" }
         if let term = VocabularySet.term(in: item) { return "vocabulary:\(term.id)" }
         struct Envelope: Decodable {
             struct Target: Decodable { var language: String; var expression: String }

@@ -198,6 +198,8 @@ extension ItemStore {
 
         var typeMap: [UUID: ItemType] = [:]
         var createdTypes: [ItemType] = []
+        var expandedVocabularyPreset: ItemType?
+        var expectedVocabularyPreset: ItemType?
         var reusedCount = 0
         for record in package.types {
             // Recompute instead of trusting the package's claimed digest.
@@ -213,6 +215,19 @@ extension ItemStore {
                    $0.id == exactMapping.localTypeID && existingDigests[$0.id] == record.digest
                }) {
                 typeMap[record.itemType.id] = existing
+                reusedCount += 1
+                continue
+            }
+            // The extended preset adds only optional fields and one setup that
+            // requires a course sentence. Neither schema changes existing cards.
+            let source = record.itemType
+            if let existing = existingTypes.first(where: { $0.id == source.id }),
+               VocabularySet.supportsDefinition(existing), VocabularySet.supportsDefinition(source),
+               existing != source, existing == VocabularySet.itemType || source == VocabularySet.itemType {
+                let expanded = source == VocabularySet.itemType ? existing : source
+                if expanded != existing { expandedVocabularyPreset = expanded }
+                expectedVocabularyPreset = existing
+                typeMap[source.id] = expanded
                 reusedCount += 1
                 continue
             }
@@ -262,8 +277,7 @@ extension ItemStore {
             } else {
                 // The Vocabulary Set preset's IDs connect imported examples to
                 // Known Words and its typed answer evaluator.
-                let source = record.itemType
-                let isVocabularyPreset = source == VocabularySet.itemType || source == VocabularySet.legacyItemType
+                let isVocabularyPreset = VocabularySet.supportsDefinition(source) || source == VocabularySet.legacyItemType
                 let canKeepPresetID = isVocabularyPreset && !existingTypes.contains { $0.id == source.id }
                 let created = canKeepPresetID ? source : source.duplicated(name: source.name)
                 typeMap[source.id] = created
@@ -433,9 +447,11 @@ extension ItemStore {
                     deckTypeSettings: package.deckTypeSettings.compactMap { value in
                         guard let deckID = deckMap[value.deckID] else { return nil }
                         return .init(deckID: deckID, inherits: value.inherits, itemTypeIDs: value.itemTypeIDs.compactMap { typeMap[$0]?.id }, defaultItemTypeID: value.defaultItemTypeID.flatMap { typeMap[$0]?.id })
-                    }
+                    },
+                    expectedItemTypes: expectedVocabularyPreset.map { [$0] } ?? []
                 ),
-                now: now, initialDueDates: initialDueDates, result: result
+                now: now, initialDueDates: initialDueDates, result: result,
+                expandedVocabularyPreset: expandedVocabularyPreset
             )
             // The import has committed; cleanup cannot turn it into a failed
             // operation and invite a duplicate import on retry.

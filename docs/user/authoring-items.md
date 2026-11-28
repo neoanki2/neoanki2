@@ -57,6 +57,9 @@ review schedules.
 Words can become **Known · From reviews** after spaced, successful meaning
 recall. **Cloze recall** reflects production separately. Known words from
 deleted card sets stay known and show **Kept from deleted cards**.
+Japanese Academy recognition cards saved as Vocabulary Sets contribute to
+**Japanese**. Unlearned course words start in **Learning**, and successful
+spaced reviews can move them to **Known**.
 
 Choose **Known**, **Learning**, **Not known**, or **Ignored** above the list to
 see each group. Open a word's actions to correct it: **I Know This**, **Remove

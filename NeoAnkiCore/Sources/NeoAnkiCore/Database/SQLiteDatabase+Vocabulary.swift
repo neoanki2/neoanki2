@@ -101,7 +101,6 @@ extension SQLiteDatabase {
     }
 
     func insertVocabularySet(_ item: Item, legacy: Item?, now: Date) throws {
-        let type = VocabularySet.itemType
         try inTransaction(recordNativeCommand: true, affectedCount: 1) {
             if let existing = try fetchItem(id: item.id) {
                 guard existing.item == item || existing.item == legacy else { throw VocabularySetError.idConflict }
@@ -110,23 +109,29 @@ extension SQLiteDatabase {
             if let deckID = item.deckID, try fetchDeck(id: deckID) == nil {
                 throw DatabaseError.deckNotFound(deckID)
             }
-            if let existing = try fetchItemType(id: type.id) {
-                guard existing == type else { throw VocabularySetError.changedPreset }
-            } else {
-                try ItemTypeValidation.validate(type)
-                try createScopedType(type, deckID: nil, shared: false)
-            }
+            let type = try vocabularySetType()
             let cards = CardGenerator.cards(for: item, type: type, now: now, deterministicIDs: true)
             try insertItemWithCards(item, cards: cards, createdAt: now, updatedAt: now)
             for card in cards { _ = try ensureSchedulerCardHistory(cardID: card.id, now: now) }
         }
     }
 
+    private func vocabularySetType() throws -> ItemType {
+        let preset = VocabularySet.itemType
+        if let existing = try fetchItemType(id: preset.id) {
+            guard VocabularySet.supportsDefinition(existing) else { throw VocabularySetError.changedPreset }
+            return existing
+        }
+        try ItemTypeValidation.validate(preset)
+        try createScopedType(preset, deckID: nil, shared: false)
+        return preset
+    }
+
     func matchingVocabularySets(_ candidate: Item) throws -> [VocabularySetMatch] {
         try fetchItems(itemTypeID: VocabularySet.typeID).compactMap { record in
             guard VocabularySet.matches(record.item, candidate) else { return nil }
             let rows = VocabularySet.examples.rows(in: record.item)
-            let label = rows.first?.values.first.map { ItemDisplay.plainText(from: $0.value) } ?? ""
+            let label = VocabularySet.firstExampleLabel(in: record.item)
             return VocabularySetMatch(id: record.item.id, exampleCount: rows.count, firstExample: label)
         }
     }
@@ -136,8 +141,7 @@ extension SQLiteDatabase {
             guard var target = try fetchItem(id: itemID)?.item,
                   target.itemTypeID == VocabularySet.typeID, VocabularySet.matches(target, candidate),
                   let row = VocabularySet.examples.rows(in: candidate).first else { throw VocabularySetError.idConflict }
-            let type = VocabularySet.itemType
-            guard try fetchItemType(id: type.id) == type else { throw VocabularySetError.changedPreset }
+            let type = try vocabularySetType()
             var rows = VocabularySet.examples.rows(in: target)
             if let existing = rows.first(where: { $0.id == row.id }) {
                 guard existing == row else { throw VocabularySetError.idConflict }
@@ -155,8 +159,8 @@ extension SQLiteDatabase {
 
     func vocabularyReview(_ log: ReviewLog) throws -> ReviewLog {
         guard let card = try fetchCard(id: log.cardID),
-              VocabularySet.isReading(card.templateID) || VocabularySet.isProduction(card.templateID),
               let item = try fetchItem(id: card.itemID)?.item,
+              VocabularySet.supportedItemTypeIDs.contains(item.itemTypeID),
               let type = try fetchValidatedItemType(id: item.itemTypeID),
               let fingerprint = VocabularySet.prompt(for: card, item: item, type: type) else { return log }
         return log.withVocabularyPrompt(fingerprint)
@@ -255,7 +259,12 @@ extension SQLiteDatabase {
         }
         let cardsByItem = Dictionary(grouping: try cardRows.map(decodeCard(from:)), by: \.itemID)
 
-        struct Candidate { let card: Card; let fingerprint: String; let evidence: Int }
+        struct Candidate {
+            let card: Card
+            let fingerprint: String
+            let importedPrompt: String?
+            let evidence: Int
+        }
         var evidence: [VocabularyEvidence] = []
         var candidates: [Candidate] = []
         for item in items {
@@ -266,7 +275,9 @@ extension SQLiteDatabase {
                 if !card.isSuspended { row.hasCards = true }
                 guard card.memory.phase == .review, card.memory.stability.isFinite,
                       card.memory.stability >= CardMaturityStatus.maintainingStabilityDays else { continue }
-                candidates.append(.init(card: card, fingerprint: fingerprint, evidence: evidence.count))
+                candidates.append(.init(card: card, fingerprint: fingerprint,
+                                        importedPrompt: VocabularySet.importedPrompt(for: card, item: item, type: type),
+                                        evidence: evidence.count))
             }
             evidence.append(row)
         }
@@ -274,10 +285,15 @@ extension SQLiteDatabase {
         for candidate in candidates {
             var card = candidate.card
             card.isSuspended = false
-            let current = (logs[card.id] ?? []).reversed().prefix { $0.vocabularyPrompt == candidate.fingerprint }
+            let current = (logs[card.id] ?? []).reversed().prefix {
+                ($0.vocabularyPrompt ?? candidate.importedPrompt) == candidate.fingerprint
+            }
             guard CardMaturityStatus.evaluate(card: card, reviews: Array(current)) == .maintaining else { continue }
-            if VocabularySet.isReading(card.templateID) { evidence[candidate.evidence].readingMature = true }
-            if VocabularySet.isProduction(card.templateID) { evidence[candidate.evidence].clozeMature = true }
+            if VocabularySet.isProduction(card.templateID) {
+                evidence[candidate.evidence].clozeMature = true
+            } else {
+                evidence[candidate.evidence].readingMature = true
+            }
         }
         return evidence
     }
